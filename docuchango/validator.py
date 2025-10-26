@@ -78,9 +78,16 @@ class Document:
     doc_uuid: str = ""  # Frontmatter doc_uuid field (UUID v4)
     links: list["Link"] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    _content_cache: str = ""  # Cached file content to avoid multiple reads
 
     def __hash__(self):
         return hash(str(self.file_path))
+
+    def get_content(self) -> str:
+        """Get file content, using cache if available"""
+        if not self._content_cache:
+            self._content_cache = self.file_path.read_text(encoding="utf-8")
+        return self._content_cache
 
 
 @dataclass
@@ -148,7 +155,7 @@ class DocValidator:
         # Scan ADRs
         adr_dir = self.repo_root / "docs-cms" / "adr"
         if adr_dir.exists():
-            for md_file in sorted(adr_dir.glob("*.md")):
+            for md_file in adr_dir.glob("*.md"):
                 # Skip README and index files (landing pages)
                 if md_file.name in ["README.md", "index.md"]:
                     continue
@@ -175,7 +182,7 @@ class DocValidator:
         # Scan RFCs
         rfc_dir = self.repo_root / "docs-cms" / "rfcs"
         if rfc_dir.exists():
-            for md_file in sorted(rfc_dir.glob("*.md")):
+            for md_file in rfc_dir.glob("*.md"):
                 # Skip index files and validate filename format
                 if md_file.name in ["README.md", "index.md"]:
                     continue
@@ -202,7 +209,7 @@ class DocValidator:
         # Scan MEMOs
         memo_dir = self.repo_root / "docs-cms" / "memos"
         if memo_dir.exists():
-            for md_file in sorted(memo_dir.glob("*.md")):
+            for md_file in memo_dir.glob("*.md"):
                 # Skip index files and validate filename format
                 if md_file.name in ["README.md", "index.md"]:
                     continue
@@ -245,13 +252,16 @@ class DocValidator:
     def _parse_document_enhanced(self, file_path: Path, doc_type: str) -> Optional[Document]:
         """Parse document with python-frontmatter and pydantic validation"""
         try:
-            # Parse frontmatter
-            post = frontmatter.load(file_path)
+            # Read file content once and cache it
+            content = file_path.read_text(encoding="utf-8")
+
+            # Parse frontmatter from content
+            post = frontmatter.loads(content)
 
             if not post.metadata:
                 error = "Missing YAML frontmatter"
                 self.log(f"   ✗ {file_path.name}: {error}")
-                doc = Document(file_path=file_path, doc_type=doc_type, title="Unknown")
+                doc = Document(file_path=file_path, doc_type=doc_type, title="Unknown", _content_cache=content)
                 doc.errors.append(error)
                 return doc
 
@@ -277,6 +287,7 @@ class DocValidator:
                     date=str(post.metadata.get("date", post.metadata.get("created", ""))),
                     tags=post.metadata.get("tags", []),
                     doc_id=post.metadata.get("id", ""),
+                    _content_cache=content,
                 )
 
                 for error in e.errors():  # type: ignore[assignment]
@@ -305,6 +316,7 @@ class DocValidator:
                 tags=post.metadata.get("tags", []),
                 doc_id=post.metadata.get("id", ""),
                 doc_uuid=post.metadata.get("doc_uuid", ""),
+                _content_cache=content,
             )
 
             self.log(f"   ✓ {file_path.name}: {doc.title}")
@@ -320,18 +332,18 @@ class DocValidator:
         self.log("\n🔗 Extracting links...")
 
         for doc in self.documents:
-            links = self._extract_links_from_file(doc.file_path)
+            links = self._extract_links_from_doc(doc)
             doc.links = links
             self.all_links.extend(links)
 
         self.log(f"   Found {len(self.all_links)} total links")
 
-    def _extract_links_from_file(self, file_path: Path) -> list[Link]:
-        """Extract markdown links from a file"""
+    def _extract_links_from_doc(self, doc: Document) -> list[Link]:
+        """Extract markdown links from a document using cached content"""
         links = []
 
         try:
-            content = file_path.read_text(encoding="utf-8")
+            content = doc.get_content()
             lines = content.split("\n")
 
             in_code_fence = False
@@ -357,13 +369,13 @@ class DocValidator:
                     if link_target.startswith(("mailto:", "data:")):
                         continue
 
-                    link_type = self._classify_link(link_target, file_path)
+                    link_type = self._classify_link(link_target, doc.file_path)
 
-                    link = Link(source_doc=file_path, target=link_target, line_number=line_num, link_type=link_type)
+                    link = Link(source_doc=doc.file_path, target=link_target, line_number=line_num, link_type=link_type)
                     links.append(link)
 
         except Exception as e:
-            self.errors.append(f"Error extracting links from {file_path}: {e}")
+            self.errors.append(f"Error extracting links from {doc.file_path}: {e}")
 
         return links
 
@@ -538,7 +550,7 @@ class DocValidator:
 
         for doc in self.documents:
             try:
-                content = doc.file_path.read_text(encoding="utf-8")
+                content = doc.get_content()
                 lines = content.split("\n")
 
                 in_code_fence = False
@@ -578,7 +590,7 @@ class DocValidator:
 
         for doc in self.documents:
             try:
-                content = doc.file_path.read_text(encoding="utf-8")
+                content = doc.get_content()
                 matches = list(cross_plugin_pattern.finditer(content))
 
                 if matches:
@@ -729,7 +741,7 @@ class DocValidator:
 
         for doc in self.documents:
             try:
-                content = doc.file_path.read_text(encoding="utf-8")
+                content = doc.get_content()
                 lines = content.split("\n")
 
                 in_code_block = False
@@ -870,7 +882,7 @@ class DocValidator:
 
         for doc in self.documents:
             try:
-                content = doc.file_path.read_text(encoding="utf-8")
+                content = doc.get_content()
                 lines = content.split("\n")
 
                 # Check for trailing whitespace
