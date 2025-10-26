@@ -85,9 +85,8 @@ def test_cli_help():
         if result.exit_code == 0:
             print("✓ CLI help command works")
             return True
-        else:
-            print(f"✗ CLI help failed with exit code {result.exit_code}")
-            return False
+        print(f"✗ CLI help failed with exit code {result.exit_code}")
+        return False
     except Exception as e:
         print(f"✗ CLI test failed: {e}")
         return False

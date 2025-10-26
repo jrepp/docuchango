@@ -118,16 +118,30 @@ select = [
     "B",   # flake8-bugbear
     "C4",  # flake8-comprehensions
     "UP",  # pyupgrade
+    "N",   # pep8-naming
+    "S",   # flake8-bandit security
+    "A",   # flake8-builtins
+    "SIM", # flake8-simplify
+    "RET", # flake8-return
+    "ARG", # flake8-unused-arguments
+    "PTH", # flake8-use-pathlib
 ]
 ignore = [
     "E501",  # line too long (handled by formatter)
     "B008",  # do not perform function calls in argument defaults
     "C901",  # too complex
+    "S603",  # subprocess without shell=True
+    "S607",  # starting process with partial path
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
-"tests/**/*" = ["B011"]
+"tests/**/*" = ["B011", "S101", "ARG001"]
+"test_install.py" = ["RET505"]
+"docuchango/cli.py" = ["ARG001"]
+"docuchango/fixes/*" = ["RET505"]
+"docuchango/testing/*" = ["S311", "S107", "S110", "SIM105"]
+"docuchango/validator.py" = ["PTH123"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["docuchango"]
@@ -140,16 +154,23 @@ line-ending = "auto"
 
 [tool.mypy]
 python_version = "3.10"
-warn_return_any = false
+strict = true
+warn_return_any = true
 warn_unused_configs = true
-check_untyped_defs = true
-no_implicit_optional = true
 warn_redundant_casts = true
-warn_unused_ignores = false
+warn_unused_ignores = true
 warn_no_return = true
 warn_unreachable = true
 strict_equality = true
 show_error_codes = true
+disallow_any_generics = true
+disallow_subclassing_any = true
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
 # Exclude non-core modules from strict checking
 exclude = [
     "docuchango/fixes/.*",
@@ -171,4 +192,12 @@ ignore_missing_imports = true
 module = "tests.*"
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
-disable_error_code = ["call-arg", "arg-type"]
+disallow_untyped_calls = false
+disable_error_code = ["call-arg", "arg-type", "no-untyped-call"]
+
+[[tool.mypy.overrides]]
+module = ["docuchango.validator", "docuchango.cli"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_calls = false
+disable_error_code = ["no-untyped-call", "no-untyped-def", "no-any-return"]

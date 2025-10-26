@@ -65,9 +65,8 @@ def fix_migration_file(filepath: Path) -> bool:
         filepath.write_text(content)
         print(f"  ✓ Fixed {filepath.name}")
         return True
-    else:
-        print(f"  - No changes needed for {filepath.name}")
-        return False
+    print(f"  - No changes needed for {filepath.name}")
+    return False
 
 
 def main():

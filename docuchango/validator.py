@@ -29,7 +29,7 @@ import sys
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 try:
     import frontmatter
@@ -121,7 +121,7 @@ class DocValidator:
         # Load project configuration
         self.project_config = self._load_project_config()
 
-    def _load_project_config(self) -> dict:
+    def _load_project_config(self) -> dict[str, Any]:
         """Load docs-project.yaml configuration"""
         config_path = self.repo_root / "docs-cms" / "docs-project.yaml"
         if config_path.exists():
@@ -614,7 +614,7 @@ class DocValidator:
             self.log("   ⚠️  Docusaurus directory not found, skipping typecheck")
             return True
 
-        original_dir = os.getcwd()
+        original_dir = Path.cwd()
         try:
             os.chdir(docusaurus_dir)
 
@@ -662,7 +662,7 @@ class DocValidator:
             self.log("   ⚠️  Docusaurus directory not found, skipping build check")
             return True
 
-        original_dir = os.getcwd()
+        original_dir = Path.cwd()
         try:
             os.chdir(docusaurus_dir)
 
