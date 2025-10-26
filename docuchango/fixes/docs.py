@@ -67,24 +67,31 @@ def fix_blank_lines_before_fences(file_path: Path) -> int:
     """Add blank line before code fences when missing."""
     content = file_path.read_text()
     lines = content.splitlines(keepends=True)
-    
+
     new_lines = []
     changes = 0
-    
+    in_code_block = False
+
     for i, line in enumerate(lines):
-        # Check if this line starts a code fence
-        if line.strip().startswith('```'):
-            # Check if previous line is not blank and not in frontmatter
-            if i > 0 and new_lines and new_lines[-1].strip() != '' and not new_lines[-1].strip() == '---':
+        stripped = line.strip()
+
+        # Check if this line starts a code fence (opening fence only)
+        if stripped.startswith('```') and not in_code_block:
+            # Check if previous line is not blank and not closing frontmatter delimiter
+            if new_lines and new_lines[-1].strip() != '' and new_lines[-1].strip() != '---':
                 # Add blank line before fence
                 new_lines.append('\n')
                 changes += 1
-        
+            in_code_block = True
+        elif stripped.startswith('```') and in_code_block:
+            # Closing fence
+            in_code_block = False
+
         new_lines.append(line)
-    
+
     if changes > 0:
         file_path.write_text(''.join(new_lines))
-    
+
     return changes
 
 def add_missing_frontmatter_fields(file_path: Path) -> int:
