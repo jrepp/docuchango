@@ -1,45 +1,112 @@
 # Docuchango
 
-Docusaurus validation and repair framework for opinionated micro-CMS documentation, designed for human-agent collaboration workflows.
+Validate and fix Docusaurus documentation. Checks frontmatter, links, code blocks, and formatting.
+
+## Quick Start
+
+```bash
+# Install
+pip install docuchango
+
+# Validate
+docuchango validate
+
+# Fix issues
+docuchango fix all
+```
+
+## Example Usage
+
+```bash
+# Run validation
+$ docuchango validate --verbose
+
+📂 Scanning documents...
+   Found 23 documents
+
+✓ Validating links...
+   Found 47 total links
+
+❌ DOCUMENTS WITH ERRORS (2):
+   adr/adr-001.md:
+   ✗ Missing field: 'deciders'
+   ✗ Invalid status: 'Draft'
+
+# Fix automatically
+$ docuchango fix all
+   ✓ Fixed 12 code blocks
+   ✓ Removed trailing whitespace
+   ✓ Added missing frontmatter
+```
+
+## Document Structure
+
+```text
+docs-cms/
+├── adr/              # Architecture Decision Records
+│   ├── adr-001-*.md
+│   └── adr-002-*.md
+├── rfcs/             # Request for Comments
+│   └── rfc-001-*.md
+├── memos/            # Technical memos
+│   └── memo-001-*.md
+└── prd/              # Product requirements
+    └── prd-001-*.md
+```
+
+Each doc needs frontmatter:
+```yaml
+---
+id: "adr-001"
+title: "Use Click for CLI"
+status: Accepted
+date: 2025-01-26
+deciders: Engineering Team
+tags: ["cli", "framework"]
+project_id: "my-project"
+doc_uuid: "..."
+---
+```
 
 ## Features
 
-- **Validation**: Frontmatter (Pydantic schemas), links, formatting, code blocks, MDX compatibility
-- **Automated Fixes**: Broken links, code blocks, frontmatter, MDX syntax
-- **Testing Framework**: CLI runners, assertions, Docker utilities, health checks
+- **Validates** frontmatter (required fields, valid formats)
+- **Checks links** (internal, relative, broken refs)
+- **Fixes automatically** (whitespace, code blocks, frontmatter)
+- **Fast** (100 docs in < 1s)
+- **CI-ready** (exit codes, clear errors)
 
-## Installation
-
-```bash
-pip install docuchango
-# or
-uv pip install docuchango
-```
-
-## Usage
-
-### CLI
+## Commands
 
 ```bash
-# Validate
-docuchango validate --repo-root /path/to/repo --verbose
-dcc-validate --verbose
+# Validate everything
+docuchango validate
 
-# Fix
-docuchango fix all --repo-root /path/to/repo
-dcc-fix links
+# Validate with verbose output
+docuchango validate --verbose
 
-# Test
-docuchango test health --url http://localhost:8080
+# Skip slow build checks
+docuchango validate --skip-build
+
+# Fix all issues
+docuchango fix all
+
+# Fix specific issues
+docuchango fix code-blocks
+docuchango fix links
+
+# CLI shortcuts
+dcc-validate        # Same as docuchango validate
+dcc-fix            # Same as docuchango fix
 ```
 
-### Python API
+## Python API
 
 ```python
 from docuchango.validator import DocValidator
-from docuchango.schemas import ADRFrontmatter, RFCFrontmatter
+from docuchango.schemas import ADRFrontmatter
 
-# Validate documents
+# Validate
 validator = DocValidator(repo_root=".", verbose=True)
 validator.scan_documents()
 validator.check_code_blocks()
@@ -48,21 +115,6 @@ validator.check_formatting()
 # Use schemas
 adr = ADRFrontmatter(**frontmatter_data)
 ```
-
-## Documentation Schemas
-
-### ADR (Architecture Decision Record)
-Required: `title`, `status`, `date`, `deciders`, `tags`, `id`, `project_id`, `doc_uuid`
-
-### RFC (Request for Comments)
-Required: `title`, `status`, `author`, `created`, `updated`, `tags`, `id`, `project_id`, `doc_uuid`
-
-### Memo
-Required: `title`, `author`, `created`, `updated`, `tags`, `id`, `project_id`, `doc_uuid`
-
-### Generic Documentation
-Required: `title`, `project_id`, `doc_uuid`
-Optional: `description`, `sidebar_position`, `tags`, `id`
 
 ## Development
 
@@ -75,41 +127,32 @@ pip install -e ".[dev]"
 pytest
 pytest --cov=docuchango
 
-# Quality
+# Lint
 ruff format .
 ruff check .
+mypy docuchango tests
 
 # Build
 uv build
 ```
 
-## Project Structure
+## Documentation
 
-```
-docuchango/
-├── docuchango/        # Main package
-│   ├── cli.py         # Click CLI
-│   ├── validator.py   # Validation logic
-│   ├── schemas.py     # Pydantic schemas
-│   ├── fixes/         # Fix modules (11)
-│   └── testing/       # Test framework (5)
-└── tests/             # Test suite with fixtures
-```
+- [Templates](templates/) - Starter files for ADR, RFC, Memo, PRD
+- [ADRs](docs-cms/adr/) - Architecture decisions
+- [RFCs](docs-cms/rfcs/) - Technical proposals
 
-## Dependencies
+## Requirements
 
-**Core**: python-frontmatter, pydantic, pyyaml, click, rich, grpcio, psycopg2-binary, docker
-
-**Dev**: pytest, pytest-cov, pytest-xdist, pytest-asyncio, pytest-timeout, ruff
+- Python 3.10+
+- Works on macOS, Linux, Windows
 
 ## License
 
-MIT License - See LICENSE file
+MIT - See LICENSE file
 
-## Author
+## Links
 
-Jacob Repp (jacobrepp@gmail.com)
-
-## Repository
-
-https://github.com/jrepp/docuchango
+- [GitHub](https://github.com/jrepp/docuchango)
+- [PyPI](https://pypi.org/project/docuchango)
+- [Issues](https://github.com/jrepp/docuchango/issues)
