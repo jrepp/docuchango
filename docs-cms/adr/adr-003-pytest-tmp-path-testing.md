@@ -6,7 +6,7 @@ date: 2025-01-26
 deciders: Engineering Team
 tags: ["pytest", "testing", "tmp-path", "filesystem"]
 project_id: "docuchango"
-doc_uuid: "c3d4e5f6-a7b8-4c7d-0e1f-2a3b4c5d6e7f"
+doc_uuid: "a04e65be-7296-4051-8a64-98cca8abcdb0"
 ---
 
 # ADR-003: Use pytest with tmp_path for Testing
@@ -37,6 +37,7 @@ def test_fix_trailing_whitespace(tmp_path):
 ```
 
 Create complex structures easily:
+
 ```python
 def test_validator(tmp_path):
     docs_root = tmp_path / "repo"

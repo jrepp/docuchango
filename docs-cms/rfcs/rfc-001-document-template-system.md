@@ -7,7 +7,7 @@ created: 2025-01-26
 updated: 2025-01-26
 tags: ["templates", "documentation", "standards"]
 project_id: "docuchango"
-doc_uuid: "d4e5f6a7-b8c9-4d8e-1f2a-3b4c5d6e7f8a"
+doc_uuid: "fe162317-3fa5-44b5-a1f3-1b2471d47548"
 ---
 
 # RFC-001: Document Template System
