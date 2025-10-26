@@ -1,6 +1,6 @@
 """Test suite for link validation functionality."""
 
-from docuchango.validator import LinkType, DocValidator
+from docuchango.validator import DocValidator, LinkType
 
 
 class TestLinkExtraction:
