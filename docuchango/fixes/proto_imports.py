@@ -17,7 +17,6 @@ Exit Codes:
 import re
 import sys
 from pathlib import Path
-from typing import List, Tuple
 
 try:
     from rich.console import Console
@@ -53,7 +52,7 @@ class ProtoImportFixer:
         self.proto_dir = proto_dir or Path("proto-public/go")
         self.hashicorp_dir = self.proto_dir / "hashicorp"
 
-    def find_pb_files(self) -> List[Path]:
+    def find_pb_files(self) -> list[Path]:
         """Find all .pb.go files in the hashicorp directory."""
         if not self.hashicorp_dir.exists():
             console.print(
@@ -64,7 +63,7 @@ class ProtoImportFixer:
 
         return list(self.hashicorp_dir.rglob("*.pb.go"))
 
-    def fix_file(self, file_path: Path) -> Tuple[bool, int]:
+    def fix_file(self, file_path: Path) -> tuple[bool, int]:
         """
         Fix imports in a single file.
 
@@ -125,8 +124,7 @@ class ProtoImportFixer:
 
         console.print("✅ Proto import paths fixed", style="bold green")
         console.print(
-            f"📊 Fixed imports in {modified_count} file(s) "
-            f"({total_replacements} total replacements)",
+            f"📊 Fixed imports in {modified_count} file(s) ({total_replacements} total replacements)",
             style="bold cyan",
         )
 

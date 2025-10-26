@@ -776,11 +776,13 @@ class PrismDocValidator:
                                 # Non-blank line immediately after closing fence
                                 error = f"Line {closing_fence_line}: Missing blank line after closing code fence (found content at line {line_num})"
                                 doc.errors.append(error)
-                                self.log(f"   ✗ {doc.file_path.name}:{closing_fence_line} - No blank line after closing fence")
+                                self.log(
+                                    f"   ✗ {doc.file_path.name}:{closing_fence_line} - No blank line after closing fence"
+                                )
                                 doc_invalid_blocks += 1
                                 total_invalid += 1
                             closing_fence_line = None  # Reset after check
-                        
+
                         # Track if this line is blank for next iteration
                         previous_line_blank = not stripped
                         continue
@@ -795,14 +797,14 @@ class PrismDocValidator:
                         content_start = (frontmatter_end_line + 1) if frontmatter_end_line else 1
                         is_after_frontmatter = frontmatter_end_line and line_num == frontmatter_end_line + 1
                         is_document_start = line_num == content_start
-                        
+
                         if not previous_line_blank and not is_after_frontmatter and not is_document_start:
                             error = f"Line {line_num}: Missing blank line before opening code fence"
                             doc.errors.append(error)
                             self.log(f"   ✗ {doc.file_path.name}:{line_num} - No blank line before opening fence")
                             doc_invalid_blocks += 1
                             total_invalid += 1
-                        
+
                         if not remainder:
                             # Bare opening fence - INVALID (must have language)
                             error = f"Line {line_num}: Opening code fence missing language (use ```text for plain text)"
@@ -819,7 +821,7 @@ class PrismDocValidator:
                             in_code_block = True
                             opening_line = line_num
                             opening_language = remainder.split()[0] if remainder else "<none>"
-                        
+
                         # Reset blank line tracking when entering code block
                         previous_line_blank = False
                     else:
@@ -1009,7 +1011,7 @@ class PrismDocValidator:
         total_docs = len(self.documents)
         docs_with_errors = sum(1 for d in self.documents if d.errors)
         total_links = len(self.all_links)
-        valid_links = sum(1 for l in self.all_links if l.is_valid)
+        valid_links = sum(1 for link in self.all_links if link.is_valid)
         broken_links = total_links - valid_links
 
         lines.append(f"\n📄 Documents scanned: {total_docs}")
@@ -1091,7 +1093,7 @@ class PrismDocValidator:
         else:
             lines.append("❌ FAILURE: Validation errors found")
             all_valid = False
-            
+
             # Add remediation help
             lines.append("")
             lines.append("🔧 REMEDIATION TOOLS:")
@@ -1107,9 +1109,9 @@ class PrismDocValidator:
             lines.append("  Manual fixes for:")
             lines.append("    • Broken links: Update file paths to match actual document slugs")
             lines.append("    • Missing files: Ensure referenced documents exist")
-            lines.append("    • UUID conflicts: Generate new UUIDs with 'uuidgen | tr \"[:upper:]\" \"[:lower:]\"'")
+            lines.append('    • UUID conflicts: Generate new UUIDs with \'uuidgen | tr "[:upper:]" "[:lower:]"\'')
             lines.append("")
-            
+
         lines.append("=" * 80 + "\n")
 
         return all_valid, "\n".join(lines)

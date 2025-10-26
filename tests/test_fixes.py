@@ -1,13 +1,10 @@
 """Test suite for fix functionality using temporary filesystem."""
 
-import pytest
-from pathlib import Path
-
 from docuchango.fixes.docs import (
-    fix_trailing_whitespace,
-    fix_code_fence_languages,
-    fix_blank_lines_before_fences,
     add_missing_frontmatter_fields,
+    fix_blank_lines_before_fences,
+    fix_code_fence_languages,
+    fix_trailing_whitespace,
 )
 
 
@@ -165,8 +162,8 @@ title: Test
         assert changes == 2  # project_id and doc_uuid
 
         result = test_file.read_text()
-        assert 'project_id:' in result
-        assert 'doc_uuid:' in result
+        assert "project_id:" in result
+        assert "doc_uuid:" in result
 
     def test_skip_file_without_frontmatter(self, tmp_path):
         """Test that files without frontmatter are skipped."""
@@ -224,7 +221,7 @@ more code
         test_file.write_text(content)
 
         # Apply all fixes
-        ws_changes = fix_trailing_whitespace(test_file)
+        fix_trailing_whitespace(test_file)
         lang_changes = fix_code_fence_languages(test_file)
         blank_changes = fix_blank_lines_before_fences(test_file)
         fm_changes = add_missing_frontmatter_fields(test_file)
@@ -287,5 +284,5 @@ More text
 
         # Should have minimal errors (only missing project_id/uuid are auto-fixable)
         # Frontmatter validation errors might still exist
-        format_errors = [e for e in all_errors if 'whitespace' in e.lower() or 'code block' in e.lower()]
+        format_errors = [e for e in all_errors if "whitespace" in e.lower() or "code block" in e.lower()]
         assert len(format_errors) == 0, f"Format errors remain after fix: {format_errors}"

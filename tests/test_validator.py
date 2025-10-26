@@ -1,7 +1,8 @@
 """Test suite for the Prism documentation validator."""
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 from docuchango.validator import PrismDocValidator
 
@@ -59,10 +60,12 @@ class TestMarkdownValidation:
             for doc in validator.documents:
                 all_errors.extend(doc.errors)
 
-            code_block_errors = [e for e in all_errors if 'code block' in e.lower() or 'fence' in e.lower()]
-            format_errors = [e for e in all_errors if 'whitespace' in e.lower()]
-            
-            assert len(code_block_errors) == 0, f"Fixture {fixture_file.name} has code block errors: {code_block_errors}"
+            code_block_errors = [e for e in all_errors if "code block" in e.lower() or "fence" in e.lower()]
+            format_errors = [e for e in all_errors if "whitespace" in e.lower()]
+
+            assert len(code_block_errors) == 0, (
+                f"Fixture {fixture_file.name} has code block errors: {code_block_errors}"
+            )
             assert len(format_errors) == 0, f"Fixture {fixture_file.name} has formatting errors: {format_errors}"
 
     def test_failing_fixtures(self, fixtures_dir, tmp_path):

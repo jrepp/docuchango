@@ -1,14 +1,15 @@
 """Test suite for Pydantic schema validation."""
 
-import pytest
 from datetime import date
+
+import pytest
 from pydantic import ValidationError
 
 from docuchango.schemas import (
     ADRFrontmatter,
-    RFCFrontmatter,
-    MemoFrontmatter,
     GenericDocFrontmatter,
+    MemoFrontmatter,
+    RFCFrontmatter,
 )
 
 

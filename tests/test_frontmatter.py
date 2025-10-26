@@ -1,8 +1,7 @@
 """Test suite for frontmatter validation edge cases."""
 
-import pytest
-from pathlib import Path
 import frontmatter
+import pytest
 
 from docuchango.validator import PrismDocValidator
 
@@ -137,9 +136,9 @@ doc_uuid: "not-a-valid-uuid"
         assert len(validator.documents) == 1
 
         # Verify Pydantic would catch this
-        from docuchango.schemas import RFCFrontmatter
         from pydantic import ValidationError
-        import frontmatter
+
+        from docuchango.schemas import RFCFrontmatter
 
         fm = frontmatter.load(doc_file)
         with pytest.raises(ValidationError) as exc_info:
@@ -175,9 +174,9 @@ doc_uuid: "5c345ed0-a7e3-4104-832b-c0c5d7f2848d"
         assert len(validator.documents) == 1
 
         # Verify Pydantic would catch this
-        from docuchango.schemas import MemoFrontmatter
         from pydantic import ValidationError
-        import frontmatter
+
+        from docuchango.schemas import MemoFrontmatter
 
         fm = frontmatter.load(doc_file)
         with pytest.raises(ValidationError) as exc_info:

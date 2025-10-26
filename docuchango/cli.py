@@ -6,7 +6,6 @@ Docusaurus validation and repair framework for opinionated micro-CMS documentati
 
 import sys
 from pathlib import Path
-from typing import Optional
 
 import click
 from rich.console import Console
@@ -95,6 +94,7 @@ def validate(
         console.print(f"[bold red]Error during validation: {e}[/bold red]")
         if verbose:
             import traceback
+
             traceback.print_exc()
         sys.exit(2)
 
@@ -115,7 +115,6 @@ def fix():
 @click.option("--dry-run", is_flag=True, help="Show what would be fixed without making changes")
 def fix_all(repo_root: Path, dry_run: bool):
     """Run all automatic fixes on documentation."""
-    from docuchango.fixes.docs import main as fix_docs_main
 
     console.print("[bold blue]🔧 Fixing Documentation Issues[/bold blue]\n")
     if dry_run:
@@ -180,7 +179,7 @@ def test_health(url: str, timeout: int):
 
     console.print(f"[bold blue]🏥 Checking Health: {url}[/bold blue]\n")
 
-    checker = HealthChecker(base_url=url, timeout=timeout)
+    HealthChecker(base_url=url, timeout=timeout)
     # This would run health checks
     console.print("[green]✓[/green] Service is healthy")
 

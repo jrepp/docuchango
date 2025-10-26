@@ -1,9 +1,6 @@
 """Test suite for link validation functionality."""
 
-import pytest
-from pathlib import Path
-
-from docuchango.validator import PrismDocValidator, LinkType
+from docuchango.validator import LinkType, PrismDocValidator
 
 
 class TestLinkExtraction:

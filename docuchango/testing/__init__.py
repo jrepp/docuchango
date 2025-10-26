@@ -14,8 +14,8 @@ Modules:
 
 __version__ = "0.1.0"
 
-from .cli import AGFCLIRunner, CLIResult
 from .assertions import AGFAssertions
+from .cli import AGFCLIRunner, CLIResult
 from .health import HealthChecker
 
 __all__ = [
