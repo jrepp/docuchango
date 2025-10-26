@@ -62,7 +62,7 @@ def main():
 @click.option("--verbose", is_flag=True)
 def validate(repo_root, verbose):
     """Validate documentation."""
-    validator = PrismDocValidator(repo_root=repo_root, verbose=verbose)
+    validator = DocValidator(repo_root=repo_root, verbose=verbose)
     validator.scan_documents()
     validator.validate_links()
 ```

@@ -10,8 +10,8 @@ This package provides:
 - CLI tools for all operations
 
 Example:
-    >>> from docuchango.validator import PrismDocValidator
-    >>> validator = PrismDocValidator(repo_root=".")
+    >>> from docuchango.validator import DocValidator
+    >>> validator = DocValidator(repo_root=".")
     >>> validator.scan_documents()
     >>> validator.check_code_blocks()
 """

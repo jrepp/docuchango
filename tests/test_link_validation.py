@@ -1,6 +1,6 @@
 """Test suite for link validation functionality."""
 
-from docuchango.validator import LinkType, PrismDocValidator
+from docuchango.validator import LinkType, DocValidator
 
 
 class TestLinkExtraction:
@@ -31,7 +31,7 @@ Also check [external docs](https://example.com/docs).
 """
         doc_file.write_text(content)
 
-        validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+        validator = DocValidator(repo_root=docs_root, verbose=False)
         validator.scan_documents()
         validator.extract_links()
 
@@ -75,7 +75,7 @@ Another valid link: [example](https://example.com)
 """
         doc_file.write_text(content)
 
-        validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+        validator = DocValidator(repo_root=docs_root, verbose=False)
         validator.scan_documents()
         validator.extract_links()
 
@@ -112,7 +112,7 @@ But this is real: [actual link](./real.md)
 """
         doc_file.write_text(content)
 
-        validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+        validator = DocValidator(repo_root=docs_root, verbose=False)
         validator.scan_documents()
         validator.extract_links()
 
@@ -146,7 +146,7 @@ Real link: [doc](./test.md)
 """
         doc_file.write_text(content)
 
-        validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+        validator = DocValidator(repo_root=docs_root, verbose=False)
         validator.scan_documents()
         validator.extract_links()
 
@@ -176,7 +176,7 @@ See [RFC 001](./rfc-001.md) and [RFC 002](./rfc-002.md) for context.
 """
         doc_file.write_text(content)
 
-        validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+        validator = DocValidator(repo_root=docs_root, verbose=False)
         validator.scan_documents()
         validator.extract_links()
 
@@ -213,7 +213,7 @@ See [HTTP link](http://example.com) and [HTTPS link](https://example.com).
 """
         doc_file.write_text(content)
 
-        validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+        validator = DocValidator(repo_root=docs_root, verbose=False)
         validator.scan_documents()
         validator.extract_links()
 
@@ -243,7 +243,7 @@ See [section below](#context) for details.
 """
         doc_file.write_text(content)
 
-        validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+        validator = DocValidator(repo_root=docs_root, verbose=False)
         validator.scan_documents()
         validator.extract_links()
 
@@ -274,7 +274,7 @@ Also [RFC](/rfc/RFC-001) and [memo](/memos/MEMO-003).
 """
         doc_file.write_text(content)
 
-        validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+        validator = DocValidator(repo_root=docs_root, verbose=False)
         validator.scan_documents()
         validator.extract_links()
 
@@ -305,7 +305,7 @@ See [relative](./test.md) and [parent](../docs/guide.md).
 """
         doc_file.write_text(content)
 
-        validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+        validator = DocValidator(repo_root=docs_root, verbose=False)
         validator.scan_documents()
         validator.extract_links()
 
@@ -336,7 +336,7 @@ See [ADR](../adr/adr-002-test.md) and [RFC](../rfcs/rfc-001-test.md).
 """
         doc_file.write_text(content)
 
-        validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+        validator = DocValidator(repo_root=docs_root, verbose=False)
         validator.scan_documents()
         validator.extract_links()
 
@@ -375,7 +375,7 @@ See [docs](https://example.com/docs).
 """
         doc_file.write_text(content)
 
-        validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+        validator = DocValidator(repo_root=docs_root, verbose=False)
         validator.scan_documents()
         validator.extract_links()
         validator.validate_links()
@@ -406,7 +406,7 @@ See [context](#context) below.
 """
         doc_file.write_text(content)
 
-        validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+        validator = DocValidator(repo_root=docs_root, verbose=False)
         validator.scan_documents()
         validator.extract_links()
         validator.validate_links()
@@ -437,7 +437,7 @@ See [ADR](/adr/ADR-046) and [RFC](/rfc/RFC-001).
 """
         doc_file.write_text(content)
 
-        validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+        validator = DocValidator(repo_root=docs_root, verbose=False)
         validator.scan_documents()
         validator.extract_links()
         validator.validate_links()
@@ -474,7 +474,7 @@ See [ADR 002](./adr-002-target.md) for details.
 """
         doc_file.write_text(content)
 
-        validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+        validator = DocValidator(repo_root=docs_root, verbose=False)
         validator.scan_documents()
         validator.extract_links()
         validator.validate_links()
@@ -510,7 +510,7 @@ See [missing](./missing-file.md) for details.
 """
         doc_file.write_text(content)
 
-        validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+        validator = DocValidator(repo_root=docs_root, verbose=False)
         validator.scan_documents()
         validator.extract_links()
         validator.validate_links()
@@ -549,7 +549,7 @@ See [RFC 001](../rfcs/rfc-001-test.md) for details.
 """
         doc_file.write_text(content)
 
-        validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+        validator = DocValidator(repo_root=docs_root, verbose=False)
         validator.scan_documents()
         validator.extract_links()
         validator.validate_links()
@@ -586,7 +586,7 @@ See [section](./adr-002-target.md#section) for details.
 """
         doc_file.write_text(content)
 
-        validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+        validator = DocValidator(repo_root=docs_root, verbose=False)
         validator.scan_documents()
         validator.extract_links()
         validator.validate_links()
@@ -648,7 +648,7 @@ doc_uuid: "ab063564-82a5-4a21-943f-e868388d36b9"
 Supersedes [ADR 001](./adr-001-first.md) and [broken link](./missing.md).
 """)
 
-        validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+        validator = DocValidator(repo_root=docs_root, verbose=False)
         validator.scan_documents()
         validator.extract_links()
         validator.validate_links()

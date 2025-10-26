@@ -36,11 +36,11 @@ docuchango test health --url http://localhost:8080
 ### Python API
 
 ```python
-from docuchango.validator import PrismDocValidator
+from docuchango.validator import DocValidator
 from docuchango.schemas import ADRFrontmatter, RFCFrontmatter
 
 # Validate documents
-validator = PrismDocValidator(repo_root=".", verbose=True)
+validator = DocValidator(repo_root=".", verbose=True)
 validator.scan_documents()
 validator.check_code_blocks()
 validator.check_formatting()

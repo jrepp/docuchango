@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pydantic schemas for Prism documentation frontmatter validation.
+"""Pydantic schemas for documentation frontmatter validation.
 
 These schemas enforce consistent metadata across ADRs, RFCs, and Memos.
 """
@@ -21,7 +21,7 @@ class ADRFrontmatter(BaseModel):
     - deciders: Person or team who made the decision (e.g., "Core Team", "Platform Team")
     - tags: List of lowercase hyphenated tags for categorization
     - id: Lowercase identifier matching filename (e.g., "adr-001" for ADR-001-rust-proxy.md)
-    - project_id: Project identifier from docs-project.yaml (e.g., "prism-data-layer")
+    - project_id: Project identifier from docs-project.yaml (e.g., "my-project")
     - doc_uuid: Unique identifier for backend tracking (UUID v4 format)
     """
 
@@ -51,7 +51,7 @@ class ADRFrontmatter(BaseModel):
     )
     project_id: str = Field(
         ...,
-        description="Project identifier from docs-project.yaml. Must match configured project ID (e.g., 'prism-data-layer')",
+        description="Project identifier from docs-project.yaml. Must match configured project ID (e.g., 'my-project')",
     )
     doc_uuid: str = Field(
         ...,
@@ -108,7 +108,7 @@ class RFCFrontmatter(BaseModel):
     - updated: Date RFC was last modified in ISO 8601 format (YYYY-MM-DD)
     - tags: List of lowercase hyphenated tags for categorization
     - id: Lowercase identifier matching filename (e.g., "rfc-015" for RFC-015-plugin-architecture.md)
-    - project_id: Project identifier from docs-project.yaml (e.g., "prism-data-layer")
+    - project_id: Project identifier from docs-project.yaml (e.g., "my-project")
     - doc_uuid: Unique identifier for backend tracking (UUID v4 format)
     """
 
@@ -139,7 +139,7 @@ class RFCFrontmatter(BaseModel):
     )
     project_id: str = Field(
         ...,
-        description="Project identifier from docs-project.yaml. Must match configured project ID (e.g., 'prism-data-layer')",
+        description="Project identifier from docs-project.yaml. Must match configured project ID (e.g., 'my-project')",
     )
     doc_uuid: str = Field(
         ...,
@@ -195,7 +195,7 @@ class MemoFrontmatter(BaseModel):
     - updated: Date memo was last modified in ISO 8601 format (YYYY-MM-DD)
     - tags: List of lowercase hyphenated tags for categorization
     - id: Lowercase identifier matching filename (e.g., "memo-010" for MEMO-010-loadtest-results.md)
-    - project_id: Project identifier from docs-project.yaml (e.g., "prism-data-layer")
+    - project_id: Project identifier from docs-project.yaml (e.g., "my-project")
     - doc_uuid: Unique identifier for backend tracking (UUID v4 format)
     """
 
@@ -222,7 +222,7 @@ class MemoFrontmatter(BaseModel):
     )
     project_id: str = Field(
         ...,
-        description="Project identifier from docs-project.yaml. Must match configured project ID (e.g., 'prism-data-layer')",
+        description="Project identifier from docs-project.yaml. Must match configured project ID (e.g., 'my-project')",
     )
     doc_uuid: str = Field(
         ...,
@@ -273,7 +273,7 @@ class GenericDocFrontmatter(BaseModel):
 
     REQUIRED FIELDS:
     - title: Document title (descriptive, no prefix required)
-    - project_id: Project identifier from docs-project.yaml (e.g., "prism-data-layer")
+    - project_id: Project identifier from docs-project.yaml (e.g., "my-project")
     - doc_uuid: Unique identifier for backend tracking (UUID v4 format)
 
     OPTIONAL FIELDS:
@@ -304,7 +304,7 @@ class GenericDocFrontmatter(BaseModel):
     )
     project_id: str = Field(
         ...,
-        description="Project identifier from docs-project.yaml. Must match configured project ID (e.g., 'prism-data-layer')",
+        description="Project identifier from docs-project.yaml. Must match configured project ID (e.g., 'my-project')",
     )
     doc_uuid: str = Field(
         ...,

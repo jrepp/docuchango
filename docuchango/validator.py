@@ -1,5 +1,5 @@
 #!/usr/bin/env -S uv run python3
-"""Document Validation and Link Checker for Prism
+"""Document Validation and Link Checker
 
 Validates markdown documents for:
 - YAML frontmatter format and required fields
@@ -9,22 +9,15 @@ Validates markdown documents for:
 - MDX compilation compatibility
 - Docusaurus build validation
 
-⚠️ CRITICAL: Run this before pushing documentation changes!
-⚠️ MUST use "uv run" - script requires pydantic and python-frontmatter
-
 Usage:
-    uv run tooling/validate_docs.py
-    uv run tooling/validate_docs.py --verbose
-    uv run tooling/validate_docs.py --skip-build  # Skip Docusaurus build check
-    uv run tooling/validate_docs.py --fix  # Auto-fix issues where possible
-
-    OR run directly (shebang will invoke uv):
-    ./tooling/validate_docs.py
+    docugo validate
+    docugo validate --verbose
+    docugo fix all
 
 Exit Codes:
     0 - All documents valid
     1 - Validation errors found
-    2 - Missing dependencies (must use "uv run")
+    2 - Missing dependencies
 """
 
 import argparse
@@ -73,7 +66,7 @@ class LinkType(Enum):
 
 @dataclass
 class Document:
-    """Represents a Prism documentation file"""
+    """Represents a documentation file"""
 
     file_path: Path
     doc_type: str  # "adr", "rfc", "memo", or "doc"
@@ -106,8 +99,8 @@ class Link:
         return f"{status} {self.source_doc.name}:{self.line_number} -> {self.target}"
 
 
-class PrismDocValidator:
-    """Validates Prism documentation"""
+class DocValidator:
+    """Validates documentation"""
 
     def __init__(self, repo_root: Path, verbose: bool = False, fix: bool = False) -> None:
         self.repo_root = repo_root.resolve()
@@ -1005,7 +998,7 @@ class PrismDocValidator:
         """Generate validation report"""
         lines = []
         lines.append("\n" + "=" * 80)
-        lines.append("📊 PRISM DOCUMENTATION VALIDATION REPORT")
+        lines.append("📊 DOCUMENTATION VALIDATION REPORT")
         lines.append("=" * 80)
 
         # Summary
@@ -1141,7 +1134,7 @@ class PrismDocValidator:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Validate Prism documentation (⚠️ CRITICAL: Run before pushing docs!)",
+        description="Validate documentation (run before pushing docs)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -1178,7 +1171,7 @@ What this checks:
     args = parser.parse_args()
 
     repo_root = Path(__file__).parent.parent
-    validator = PrismDocValidator(repo_root=repo_root, verbose=args.verbose, fix=args.fix)
+    validator = DocValidator(repo_root=repo_root, verbose=args.verbose, fix=args.fix)
 
     try:
         all_valid = validator.validate(skip_build=args.skip_build)

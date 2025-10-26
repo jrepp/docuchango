@@ -270,9 +270,9 @@ More text
         add_missing_frontmatter_fields(doc_file)
 
         # Validate with docuchango
-        from docuchango.validator import PrismDocValidator
+        from docuchango.validator import DocValidator
 
-        validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+        validator = DocValidator(repo_root=docs_root, verbose=False)
         validator.scan_documents()
         validator.check_code_blocks()
         validator.check_formatting()

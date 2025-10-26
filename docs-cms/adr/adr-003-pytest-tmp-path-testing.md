@@ -100,7 +100,7 @@ def test_validator(tmp_path):
     doc_file = doc_dir / "adr-001-test.md"
     doc_file.write_text(content)
 
-    validator = PrismDocValidator(repo_root=docs_root)
+    validator = DocValidator(repo_root=docs_root)
     validator.scan_documents()
 ```
 

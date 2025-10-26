@@ -3,7 +3,7 @@
 import frontmatter
 import pytest
 
-from docuchango.validator import PrismDocValidator
+from docuchango.validator import DocValidator
 
 
 class TestFrontmatterValidation:
@@ -33,7 +33,7 @@ Content here.
 """
         doc_file.write_text(content)
 
-        validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+        validator = DocValidator(repo_root=docs_root, verbose=False)
         validator.scan_documents()
 
         assert len(validator.documents) == 1
@@ -63,7 +63,7 @@ doc_uuid: "8b063564-82a5-4a21-943f-e868388d36b9"
 """
         doc_file.write_text(content)
 
-        validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+        validator = DocValidator(repo_root=docs_root, verbose=False)
         validator.scan_documents()
 
         # Should detect validation errors
@@ -98,7 +98,7 @@ doc_uuid: "8b063564-82a5-4a21-943f-e868388d36b9"
 """
         doc_file.write_text(content)
 
-        validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+        validator = DocValidator(repo_root=docs_root, verbose=False)
         validator.scan_documents()
 
         all_errors = list(validator.errors)
@@ -129,7 +129,7 @@ doc_uuid: "not-a-valid-uuid"
 """
         doc_file.write_text(content)
 
-        validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+        validator = DocValidator(repo_root=docs_root, verbose=False)
         validator.scan_documents()
 
         # Document is loaded but Pydantic schema validation would catch UUID format
@@ -167,7 +167,7 @@ doc_uuid: "5c345ed0-a7e3-4104-832b-c0c5d7f2848d"
 """
         doc_file.write_text(content)
 
-        validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+        validator = DocValidator(repo_root=docs_root, verbose=False)
         validator.scan_documents()
 
         # Document is loaded but Pydantic schema validation would catch tag format
@@ -202,7 +202,7 @@ tags: [unclosed array
 """
         doc_file.write_text(content)
 
-        validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+        validator = DocValidator(repo_root=docs_root, verbose=False)
         # Should handle parsing error gracefully
         validator.scan_documents()
 
@@ -226,7 +226,7 @@ No frontmatter here.
 """
         doc_file.write_text(content)
 
-        validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+        validator = DocValidator(repo_root=docs_root, verbose=False)
         validator.scan_documents()
 
         all_errors = list(validator.errors)
@@ -258,7 +258,7 @@ doc_uuid: "046aa65f-f236-4221-9c19-6bf3e1e9f0f0"
 """
         doc_file.write_text(content)
 
-        validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+        validator = DocValidator(repo_root=docs_root, verbose=False)
         validator.scan_documents()
 
         assert len(validator.documents) == 1
@@ -301,7 +301,7 @@ doc_uuid: "046aa65f-f236-4221-9c19-6bf3e1e9f0f0"
 # Content
 """)
 
-        validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+        validator = DocValidator(repo_root=docs_root, verbose=False)
         validator.scan_documents()
 
         assert len(validator.documents) == 2

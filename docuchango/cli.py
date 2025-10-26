@@ -47,7 +47,7 @@ def validate(
     - Docusaurus build validation (unless --skip-build)
     """
     try:
-        from docuchango.validator import PrismDocValidator
+        from docuchango.validator import DocValidator
     except ImportError as e:
         console.print(f"[red]Error importing validator: {e}[/red]")
         sys.exit(2)
@@ -59,7 +59,7 @@ def validate(
     console.print(f"Auto-fix: {fix}\n")
 
     try:
-        validator = PrismDocValidator(repo_root=repo_root, verbose=verbose)
+        validator = DocValidator(repo_root=repo_root, verbose=verbose)
         validator.scan_documents()
         validator.check_code_blocks()
         validator.check_formatting()

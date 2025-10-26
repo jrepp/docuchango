@@ -1,10 +1,10 @@
-"""Test suite for the Prism documentation validator."""
+"""Test suite for the documentation validator."""
 
 from pathlib import Path
 
 import pytest
 
-from docuchango.validator import PrismDocValidator
+from docuchango.validator import DocValidator
 
 
 class TestMarkdownValidation:
@@ -50,7 +50,7 @@ class TestMarkdownValidation:
             target_file = target_dir / fixture_file.name
             target_file.write_text(fixture_file.read_text())
 
-            validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+            validator = DocValidator(repo_root=docs_root, verbose=False)
             validator.scan_documents()
             validator.check_code_blocks()
             validator.check_formatting()
@@ -91,7 +91,7 @@ class TestMarkdownValidation:
             target_file = target_dir / fixture_file.name
             target_file.write_text(fixture_file.read_text())
 
-            validator = PrismDocValidator(repo_root=docs_root, verbose=False)
+            validator = DocValidator(repo_root=docs_root, verbose=False)
             validator.scan_documents()
             validator.check_code_blocks()
             validator.check_formatting()
