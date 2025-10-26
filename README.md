@@ -2,6 +2,18 @@
 
 Validate and fix Docusaurus documentation. Checks frontmatter, links, code blocks, and formatting.
 
+```mermaid
+flowchart LR
+    A[docs-cms/] --> B{docuchango}
+    B -->|validate| C[✓ Report errors]
+    B -->|fix| D[✓ Fixed docs]
+
+    style A fill:#f9f,stroke:#333
+    style B fill:#bbf,stroke:#333
+    style C fill:#bfb,stroke:#333
+    style D fill:#bfb,stroke:#333
+```
+
 ## Quick Start
 
 ```bash
