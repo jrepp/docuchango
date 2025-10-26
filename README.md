@@ -84,6 +84,38 @@ doc_uuid: "..."
 ---
 ```
 
+### Schema Structure
+
+```mermaid
+graph TD
+    A[Document] --> B[Frontmatter]
+    A --> C[Content]
+
+    B --> D[Required Fields]
+    B --> E[Optional Fields]
+
+    D --> F[id: adr-001]
+    D --> G[title: string]
+    D --> H[status: Literal]
+    D --> I[date/created]
+    D --> J[tags: list]
+    D --> K[project_id]
+    D --> L[doc_uuid: UUID]
+
+    C --> M[Markdown Body]
+    C --> N[Code Blocks]
+    C --> O[Links]
+
+    style A fill:#bbf,stroke:#333
+    style B fill:#feb,stroke:#333
+    style C fill:#bfb,stroke:#333
+    style D fill:#fbb,stroke:#333
+```
+
+**Templates & Docs:**
+- [ADR Template](templates/adr-template.md) | [RFC Template](templates/rfc-template.md) | [Memo Template](templates/memo-template.md)
+- [Schema Docs](docuchango/schemas.py) | [ADR-001](docs-cms/adr/adr-001-pydantic-schema-validation.md)
+
 ## Features
 
 - **Validates** frontmatter (required fields, valid formats)
