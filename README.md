@@ -7,11 +7,15 @@ flowchart LR
     A[docs-cms/] --> B{docuchango}
     B -->|validate| C[✓ Report errors]
     B -->|fix| D[✓ Fixed docs]
+    D --> E[Docusaurus]
+    E -->|build| F[📚 Static site]
 
     style A fill:#f9f,stroke:#333
     style B fill:#bbf,stroke:#333
     style C fill:#bfb,stroke:#333
     style D fill:#bfb,stroke:#333
+    style E fill:#feb,stroke:#333
+    style F fill:#bfb,stroke:#333
 ```
 
 ## Quick Start
@@ -138,6 +142,7 @@ pip install -e ".[dev]"
 # Test
 pytest
 pytest --cov=docuchango
+pytest -n auto  # Parallel (for large test suites)
 
 # Lint
 ruff format .

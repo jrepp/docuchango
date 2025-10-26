@@ -91,6 +91,10 @@ markers = [
     "integration: marks tests as integration tests",
 ]
 
+# Parallel execution available via: pytest -n auto
+# Note: Current test suite is fast enough that parallelization adds overhead
+# Use -n 2 or -n 4 for larger test suites
+
 [tool.coverage.run]
 source = ["docuchango"]
 branch = true
