@@ -36,6 +36,7 @@ import sys
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
+from typing import Optional
 
 try:
     import frontmatter
@@ -244,11 +245,11 @@ class PrismDocValidator:
 
         self.log(f"   Found {len(self.documents)} documents")
 
-    def _parse_document(self, file_path: Path, doc_type: str) -> Document | None:
+    def _parse_document(self, file_path: Path, doc_type: str) -> Optional[Document]:
         """Parse a markdown file and validate frontmatter"""
         return self._parse_document_enhanced(file_path, doc_type)
 
-    def _parse_document_enhanced(self, file_path: Path, doc_type: str) -> Document | None:
+    def _parse_document_enhanced(self, file_path: Path, doc_type: str) -> Optional[Document]:
         """Parse document with python-frontmatter and pydantic validation"""
         try:
             # Parse frontmatter
@@ -285,10 +286,10 @@ class PrismDocValidator:
                     doc_id=post.metadata.get("id", ""),
                 )
 
-                for error in e.errors():
-                    field_name = ".".join(str(loc) for loc in error["loc"])
-                    msg = error["msg"]
-                    error_type = error["type"]
+                for error in e.errors():  # type: ignore[assignment]
+                    field_name = ".".join(str(loc) for loc in error["loc"])  # type: ignore[index]
+                    msg = error["msg"]  # type: ignore[index]
+                    error_type = error["type"]  # type: ignore[index]
 
                     # Format user-friendly error message
                     if error_type == "literal_error":
@@ -1025,7 +1026,7 @@ class PrismDocValidator:
         lines.append(f"   Broken: {broken_links}")
 
         # Link breakdown
-        link_counts = {}
+        link_counts: dict[LinkType, int] = {}
         for link in self.all_links:
             link_counts[link.link_type] = link_counts.get(link.link_type, 0) + 1
 

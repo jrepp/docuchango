@@ -175,13 +175,13 @@ def test():
 @click.option("--timeout", default=30, help="Timeout in seconds")
 def test_health(url: str, timeout: int):
     """Check service health."""
-    from docuchango.testing.health import HealthChecker
-
     console.print(f"[bold blue]🏥 Checking Health: {url}[/bold blue]\n")
 
-    HealthChecker(base_url=url, timeout=timeout)
-    # This would run health checks
-    console.print("[green]✓[/green] Service is healthy")
+    # Placeholder for health check implementation
+    # HealthChecker would be initialized and used here
+    console.print(f"[yellow]ℹ[/yellow] Health check not yet implemented for {url}")
+    console.print(f"[dim]Timeout: {timeout}s[/dim]")
+    console.print("[green]✓[/green] Placeholder completed")
 
 
 # Export the validate command as a separate entry point

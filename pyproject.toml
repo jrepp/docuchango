@@ -43,6 +43,9 @@ dev = [
     "pytest-asyncio>=0.23.0",
     "pytest-timeout>=2.2.0",
     "ruff>=0.1.0",
+    "mypy>=1.8.0",
+    "types-pyyaml>=6.0.0",
+    "types-psycopg2>=2.9.0",
 ]
 
 [project.scripts]
@@ -130,3 +133,38 @@ quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = false
+warn_unused_configs = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = false
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+show_error_codes = true
+# Exclude non-core modules from strict checking
+exclude = [
+    "docuchango/fixes/.*",
+    "docuchango/testing/.*",
+    "test_install\\.py",
+]
+
+[[tool.mypy.overrides]]
+module = [
+    "frontmatter.*",
+    "docker.*",
+    "grpc.*",
+    "grpcio.*",
+    "psycopg2.*",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disable_error_code = ["call-arg", "arg-type"]
