@@ -11,48 +11,20 @@ doc_uuid: "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d"
 
 # ADR-001: Use Pydantic for Frontmatter Schema Validation
 
-## Status
-
-Accepted
-
-## Context
-
-Docuchango needs to validate YAML frontmatter in markdown documents against strict schemas. Different document types (ADR, RFC, Memo, PRD, etc.) have different required fields and validation rules. We need a solution that provides:
-
-- Strong type validation
-- Clear error messages
-- Field-level validators
-- Python 3.9+ compatibility
-- Good developer experience
-
-Options considered:
-
-1. **Manual validation with dict checks** - Simple but error-prone and verbose
-2. **JSON Schema with jsonschema library** - Industry standard but complex for simple cases
-3. **Pydantic v2** - Modern Python validation with excellent DX
-4. **dataclasses with custom validators** - Lightweight but requires more boilerplate
-
 ## Decision
 
-We will use **Pydantic v2** for all frontmatter schema validation.
+Use Pydantic v2 for validating frontmatter schemas in markdown documents.
 
-## Rationale
+## Why
 
-### Advantages
-
-1. **Type Safety**: Pydantic provides runtime type checking with excellent error messages
-2. **Field Validators**: Easy to write custom validators (e.g., UUID format, tag lowercase check)
-3. **Developer Experience**: Clean, Pythonic API that's easy to maintain
-4. **Documentation**: Schemas serve as living documentation
-5. **Ecosystem**: Wide adoption, active development, excellent IDE support
-6. **Performance**: Pydantic v2 uses Rust core for fast validation
-
-### Example Schema
+Different doc types (ADR, RFC, Memo) need different required fields. Pydantic gives us:
+- Type safety with clear error messages
+- Easy custom validators (UUID format, lowercase tags)
+- Fast validation (Rust core)
+- Clean Python API
 
 ```python
-class ADRFrontmatter(BaseFrontmatter):
-    """ADR (Architecture Decision Record) frontmatter schema."""
-
+class ADRFrontmatter(BaseModel):
     status: Literal["Proposed", "Accepted", "Deprecated", "Superseded"]
     date: datetime.date
     deciders: str = Field(min_length=1)
@@ -61,51 +33,21 @@ class ADRFrontmatter(BaseFrontmatter):
     @classmethod
     def validate_id_format(cls, v: str) -> str:
         if not re.match(r"^adr-\d{3}$", v.lower()):
-            raise ValueError("ID must be 'adr-XXX' format (lowercase)")
+            raise ValueError("ID must be 'adr-XXX' format")
         return v.lower()
 ```
 
-### Trade-offs
+## Alternatives
 
-- **Dependency**: Adds Pydantic as a core dependency
-- **Learning Curve**: Team needs to learn Pydantic patterns
-- **Migration**: Harder to switch validation libraries later
+**Manual dict checks**: Too verbose, error-prone, bad error messages
 
-## Consequences
+**JSON Schema**: More complex, less Pythonic, harder to write validators
 
-### Positive
+**dataclasses**: Lightweight but needs more boilerplate for validation
 
-- Clear, maintainable validation code
-- Excellent error messages for users
-- Easy to add new document types
-- Schema definitions serve as documentation
-- IDE autocomplete for frontmatter fields
+## Result
 
-### Negative
-
-- Additional dependency to maintain
-- Pydantic major version upgrades may require changes
-- Slightly larger package size
-
-## Alternatives Considered
-
-### JSON Schema
-
-Would provide vendor-neutral validation but:
-- More verbose schema definitions
-- Less Pythonic API
-- Harder to write custom validators
-- Error messages less clear
-
-### Manual Validation
-
-Would avoid dependencies but:
-- Much more code to write and maintain
-- Error-prone
-- Poor error messages
-- No type safety
-
-## References
-
-- [Pydantic Documentation](https://docs.pydantic.dev/)
-- [Pydantic v2 Performance](https://docs.pydantic.dev/latest/concepts/performance/)
+- Schemas are easy to read and maintain
+- Users get clear validation errors
+- Adding new doc types is simple
+- Trade-off: One more dependency to maintain
