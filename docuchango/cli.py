@@ -184,6 +184,92 @@ def test_health(url: str, timeout: int):
     console.print("[green]✓[/green] Placeholder completed")
 
 
+@main.command()
+@click.option(
+    "--guide",
+    type=click.Choice(["bootstrap", "agent", "best-practices"], case_sensitive=False),
+    default="bootstrap",
+    help="Which guide to display (default: bootstrap)",
+)
+@click.option(
+    "--output",
+    type=click.Path(path_type=Path),
+    help="Save guide to file instead of displaying",
+)
+def bootstrap(guide: str, output: Path | None):
+    """Display or save docs-cms bootstrap and agent guides.
+
+    Provides quick access to documentation for setting up and using docs-cms:
+
+    - bootstrap: Step-by-step setup guide for docs-cms
+    - agent: Instructions for AI agents using docs-cms
+    - best-practices: Best practices for agent-CMS interaction
+
+    Examples:
+
+        \b
+        # Display bootstrap guide
+        docuchango bootstrap
+
+        \b
+        # Display agent guide
+        docuchango bootstrap --guide agent
+
+        \b
+        # Save bootstrap guide to file
+        docuchango bootstrap --output /path/to/BOOTSTRAP_GUIDE.md
+    """
+    # Map guide names to file names
+    guide_files = {
+        "bootstrap": "BOOTSTRAP_GUIDE.md",
+        "agent": "AGENT_GUIDE.md",
+        "best-practices": "BEST_PRACTICES.md",
+    }
+
+    guide_file = guide_files[guide]
+
+    # Try to find the guide in the package
+    try:
+        # First, try to find it in the installed package
+        import importlib.resources as resources
+
+        try:
+            # Python 3.9+
+            guide_path = resources.files("docuchango") / ".." / "docs" / guide_file
+            guide_content = guide_path.read_text()
+        except AttributeError:
+            # Python 3.8 fallback
+            with resources.path("docuchango", "__init__.py") as pkg_path:
+                docs_dir = pkg_path.parent.parent / "docs"
+                guide_path = docs_dir / guide_file
+                guide_content = guide_path.read_text()
+
+    except (FileNotFoundError, ModuleNotFoundError):
+        # Fallback: try relative to the script location
+        script_dir = Path(__file__).parent.parent
+        guide_path = script_dir / "docs" / guide_file
+
+        if not guide_path.exists():
+            console.print(f"[red]✗[/red] Guide not found: {guide_file}", err=True)
+            console.print(
+                f"[dim]Searched in: {guide_path}[/dim]",
+                err=True,
+            )
+            sys.exit(1)
+
+        guide_content = guide_path.read_text()
+
+    # Output or display
+    if output:
+        output.write_text(guide_content)
+        console.print(f"[green]✓[/green] Saved {guide} guide to: {output}")
+    else:
+        # Display with rich markdown rendering
+        from rich.markdown import Markdown
+
+        console.print(Markdown(guide_content))
+
+
 # Export the validate command as a separate entry point
 def validate_main():
     """Entry point for agf-validate command."""
