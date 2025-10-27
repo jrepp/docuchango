@@ -4,6 +4,8 @@
 These schemas enforce consistent metadata across ADRs, RFCs, and Memos.
 """
 
+from __future__ import annotations
+
 import datetime
 import re
 from typing import Literal, Optional
