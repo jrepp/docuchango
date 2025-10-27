@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Docuchango Installer
-# Install docuchango documentation validation framework
+# Install docuchango documentation validation framework using uv
 #
 # Usage:
 #   curl -sSL https://raw.githubusercontent.com/jrepp/docuchango/main/install.sh | bash
@@ -19,7 +19,6 @@ NC='\033[0m' # No Color
 
 # Configuration
 PYTHON_MIN_VERSION="3.10"
-INSTALL_METHOD="pip"  # or "uv" or "pipx"
 
 print_header() {
     echo ""
@@ -67,101 +66,41 @@ check_python() {
     fi
 }
 
-check_pip() {
-    print_step "Checking pip installation..."
-
-    if ! python3 -m pip --version &> /dev/null; then
-        print_error "pip is not installed"
-        echo "Installing pip..."
-        python3 -m ensurepip --upgrade || {
-            print_error "Failed to install pip"
-            echo "Please install pip manually: https://pip.pypa.io/en/stable/installation/"
-            exit 1
-        }
-    fi
-
-    print_success "pip is available"
-}
-
-check_pipx() {
-    print_step "Checking for pipx (recommended for CLI tools)..."
-
-    if command -v pipx &> /dev/null; then
-        PIPX_VERSION=$(pipx --version 2>&1 | head -1)
-        print_success "Found pipx ${PIPX_VERSION}"
-        INSTALL_METHOD="pipx"
-        return 0
-    else
-        print_warning "pipx not found (recommended for CLI tools)."
-        echo "          pipx installs tools in isolated environments with automatic PATH setup."
-        echo "          To install pipx: python3 -m pip install --user pipx && python3 -m pipx ensurepath"
-        echo "          Or visit: https://pipx.pypa.io/stable/installation/"
-        echo ""
-        return 1
-    fi
-}
-
 check_uv() {
-    print_step "Checking for uv (optional, faster installer)..."
+    print_step "Checking for uv..."
 
     if command -v uv &> /dev/null; then
         UV_VERSION=$(uv --version | awk '{print $2}')
         print_success "Found uv ${UV_VERSION}"
-        INSTALL_METHOD="uv"
+        return 0
     else
-        print_warning "uv not found (optional). Will use pip for installation."
-        echo "          To install uv later: curl -LsSf https://astral.sh/uv/install.sh | sh"
+        print_error "uv is not installed"
+        echo ""
+        echo "uv is required to install docuchango."
+        echo "To install uv, run:"
+        echo ""
+        echo "  curl -LsSf https://astral.sh/uv/install.sh | sh"
+        echo ""
+        echo "Or visit: https://docs.astral.sh/uv/getting-started/installation/"
+        exit 1
     fi
 }
 
 install_docuchango() {
-    print_step "Installing docuchango..."
+    print_step "Installing docuchango with uv..."
 
-    if [ "$INSTALL_METHOD" = "pipx" ]; then
-        echo "Using pipx for isolated installation..."
-        if [ -d ".git" ]; then
-            # Local development install
-            pipx install -e . || {
-                print_error "Installation failed with pipx"
-                exit 1
-            }
-        else
-            # Install from PyPI
-            pipx install docuchango || {
-                print_error "Installation failed with pipx"
-                exit 1
-            }
-        fi
-    elif [ "$INSTALL_METHOD" = "uv" ]; then
-        echo "Using uv for faster installation..."
-        if [ -d ".git" ]; then
-            # Local development install
-            uv pip install -e . || {
-                print_error "Installation failed with uv"
-                exit 1
-            }
-        else
-            # Install from PyPI
-            uv pip install docuchango || {
-                print_error "Installation failed with uv"
-                exit 1
-            }
-        fi
+    if [ -d ".git" ]; then
+        # Local development install
+        uv pip install -e . || {
+            print_error "Installation failed"
+            exit 1
+        }
     else
-        echo "Using pip for installation..."
-        if [ -d ".git" ]; then
-            # Local development install
-            python3 -m pip install -e . || {
-                print_error "Installation failed with pip"
-                exit 1
-            }
-        else
-            # Install from PyPI
-            python3 -m pip install docuchango || {
-                print_error "Installation failed with pip"
-                exit 1
-            }
-        fi
+        # Install from PyPI
+        uv pip install docuchango || {
+            print_error "Installation failed"
+            exit 1
+        }
     fi
 
     print_success "docuchango installed successfully"
@@ -235,13 +174,7 @@ main() {
     print_header
 
     check_python
-    check_pip
-
-    # Check for pipx first (recommended for CLI tools)
-    # If not found, check for uv as alternative
-    if ! check_pipx; then
-        check_uv
-    fi
+    check_uv
 
     echo ""
     install_docuchango
@@ -257,10 +190,6 @@ main() {
         echo "If the command is not found, you may need to:"
         echo "1. Restart your shell"
         echo "2. Add Python's bin directory to your PATH"
-        echo ""
-        if [ "$INSTALL_METHOD" = "pipx" ]; then
-            echo "For pipx installations, run: pipx ensurepath"
-        fi
         echo ""
     fi
 }

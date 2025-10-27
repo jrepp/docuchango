@@ -1,6 +1,6 @@
 #
 # Docuchango Installer for Windows
-# Install docuchango documentation validation framework
+# Install docuchango documentation validation framework using uv
 #
 # Usage:
 #   irm https://raw.githubusercontent.com/jrepp/docuchango/main/install.ps1 | iex
@@ -11,7 +11,6 @@ $ErrorActionPreference = "Stop"
 
 # Configuration
 $PYTHON_MIN_VERSION = "3.10"
-$INSTALL_METHOD = "pip"  # or "uv" or "pipx"
 
 function Print-Header {
     Write-Host ""
@@ -76,118 +75,43 @@ function Check-Python {
     return $pythonExe
 }
 
-function Check-Pip {
-    param($PythonExe)
-
-    Print-Step "Checking pip installation..."
-
-    $pipCheck = & $PythonExe -m pip --version 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        Print-Error "pip is not installed"
-        Write-Host "Installing pip..."
-
-        & $PythonExe -m ensurepip --upgrade
-        if ($LASTEXITCODE -ne 0) {
-            Print-Error "Failed to install pip"
-            Write-Host "Please install pip manually: https://pip.pypa.io/en/stable/installation/"
-            exit 1
-        }
-    }
-
-    Print-Success "pip is available"
-}
-
-function Check-Pipx {
-    Print-Step "Checking for pipx (recommended for CLI tools)..."
-
-    $pipxCmd = Get-Command pipx -ErrorAction SilentlyContinue
-    if ($pipxCmd) {
-        $pipxVersion = & pipx --version 2>&1
-        Print-Success "Found pipx $pipxVersion"
-        return "pipx"
-    }
-    else {
-        Print-Warning "pipx not found (recommended for CLI tools)."
-        Write-Host "          pipx installs tools in isolated environments with automatic PATH setup."
-        Write-Host "          To install pipx: python -m pip install --user pipx"
-        Write-Host "          Then run: python -m pipx ensurepath"
-        Write-Host "          Or visit: https://pipx.pypa.io/stable/installation/"
-        Write-Host ""
-        return $null
-    }
-}
-
 function Check-Uv {
-    Print-Step "Checking for uv (optional, faster installer)..."
+    Print-Step "Checking for uv..."
 
     $uvCmd = Get-Command uv -ErrorAction SilentlyContinue
     if ($uvCmd) {
         $uvVersion = & uv --version 2>&1 | Select-String -Pattern "uv (\d+\.\d+\.\d+)" | ForEach-Object { $_.Matches.Groups[1].Value }
         Print-Success "Found uv $uvVersion"
-        return "uv"
+        return $true
     }
     else {
-        Print-Warning "uv not found (optional). Will use pip for installation."
-        Write-Host "          To install uv later: irm https://astral.sh/uv/install.ps1 | iex"
-        return "pip"
+        Print-Error "uv is not installed"
+        Write-Host ""
+        Write-Host "uv is required to install docuchango."
+        Write-Host "To install uv, run:"
+        Write-Host ""
+        Write-Host "  irm https://astral.sh/uv/install.ps1 | iex"
+        Write-Host ""
+        Write-Host "Or visit: https://docs.astral.sh/uv/getting-started/installation/"
+        exit 1
     }
 }
 
 function Install-Docuchango {
-    param($PythonExe, $InstallMethod)
+    Print-Step "Installing docuchango with uv..."
 
-    Print-Step "Installing docuchango..."
-
-    if ($InstallMethod -eq "pipx") {
-        Write-Host "Using pipx for isolated installation..."
-
-        if (Test-Path ".git") {
-            # Local development install
-            & pipx install -e .
-        }
-        else {
-            # Install from PyPI
-            & pipx install docuchango
-        }
-
-        if ($LASTEXITCODE -ne 0) {
-            Print-Error "Installation failed with pipx"
-            exit 1
-        }
-    }
-    elseif ($InstallMethod -eq "uv") {
-        Write-Host "Using uv for faster installation..."
-
-        if (Test-Path ".git") {
-            # Local development install
-            & uv pip install -e .
-        }
-        else {
-            # Install from PyPI
-            & uv pip install docuchango
-        }
-
-        if ($LASTEXITCODE -ne 0) {
-            Print-Error "Installation failed with uv"
-            exit 1
-        }
+    if (Test-Path ".git") {
+        # Local development install
+        & uv pip install -e .
     }
     else {
-        Write-Host "Using pip for installation..."
+        # Install from PyPI
+        & uv pip install docuchango
+    }
 
-        if (Test-Path ".git") {
-            # Local development install
-            & $PythonExe -m pip install -e .
-        }
-        else {
-            # Install from PyPI
-            & $PythonExe -m pip install docuchango
-        }
-
-        if ($LASTEXITCODE -ne 0) {
-            Print-Error "Installation failed with pip"
-            exit 1
-        }
+    if ($LASTEXITCODE -ne 0) {
+        Print-Error "Installation failed"
+        exit 1
     }
 
     Print-Success "docuchango installed successfully"
@@ -259,17 +183,10 @@ function Main {
     Print-Header
 
     $pythonExe = Check-Python
-    Check-Pip $pythonExe
-
-    # Check for pipx first (recommended for CLI tools)
-    # If not found, check for uv as alternative
-    $installMethod = Check-Pipx
-    if (-not $installMethod) {
-        $installMethod = Check-Uv
-    }
+    Check-Uv
 
     Write-Host ""
-    Install-Docuchango $pythonExe $installMethod
+    Install-Docuchango
 
     Write-Host ""
     $verified = Verify-Installation
@@ -284,11 +201,7 @@ function Main {
         Write-Host ""
         Write-Host "If the command is not found, you may need to:"
         Write-Host "1. Restart your PowerShell"
-        Write-Host "2. Add Python's Scripts directory to your PATH"
-        Write-Host ""
-        if ($installMethod -eq "pipx") {
-            Write-Host "For pipx installations, run: pipx ensurepath"
-        }
+        Write-Host "2. Add Python's bin directory to your PATH"
         Write-Host ""
     }
 }
