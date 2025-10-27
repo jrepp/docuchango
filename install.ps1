@@ -10,12 +10,13 @@
 $ErrorActionPreference = "Stop"
 
 # Configuration
+$INSTALLER_VERSION = "0.1.0"
 $PYTHON_MIN_VERSION = "3.10"
 
 function Print-Header {
     Write-Host ""
     Write-Host "╔════════════════════════════════════════╗" -ForegroundColor Blue
-    Write-Host "║     Docuchango Installer v0.1.0      ║" -ForegroundColor Blue
+    Write-Host "║     Docuchango Installer v$INSTALLER_VERSION      ║" -ForegroundColor Blue
     Write-Host "╚════════════════════════════════════════╝" -ForegroundColor Blue
     Write-Host ""
 }
@@ -80,7 +81,11 @@ function Check-Uv {
 
     $uvCmd = Get-Command uv -ErrorAction SilentlyContinue
     if ($uvCmd) {
-        $uvVersion = & uv --version 2>&1 | Select-String -Pattern "uv (\d+\.\d+\.\d+)" | ForEach-Object { $_.Matches.Groups[1].Value }
+        $uvVersion = & uv --version 2>&1 | Select-String -Pattern "(\d+\.\d+(?:\.\d+)?)" | ForEach-Object { $_.Matches.Groups[1].Value }
+        if (-not $uvVersion) {
+            Print-Warning "Could not determine uv version"
+            $uvVersion = "(unknown version)"
+        }
         Print-Success "Found uv $uvVersion"
         return $true
     }

@@ -18,12 +18,13 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
+INSTALLER_VERSION="0.1.0"
 PYTHON_MIN_VERSION="3.10"
 
 print_header() {
     echo ""
     echo -e "${BLUE}╔════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║${NC}     Docuchango Installer v0.1.0      ${BLUE}║${NC}"
+    echo -e "${BLUE}║${NC}     Docuchango Installer v${INSTALLER_VERSION}      ${BLUE}║${NC}"
     echo -e "${BLUE}╚════════════════════════════════════════╝${NC}"
     echo ""
 }
@@ -70,7 +71,11 @@ check_uv() {
     print_step "Checking for uv..."
 
     if command -v uv &> /dev/null; then
-        UV_VERSION=$(uv --version | awk '{print $2}')
+        UV_VERSION=$(uv --version | grep -Eo '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n 1)
+        if [ -z "$UV_VERSION" ]; then
+            print_warning "Could not determine uv version"
+            UV_VERSION="(unknown version)"
+        fi
         print_success "Found uv ${UV_VERSION}"
         return 0
     else
