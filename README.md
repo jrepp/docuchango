@@ -209,6 +209,7 @@ pytest -n auto  # Parallel (for large test suites)
 ruff format .
 ruff check .
 mypy docuchango tests
+actionlint  # Lint GitHub Actions workflows
 
 # Build
 uv build

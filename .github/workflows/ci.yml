@@ -65,6 +65,16 @@ jobs:
     - name: Run mypy
       run: uv run mypy docuchango tests
 
+  actionlint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Run actionlint
+      uses: reviewdog/action-actionlint@v1
+      with:
+        actionlint_flags: -color
+
   build:
     runs-on: ubuntu-latest
     steps:
