@@ -250,11 +250,11 @@ def bootstrap(guide: str, output: Path | None):
         guide_path = script_dir / "docs" / guide_file
 
         if not guide_path.exists():
-            console.print(f"[red]✗[/red] Guide not found: {guide_file}", err=True)
-            console.print(
-                f"[dim]Searched in: {guide_path}[/dim]",
-                err=True,
-            )
+            from rich.console import Console as RichConsole
+
+            stderr_console = RichConsole(stderr=True)
+            stderr_console.print(f"[red]✗[/red] Guide not found: {guide_file}")
+            stderr_console.print(f"[dim]Searched in: {guide_path}[/dim]")
             sys.exit(1)
 
         guide_content = guide_path.read_text()
