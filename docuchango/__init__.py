@@ -16,7 +16,7 @@ Example:
     >>> validator.check_code_blocks()
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 __author__ = "Jacob Repp"
 __email__ = "jacobrepp@gmail.com"
 

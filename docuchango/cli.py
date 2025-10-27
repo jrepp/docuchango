@@ -16,7 +16,7 @@ console = Console()
 
 
 @click.group()
-@click.version_option(version="0.1.0")
+@click.version_option(version="0.1.1")
 def main():
     """Docuchango - Docusaurus validation and repair framework."""
     pass
