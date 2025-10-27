@@ -11,7 +11,7 @@ $ErrorActionPreference = "Stop"
 
 # Configuration
 $PYTHON_MIN_VERSION = "3.10"
-$INSTALL_METHOD = "pip"
+$INSTALL_METHOD = "pip"  # or "uv" or "pipx"
 
 function Print-Header {
     Write-Host ""
@@ -97,6 +97,26 @@ function Check-Pip {
     Print-Success "pip is available"
 }
 
+function Check-Pipx {
+    Print-Step "Checking for pipx (recommended for CLI tools)..."
+
+    $pipxCmd = Get-Command pipx -ErrorAction SilentlyContinue
+    if ($pipxCmd) {
+        $pipxVersion = & pipx --version 2>&1
+        Print-Success "Found pipx $pipxVersion"
+        return "pipx"
+    }
+    else {
+        Print-Warning "pipx not found (recommended for CLI tools)."
+        Write-Host "          pipx installs tools in isolated environments with automatic PATH setup."
+        Write-Host "          To install pipx: python -m pip install --user pipx"
+        Write-Host "          Then run: python -m pipx ensurepath"
+        Write-Host "          Or visit: https://pipx.pypa.io/stable/installation/"
+        Write-Host ""
+        return $null
+    }
+}
+
 function Check-Uv {
     Print-Step "Checking for uv (optional, faster installer)..."
 
@@ -118,7 +138,24 @@ function Install-Docuchango {
 
     Print-Step "Installing docuchango..."
 
-    if ($InstallMethod -eq "uv") {
+    if ($InstallMethod -eq "pipx") {
+        Write-Host "Using pipx for isolated installation..."
+
+        if (Test-Path ".git") {
+            # Local development install
+            & pipx install -e .
+        }
+        else {
+            # Install from PyPI
+            & pipx install docuchango
+        }
+
+        if ($LASTEXITCODE -ne 0) {
+            Print-Error "Installation failed with pipx"
+            exit 1
+        }
+    }
+    elseif ($InstallMethod -eq "uv") {
         Write-Host "Using uv for faster installation..."
 
         if (Test-Path ".git") {
@@ -223,7 +260,13 @@ function Main {
 
     $pythonExe = Check-Python
     Check-Pip $pythonExe
-    $installMethod = Check-Uv
+
+    # Check for pipx first (recommended for CLI tools)
+    # If not found, check for uv as alternative
+    $installMethod = Check-Pipx
+    if (-not $installMethod) {
+        $installMethod = Check-Uv
+    }
 
     Write-Host ""
     Install-Docuchango $pythonExe $installMethod
@@ -242,6 +285,10 @@ function Main {
         Write-Host "If the command is not found, you may need to:"
         Write-Host "1. Restart your PowerShell"
         Write-Host "2. Add Python's Scripts directory to your PATH"
+        Write-Host ""
+        if ($installMethod -eq "pipx") {
+            Write-Host "For pipx installations, run: pipx ensurepath"
+        }
         Write-Host ""
     }
 }

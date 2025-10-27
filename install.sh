@@ -19,7 +19,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 PYTHON_MIN_VERSION="3.10"
-INSTALL_METHOD="pip"  # or "uv"
+INSTALL_METHOD="pip"  # or "uv" or "pipx"
 
 print_header() {
     echo ""
@@ -83,6 +83,24 @@ check_pip() {
     print_success "pip is available"
 }
 
+check_pipx() {
+    print_step "Checking for pipx (recommended for CLI tools)..."
+
+    if command -v pipx &> /dev/null; then
+        PIPX_VERSION=$(pipx --version 2>&1 | head -1)
+        print_success "Found pipx ${PIPX_VERSION}"
+        INSTALL_METHOD="pipx"
+        return 0
+    else
+        print_warning "pipx not found (recommended for CLI tools)."
+        echo "          pipx installs tools in isolated environments with automatic PATH setup."
+        echo "          To install pipx: python3 -m pip install --user pipx && python3 -m pipx ensurepath"
+        echo "          Or visit: https://pipx.pypa.io/stable/installation/"
+        echo ""
+        return 1
+    fi
+}
+
 check_uv() {
     print_step "Checking for uv (optional, faster installer)..."
 
@@ -99,7 +117,22 @@ check_uv() {
 install_docuchango() {
     print_step "Installing docuchango..."
 
-    if [ "$INSTALL_METHOD" = "uv" ]; then
+    if [ "$INSTALL_METHOD" = "pipx" ]; then
+        echo "Using pipx for isolated installation..."
+        if [ -d ".git" ]; then
+            # Local development install
+            pipx install -e . || {
+                print_error "Installation failed with pipx"
+                exit 1
+            }
+        else
+            # Install from PyPI
+            pipx install docuchango || {
+                print_error "Installation failed with pipx"
+                exit 1
+            }
+        fi
+    elif [ "$INSTALL_METHOD" = "uv" ]; then
         echo "Using uv for faster installation..."
         if [ -d ".git" ]; then
             # Local development install
@@ -203,7 +236,12 @@ main() {
 
     check_python
     check_pip
-    check_uv
+
+    # Check for pipx first (recommended for CLI tools)
+    # If not found, check for uv as alternative
+    if ! check_pipx; then
+        check_uv
+    fi
 
     echo ""
     install_docuchango
@@ -219,6 +257,10 @@ main() {
         echo "If the command is not found, you may need to:"
         echo "1. Restart your shell"
         echo "2. Add Python's bin directory to your PATH"
+        echo ""
+        if [ "$INSTALL_METHOD" = "pipx" ]; then
+            echo "For pipx installations, run: pipx ensurepath"
+        fi
         echo ""
     fi
 }
