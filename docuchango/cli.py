@@ -4,6 +4,8 @@
 Docusaurus validation and repair framework for opinionated micro-CMS documentation.
 """
 
+from __future__ import annotations
+
 import sys
 from pathlib import Path
 
