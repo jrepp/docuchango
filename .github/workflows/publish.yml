@@ -1,5 +1,15 @@
 name: Publish to PyPI
 
+# Triggered when:
+# 1. A new release is published on GitHub (creates PyApp binaries + publishes to PyPI)
+# 2. Manual dispatch for testing (can publish to TestPyPI or PyPI)
+#
+# To trigger a release:
+# 1. Create and push a new tag: git tag v0.1.0 && git push origin v0.1.0
+# 2. Go to GitHub → Releases → Draft a new release
+# 3. Select the tag, add release notes, and publish
+# 4. This workflow will automatically build binaries and publish to PyPI
+
 on:
   release:
     types: [published]
@@ -92,11 +102,68 @@ jobs:
         with:
           repository-url: https://test.pypi.org/legacy/
 
+  build-pyapp-binaries:
+    name: Build PyApp binaries
+    if: github.event_name == 'release'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: docuchango-linux-x86_64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: docuchango-macos-aarch64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: docuchango-windows-x86_64.exe
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Download PyApp
+        run: |
+          git clone --depth 1 https://github.com/ofek/pyapp.git pyapp-src
+        shell: bash
+
+      - name: Build PyApp binary
+        env:
+          PYAPP_PROJECT_NAME: docuchango
+          PYAPP_PROJECT_VERSION: ${{ github.ref_name }}
+          PYAPP_EXEC_MODULE: docuchango.cli:main
+          PYAPP_PYTHON_VERSION: "3.12"
+        run: |
+          cd pyapp-src
+          cargo build --release --target ${{ matrix.target }}
+        shell: bash
+
+      - name: Rename binary
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            mv pyapp-src/target/${{ matrix.target }}/release/pyapp.exe ${{ matrix.artifact_name }}
+          else
+            mv pyapp-src/target/${{ matrix.target }}/release/pyapp ${{ matrix.artifact_name }}
+          fi
+        shell: bash
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pyapp-binary-${{ matrix.os }}
+          path: ${{ matrix.artifact_name }}
+
   github-release:
     name: Create GitHub Release with packages
     if: github.event_name == 'release'
     needs:
       - publish-to-pypi
+      - build-pyapp-binaries
     runs-on: ubuntu-latest
     permissions:
       contents: write  # IMPORTANT: mandatory for making GitHub Releases
@@ -108,6 +175,13 @@ jobs:
         with:
           name: python-package-distributions
           path: dist/
+
+      - name: Download PyApp binaries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: pyapp-binary-*
+          path: binaries/
+          merge-multiple: true
 
       - name: Sign the dists with Sigstore
         uses: sigstore/gh-action-sigstore-python@v3.0.0
@@ -122,7 +196,8 @@ jobs:
         # Upload to GitHub Release using the `gh` CLI.
         # `dist/` contains the built packages, and the
         # sigstore-produced signatures and certificates.
+        # Use --clobber to replace existing assets
         run: >-
           gh release upload
-          '${{ github.ref_name }}' dist/**
+          '${{ github.ref_name }}' dist/** binaries/* --clobber
           --repo '${{ github.repository }}'
