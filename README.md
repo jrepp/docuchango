@@ -31,10 +31,28 @@ flowchart LR
 
 ## Quick Start
 
-```bash
-# Install
-pip install docuchango
+### 1. Bootstrap a docs-cms Project
 
+```bash
+# Install uv (if not already installed)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install docuchango
+curl -sSL https://raw.githubusercontent.com/jrepp/docuchango/main/install.sh | bash
+
+# View bootstrap guide
+docuchango bootstrap
+
+# View agent instructions
+docuchango bootstrap --guide agent
+
+# View best practices
+docuchango bootstrap --guide best-practices
+```
+
+### 2. Validate and Fix Documentation
+
+```bash
 # Validate
 docuchango validate
 
@@ -209,7 +227,9 @@ uv build
 
 ## License
 
-MIT - See LICENSE file
+Mozilla Public License Version 2.0 (MPL-2.0) - See [LICENSE](LICENSE) file
+
+This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 ## Links
 
