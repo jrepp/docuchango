@@ -174,12 +174,15 @@ The publish workflow runs on:
 **Problem**: First time publishing, PyPI doesn't know about the project yet.
 
 **Solution**:
-- You cannot use trusted publishing for the first release
-- For first release only, use API token:
-  1. Create API token on PyPI
-  2. Add as GitHub secret: `PYPI_API_TOKEN`
-  3. Temporarily modify workflow to use token
-  4. After first successful publish, switch to trusted publishing
+- PyPI now supports trusted publishing for first releases through **pending publishers**
+- You can configure a pending trusted publisher for your repository before the project exists on PyPI
+- When you publish for the first time, PyPI will recognize the pending publisher and allow the release
+- No API tokens are required at any stage if trusted publishing is configured in advance
+
+**Steps**:
+1. Go to https://pypi.org/manage/account/publishing/ before the project exists
+2. Configure the trusted publisher with your repository details (as described in Setup section)
+3. Run your first release - PyPI will automatically create the project and publish it
 
 ### "Environment not found"
 
