@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import datetime
 import re
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -129,7 +129,7 @@ class RFCFrontmatter(BaseModel):
         ...,
         description="Date RFC was first created in ISO 8601 format (YYYY-MM-DD). Do not change after initial creation",
     )
-    updated: Optional[datetime.date] = Field(
+    updated: datetime.date | None = Field(
         None, description="Date RFC was last modified in ISO 8601 format (YYYY-MM-DD). Update whenever content changes"
     )
     tags: list[str] = Field(
@@ -290,17 +290,17 @@ class GenericDocFrontmatter(BaseModel):
         min_length=3,
         description="Document title. Should be descriptive and clear (e.g., 'Getting Started Guide', 'API Reference')",
     )
-    description: Optional[str] = Field(
+    description: str | None = Field(
         None, description="Brief description of the document content. Optional but recommended"
     )
-    sidebar_position: Optional[int] = Field(
+    sidebar_position: int | None = Field(
         None, description="Position in Docusaurus sidebar (lower numbers appear first). Optional"
     )
     tags: list[str] = Field(
         default_factory=list,
         description="List of lowercase, hyphenated tags (e.g., ['guide', 'tutorial', 'reference'])",
     )
-    id: Optional[str] = Field(
+    id: str | None = Field(
         None,
         description="Document identifier (optional). Use lowercase with hyphens if provided (e.g., 'getting-started')",
     )
