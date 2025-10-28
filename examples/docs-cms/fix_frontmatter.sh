@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # Generate UUID function
 gen_uuid() {

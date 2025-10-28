@@ -135,10 +135,13 @@ jobs:
       - name: Build PyApp binary
         env:
           PYAPP_PROJECT_NAME: docuchango
-          PYAPP_PROJECT_VERSION: ${{ github.ref_name }}
           PYAPP_EXEC_MODULE: docuchango.cli:main
           PYAPP_PYTHON_VERSION: "3.12"
         run: |
+          # Strip 'v' prefix from version tag
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          export PYAPP_PROJECT_VERSION="$VERSION"
           cd pyapp-src
           cargo build --release --target ${{ matrix.target }}
         shell: bash
