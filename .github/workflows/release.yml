@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  release:
+    name: Semantic Release
+    runs-on: ubuntu-latest
+    concurrency: release
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install python-semantic-release
+        run: uv tool install python-semantic-release
+
+      - name: Python Semantic Release
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          uv tool run semantic-release version --no-push
+          # Check if version was bumped
+          if git diff --exit-code pyproject.toml > /dev/null 2>&1; then
+            echo "No version change detected"
+            echo "released=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Version bumped, pushing changes"
+            git push origin main --follow-tags
+            echo "released=true" >> "$GITHUB_OUTPUT"
+            # Get the new version
+            NEW_VERSION="$(git describe --tags --abbrev=0)"
+            echo "version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub Release
+        if: steps.release.outputs.released == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          uv tool run semantic-release changelog --unreleased
+          gh release create "${VERSION}" \
+            --title "${VERSION}" \
+            --notes-file CHANGELOG.md \
+            --verify-tag
