@@ -39,18 +39,24 @@ jobs:
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
+
+          # Store the current tag before running semantic-release
+          OLD_TAG="$(git describe --tags --abbrev=0 2>/dev/null || echo 'none')"
+
+          # Run semantic-release
           uv tool run semantic-release version --no-push
-          # Check if version was bumped
-          if git diff --exit-code pyproject.toml > /dev/null 2>&1; then
-            echo "No version change detected"
+
+          # Check if a new tag was created
+          NEW_TAG="$(git describe --tags --abbrev=0 2>/dev/null || echo 'none')"
+
+          if [ "$OLD_TAG" = "$NEW_TAG" ]; then
+            echo "No version change detected (tag: $NEW_TAG)"
             echo "released=false" >> "$GITHUB_OUTPUT"
           else
-            echo "Version bumped, pushing changes"
+            echo "Version bumped from $OLD_TAG to $NEW_TAG"
             git push origin main --follow-tags
             echo "released=true" >> "$GITHUB_OUTPUT"
-            # Get the new version
-            NEW_VERSION="$(git describe --tags --abbrev=0)"
-            echo "version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
+            echo "version=${NEW_TAG}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Create GitHub Release
