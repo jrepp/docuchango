@@ -29,9 +29,6 @@ jobs:
       - name: Set up Python
         run: uv python install 3.12
 
-      - name: Install python-semantic-release
-        run: uv tool install python-semantic-release
-
       - name: Python Semantic Release
         id: release
         env:
@@ -43,8 +40,8 @@ jobs:
           # Store the current tag before running semantic-release
           OLD_TAG="$(git describe --tags --abbrev=0 2>/dev/null || echo 'none')"
 
-          # Run semantic-release
-          uv tool run semantic-release version --no-push
+          # Run semantic-release (uv tool run installs and runs in one step)
+          uv tool run python-semantic-release version --no-push
 
           # Check if a new tag was created
           NEW_TAG="$(git describe --tags --abbrev=0 2>/dev/null || echo 'none')"
@@ -65,7 +62,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.release.outputs.version }}
         run: |
-          uv tool run semantic-release changelog --unreleased
+          uv tool run python-semantic-release changelog --unreleased
           gh release create "${VERSION}" \
             --title "${VERSION}" \
             --notes-file CHANGELOG.md \
