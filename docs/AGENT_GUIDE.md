@@ -347,9 +347,65 @@ docuchango validate --verbose
 
 ### 2. Use Proper Git Commit Messages
 
+This project uses **Conventional Commits** for automated semantic versioning. Your commit messages directly affect version bumps and changelog generation.
+
+#### Conventional Commit Format
+
+```
+<type>(<scope>): <description>
+
+[optional body]
+
+[optional footer]
+```
+
+**Types that trigger releases:**
+- `feat:` - New feature (triggers MINOR version bump: 0.1.0 → 0.2.0)
+- `fix:` - Bug fix (triggers PATCH version bump: 0.1.0 → 0.1.1)
+- `perf:` - Performance improvement (triggers PATCH version bump)
+
+**Other types (no release):**
+- `docs:` - Documentation only changes
+- `style:` - Code style changes (formatting, etc.)
+- `refactor:` - Code refactoring
+- `test:` - Adding or updating tests
+- `build:` - Build system changes
+- `ci:` - CI/CD configuration changes
+- `chore:` - Maintenance tasks
+
+**Breaking changes:**
+- Add `BREAKING CHANGE:` in footer OR `!` after type
+- Triggers MAJOR version bump (0.1.0 → 1.0.0)
+
 ```bash
-# Good commit messages
-git commit -m "Add ADR-042: Adopt Redis for caching
+# Feature commit (MINOR bump)
+git commit -m "feat: add real-time notification system
+
+Implements WebSocket-based notifications per RFC-042.
+Includes connection pooling and automatic reconnection.
+
+🤖 Generated with Claude Code"
+
+# Bug fix commit (PATCH bump)
+git commit -m "fix: resolve memory leak in connection pool
+
+Closes connection handles properly in error cases.
+Addresses issue reported in #123.
+
+🤖 Generated with Claude Code"
+
+# Breaking change commit (MAJOR bump)
+git commit -m "feat!: change authentication API to use OAuth2
+
+BREAKING CHANGE: The /auth endpoint now requires OAuth2 tokens
+instead of API keys. All clients must be updated.
+
+Migration guide: docs-cms/adr/adr-043-oauth2-migration.md
+
+🤖 Generated with Claude Code"
+
+# Documentation commit (no release)
+git commit -m "docs: add ADR-042 for Redis caching
 
 Context: Need to improve API response times
 Decision: Use Redis for application-level caching
@@ -357,12 +413,62 @@ Consequences: Faster responses, additional infrastructure
 
 🤖 Generated with Claude Code"
 
-# Include references
-git commit -m "Update ADR-015: Add session timeout details
+# Chore commit (no release)
+git commit -m "chore: update ADR-015 with session timeout details
 
 Clarifies session handling per RFC-018 discussion.
 
 References: RFC-018, ADR-015
+🤖 Generated with Claude Code"
+```
+
+#### Semantic Release Workflow
+
+When commits are pushed to `main`:
+
+1. **Analysis**: `python-semantic-release` analyzes all commits since last release
+2. **Version Bump**: Determines next version based on commit types:
+   - `feat:` → MINOR bump (0.1.0 → 0.2.0)
+   - `fix:` or `perf:` → PATCH bump (0.1.0 → 0.1.1)
+   - `BREAKING CHANGE` → MAJOR bump (0.1.0 → 1.0.0)
+3. **Changelog**: Automatically generates `CHANGELOG.md` from commit messages
+4. **Release**: Creates GitHub release with generated notes
+5. **Publish**: Triggers PyPI publication and binary builds
+
+**Important for agents:**
+- Use `feat:` for new features (even documentation of new features)
+- Use `fix:` for bug fixes and corrections
+- Use `docs:` for pure documentation changes that don't add features
+- Use `chore:` for maintenance tasks
+- Be descriptive in commit body - it goes into the changelog!
+
+```bash
+# Good: Feature commit with scope
+git commit -m "feat(validation): add support for nested frontmatter validation
+
+Extends the schema validator to handle nested YAML structures
+in document frontmatter. Enables complex metadata like author
+objects with name, email, and URL fields.
+
+Implements RFC-045.
+
+🤖 Generated with Claude Code"
+
+# Good: Fix with issue reference
+git commit -m "fix(cli): handle missing config file gracefully
+
+Previously crashed with FileNotFoundError when docs-project.yaml
+was missing. Now provides helpful error message and exits cleanly.
+
+Fixes #42
+
+🤖 Generated with Claude Code"
+
+# Good: Documentation change
+git commit -m "docs: add ADR-046 for message queue selection
+
+Documents decision to use RabbitMQ for async task processing.
+
 🤖 Generated with Claude Code"
 ```
 
