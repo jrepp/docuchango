@@ -1,0 +1,17 @@
+project:
+  id: example-project
+  name: Example Project
+  description: Example documentation hub demonstrating docs-cms structure
+
+structure:
+  adr_dir: adr
+  rfc_dir: rfcs
+  memo_dir: memos
+  template_dir: templates
+
+metadata:
+  created: 2025-10-27
+  maintainers:
+    - Human Team
+    - AI Agents
+  purpose: Demonstrate best practices for docs-cms organization
