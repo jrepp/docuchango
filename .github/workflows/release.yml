@@ -62,8 +62,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.release.outputs.version }}
         run: |
-          uv tool run python-semantic-release changelog --unreleased
-          gh release create "${VERSION}" \
-            --title "${VERSION}" \
-            --notes-file CHANGELOG.md \
-            --verify-tag
+          # Use python-semantic-release to create the GitHub release
+          # This automatically extracts the relevant changelog section
+          uv tool run python-semantic-release publish --tag "${VERSION}"
