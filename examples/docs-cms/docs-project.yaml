@@ -7,7 +7,15 @@ structure:
   adr_dir: adr
   rfc_dir: rfcs
   memo_dir: memos
+  prd_dir: prd
   template_dir: templates
+  # List of folders to scan for documents
+  # Override this to customize which folders are validated
+  document_folders:
+    - adr
+    - rfcs
+    - memos
+    - prd
 
 metadata:
   created: 2025-10-27

@@ -37,7 +37,14 @@ try:
     from pydantic import ValidationError
 
     # Import schemas from the docuchango package
-    from docuchango.schemas import ADRFrontmatter, GenericDocFrontmatter, MemoFrontmatter, RFCFrontmatter
+    from docuchango.schemas import (
+        ADRFrontmatter,
+        DocsProjectConfig,
+        GenericDocFrontmatter,
+        MemoFrontmatter,
+        PRDFrontmatter,
+        RFCFrontmatter,
+    )
 
     ENHANCED_VALIDATION = True
 except ImportError as e:
@@ -121,119 +128,119 @@ class DocValidator:
         # Load project configuration
         self.project_config = self._load_project_config()
 
-    def _load_project_config(self) -> dict[str, Any]:
+    def _load_project_config(self) -> Optional[DocsProjectConfig]:
         """Load docs-project.yaml configuration"""
         config_path = self.repo_root / "docs-cms" / "docs-project.yaml"
         if config_path.exists():
             try:
                 with open(config_path, encoding="utf-8") as f:
-                    config = yaml.safe_load(f)
-                    self.log(f"✓ Loaded project config: {config['project']['id']}")
+                    config_data = yaml.safe_load(f)
+                    config = DocsProjectConfig(**config_data)
+                    self.log(f"✓ Loaded project config: {config.project.id}")
                     return config
+            except ValidationError as e:
+                self.log(f"⚠️  Warning: Invalid project config format: {e}")
+                return None
             except Exception as e:
                 self.log(f"⚠️  Warning: Could not load project config: {e}")
-                return {}
+                return None
         else:
             self.log(f"⚠️  Warning: Project config not found at {config_path}")
-            return {}
+            return None
 
     def log(self, message: str, force: bool = False):
         """Log if verbose or forced"""
         if self.verbose or force:
             print(message)
 
+    def _get_folder_config(self) -> dict[str, str]:
+        """Get folder configuration from project config or use defaults"""
+        if self.project_config and self.project_config.structure:
+            return {
+                "adr": self.project_config.structure.adr_dir,
+                "rfc": self.project_config.structure.rfc_dir,
+                "memo": self.project_config.structure.memo_dir,
+                "prd": self.project_config.structure.prd_dir,
+            }
+        # Default configuration
+        return {
+            "adr": "adr",
+            "rfc": "rfcs",
+            "memo": "memos",
+            "prd": "prd",
+        }
+
+    def _get_document_folders(self) -> list[str]:
+        """Get list of document folders to scan from config or defaults"""
+        if self.project_config and self.project_config.structure:
+            return self.project_config.structure.document_folders
+        # Default folders to scan (includes prd now!)
+        return ["adr", "rfcs", "memos", "prd"]
+
+    def _scan_document_folder(self, folder_name: str, doc_type: str, pattern: re.Pattern):
+        """Scan a specific document folder for markdown files"""
+        folder_path = self.repo_root / "docs-cms" / folder_name
+        if not folder_path.exists():
+            self.log(f"   ⊘ Folder {folder_name} does not exist, skipping")
+            return
+
+        for md_file in folder_path.glob("*.md"):
+            # Skip README and index files (landing pages)
+            if md_file.name in ["README.md", "index.md"]:
+                continue
+
+            match = pattern.match(md_file.name)
+            if not match:
+                self.errors.append(
+                    f"Invalid {doc_type.upper()} filename: {md_file.name} (expected: {doc_type}-NNN-name-with-dashes.md - lowercase only)"
+                )
+                self.log(f"   ✗ {md_file.name}: Invalid filename format (must be lowercase)")
+                continue
+
+            _prefix, num, _slug = match.groups()
+            # Skip template files (000)
+            if num == "000":
+                self.log(f"   ⊘ {md_file.name}: Skipping template file")
+                continue
+
+            doc = self._parse_document(md_file, doc_type)
+            if doc:
+                self.documents.append(doc)
+                self.file_to_doc[md_file] = doc
+
     def scan_documents(self):
         """Scan all markdown files"""
         self.log("\n📂 Scanning documents...")
 
-        # Filename patterns (adr-NNN-name-with-dashes.md)
+        # Get folder configuration
+        folder_config = self._get_folder_config()
+        document_folders = self._get_document_folders()
+
+        # Filename patterns (type-NNN-name-with-dashes.md)
         # ENFORCE lowercase only - uppercase is deprecated
-        adr_pattern = re.compile(r"^(adr)-(\d{3})-(.+)\.md$")
-        rfc_pattern = re.compile(r"^(rfc)-(\d{3})-(.+)\.md$")
-        memo_pattern = re.compile(r"^(memo)-(\d{3})-(.+)\.md$")
+        patterns = {
+            "adr": re.compile(r"^(adr)-(\d{3})-(.+)\.md$"),
+            "rfc": re.compile(r"^(rfc)-(\d{3})-(.+)\.md$"),
+            "memo": re.compile(r"^(memo)-(\d{3})-(.+)\.md$"),
+            "prd": re.compile(r"^(prd)-(\d{3})-(.+)\.md$"),
+        }
 
-        # Scan ADRs
-        adr_dir = self.repo_root / "docs-cms" / "adr"
-        if adr_dir.exists():
-            for md_file in adr_dir.glob("*.md"):
-                # Skip README and index files (landing pages)
-                if md_file.name in ["README.md", "index.md"]:
-                    continue
+        # Map folder names to document types
+        folder_to_type = {
+            folder_config["adr"]: "adr",
+            folder_config["rfc"]: "rfc",
+            folder_config["memo"]: "memo",
+            folder_config["prd"]: "prd",
+        }
 
-                match = adr_pattern.match(md_file.name)
-                if not match:
-                    self.errors.append(
-                        f"Invalid ADR filename: {md_file.name} (expected: adr-NNN-name-with-dashes.md - lowercase only)"
-                    )
-                    self.log(f"   ✗ {md_file.name}: Invalid filename format (must be lowercase)")
-                    continue
+        # Scan configured document folders
+        for folder_name in document_folders:
+            doc_type = folder_to_type.get(folder_name)
+            if doc_type and doc_type in patterns:
+                self.log(f"   Scanning {folder_name}/ ({doc_type} documents)...")
+                self._scan_document_folder(folder_name, doc_type, patterns[doc_type])
 
-                _prefix, num, _slug = match.groups()
-                # Skip template files (000)
-                if num == "000":
-                    self.log(f"   ⊘ {md_file.name}: Skipping template file")
-                    continue
-
-                doc = self._parse_document(md_file, "adr")
-                if doc:
-                    self.documents.append(doc)
-                    self.file_to_doc[md_file] = doc
-
-        # Scan RFCs
-        rfc_dir = self.repo_root / "docs-cms" / "rfcs"
-        if rfc_dir.exists():
-            for md_file in rfc_dir.glob("*.md"):
-                # Skip index files and validate filename format
-                if md_file.name in ["README.md", "index.md"]:
-                    continue
-
-                match = rfc_pattern.match(md_file.name)
-                if not match:
-                    self.errors.append(
-                        f"Invalid RFC filename: {md_file.name} (expected: rfc-NNN-name-with-dashes.md - lowercase only)"
-                    )
-                    self.log(f"   ✗ {md_file.name}: Invalid filename format (must be lowercase)")
-                    continue
-
-                _prefix, num, _slug = match.groups()
-                # Skip template files (000)
-                if num == "000":
-                    self.log(f"   ⊘ {md_file.name}: Skipping template file")
-                    continue
-
-                doc = self._parse_document(md_file, "rfc")
-                if doc:
-                    self.documents.append(doc)
-                    self.file_to_doc[md_file] = doc
-
-        # Scan MEMOs
-        memo_dir = self.repo_root / "docs-cms" / "memos"
-        if memo_dir.exists():
-            for md_file in memo_dir.glob("*.md"):
-                # Skip index files and validate filename format
-                if md_file.name in ["README.md", "index.md"]:
-                    continue
-
-                match = memo_pattern.match(md_file.name)
-                if not match:
-                    self.errors.append(
-                        f"Invalid MEMO filename: {md_file.name} (expected: memo-NNN-name-with-dashes.md - lowercase only)"
-                    )
-                    self.log(f"   ✗ {md_file.name}: Invalid filename format (must be lowercase)")
-                    continue
-
-                _prefix, num, _slug = match.groups()
-                # Skip template files (000)
-                if num == "000":
-                    self.log(f"   ⊘ {md_file.name}: Skipping template file")
-                    continue
-
-                doc = self._parse_document(md_file, "memo")
-                if doc:
-                    self.documents.append(doc)
-                    self.file_to_doc[md_file] = doc
-
-        # Scan general docs
+        # Scan general docs (root level)
         docs_dir = self.repo_root / "docs-cms"
         if docs_dir.exists():
             for md_file in docs_dir.glob("*.md"):
@@ -273,6 +280,8 @@ class DocValidator:
                     RFCFrontmatter(**post.metadata)
                 elif doc_type == "memo":
                     MemoFrontmatter(**post.metadata)
+                elif doc_type == "prd":
+                    PRDFrontmatter(**post.metadata)
                 else:
                     # Generic validation for other docs
                     GenericDocFrontmatter(**post.metadata)
