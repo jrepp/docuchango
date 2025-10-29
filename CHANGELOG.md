@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.1.0 (2025-10-29)
+
+### Features
+
+- Add automatic PyPI publishing to release workflow
+  ([`a16dcd9`](https://github.com/jrepp/docuchango/commit/a16dcd9ea8751621e534d2e3b48c78d915a3a8e2))
+
+
 ## v1.0.3 (2025-10-29)
 
 ### Bug Fixes
