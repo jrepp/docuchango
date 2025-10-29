@@ -190,7 +190,7 @@ def test_health(url: str, timeout: int):
 @click.option(
     "--path",
     type=click.Path(path_type=Path),
-    default=Path.cwd() / "docs-cms",
+    default=None,
     help="Path where docs-cms folder should be created (default: ./docs-cms)",
 )
 @click.option(
@@ -208,7 +208,7 @@ def test_health(url: str, timeout: int):
     is_flag=True,
     help="Overwrite existing files if they exist",
 )
-def init(path: Path, project_id: str, project_name: str, force: bool):
+def init(path: Path | None, project_id: str, project_name: str, force: bool):
     """Initialize a new docs-cms folder structure with templates.
 
     Creates a complete docs-cms folder structure with:
@@ -238,6 +238,10 @@ def init(path: Path, project_id: str, project_name: str, force: bool):
     import datetime
     import shutil
     from importlib import resources
+
+    # Set default path if not provided
+    if path is None:
+        path = Path.cwd() / "docs-cms"
 
     console.print("[bold blue]📁 Initializing docs-cms structure[/bold blue]\n")
 
