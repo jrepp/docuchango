@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.0.1 (2025-10-29)
+
+### Bug Fixes
+
+- Correct GitHub release creation command in workflow
+  ([`cc2e08c`](https://github.com/jrepp/docuchango/commit/cc2e08c216cccdc45c92d81dbb279b22a816002d))
+
+
 ## v1.0.0 (2025-10-29)
 
 ### Bug Fixes
