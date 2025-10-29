@@ -188,6 +188,125 @@ def test_health(url: str, timeout: int):
 
 @main.command()
 @click.option(
+    "--path",
+    type=click.Path(path_type=Path),
+    default=Path.cwd() / "docs-cms",
+    help="Path where docs-cms folder should be created (default: ./docs-cms)",
+)
+@click.option(
+    "--project-id",
+    default="my-project",
+    help="Project ID for docs-project.yaml (default: my-project)",
+)
+@click.option(
+    "--project-name",
+    default="My Project",
+    help="Project name for docs-project.yaml (default: My Project)",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Overwrite existing files if they exist",
+)
+def init(path: Path, project_id: str, project_name: str, force: bool):
+    """Initialize a new docs-cms folder structure with templates.
+
+    Creates a complete docs-cms folder structure with:
+    - docs-project.yaml configuration file
+    - adr/, rfcs/, memos/, prd/ folders
+    - Template files for each document type
+    - README with usage instructions
+
+    Examples:
+
+        \b
+        # Initialize in current directory
+        docuchango init
+
+        \b
+        # Initialize with custom path
+        docuchango init --path ./my-docs
+
+        \b
+        # Initialize with custom project info
+        docuchango init --project-id my-app --project-name "My Application"
+
+        \b
+        # Overwrite existing files
+        docuchango init --force
+    """
+    import datetime
+    import shutil
+    from importlib import resources
+
+    console.print("[bold blue]📁 Initializing docs-cms structure[/bold blue]\n")
+
+    # Check if path exists
+    if path.exists() and not force:
+        if any(path.iterdir()):  # Check if directory is not empty
+            console.print(f"[yellow]⚠[/yellow]  Directory already exists: {path}")
+            console.print("[yellow]Use --force to overwrite existing files[/yellow]")
+            sys.exit(1)
+
+    # Create directory structure
+    console.print(f"Creating structure at: {path}\n")
+    path.mkdir(parents=True, exist_ok=True)
+
+    folders = ["adr", "rfcs", "memos", "prd", "templates"]
+    for folder in folders:
+        folder_path = path / folder
+        folder_path.mkdir(exist_ok=True)
+        console.print(f"[green]✓[/green] Created: {folder}/")
+
+    # Copy template files
+    console.print("\n[bold]Copying templates...[/bold]")
+
+    template_files = {
+        "docs-project.yaml": path / "docs-project.yaml",
+        "README.md": path / "README.md",
+        "adr-000-template.md": path / "templates" / "adr-000-template.md",
+        "rfc-000-template.md": path / "templates" / "rfc-000-template.md",
+        "memo-000-template.md": path / "templates" / "memo-000-template.md",
+        "prd-000-template.md": path / "templates" / "prd-000-template.md",
+    }
+
+    # Get templates from package
+    try:
+        # Try to access package resources
+        template_dir = resources.files("docuchango") / "templates"
+
+        for template_name, dest_path in template_files.items():
+            if dest_path.exists() and not force:
+                console.print(f"[yellow]⊘[/yellow] Skipped: {dest_path.relative_to(path)} (already exists)")
+                continue
+
+            template_path = template_dir / template_name
+            content = template_path.read_text()
+
+            # Customize docs-project.yaml with provided values
+            if template_name == "docs-project.yaml":
+                content = content.replace("my-project", project_id)
+                content = content.replace("My Project", project_name)
+                content = content.replace("2025-01-01", datetime.date.today().isoformat())
+
+            dest_path.write_text(content)
+            console.print(f"[green]✓[/green] Created: {dest_path.relative_to(path)}")
+
+    except Exception as e:
+        console.print(f"[red]✗[/red] Error copying templates: {e}")
+        sys.exit(1)
+
+    # Success message
+    console.print(f"\n[bold green]✅ Successfully initialized docs-cms at {path}[/bold green]")
+    console.print("\n[bold]Next steps:[/bold]")
+    console.print("1. Review and customize docs-project.yaml")
+    console.print("2. Copy a template from templates/ to create your first document")
+    console.print("3. Run 'docuchango validate' to check your documents")
+    console.print("\n[dim]Tip: Run 'docuchango bootstrap' for detailed setup instructions[/dim]")
+
+
+@main.command()
+@click.option(
     "--guide",
     type=click.Choice(["bootstrap", "agent", "best-practices"], case_sensitive=False),
     default="bootstrap",
