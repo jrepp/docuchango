@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.0.3 (2025-10-29)
+
+### Bug Fixes
+
+- Address code review feedback for safer changelog handling
+  ([`539bb87`](https://github.com/jrepp/docuchango/commit/539bb873331769eb9c0f1a29495cc6c16fbaca39))
+
+- Correct GitHub release creation in semantic-release workflow
+  ([`2794d1e`](https://github.com/jrepp/docuchango/commit/2794d1ecd6c8528379a8dd2c0b9be57d2e4c31f8))
+
+
 ## v1.0.2 (2025-10-29)
 
 ### Bug Fixes
