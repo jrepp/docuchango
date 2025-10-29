@@ -2,6 +2,24 @@
 
 <!-- version list -->
 
+## v1.2.0 (2025-10-29)
+
+### Bug Fixes
+
+- Address Copilot PR review feedback
+  ([`6903dd0`](https://github.com/jrepp/docuchango/commit/6903dd00be26da232e238dfeb628663c1741a227))
+
+### Features
+
+- Add PRD document type and configurable folder scanning
+  ([`d7e5b5e`](https://github.com/jrepp/docuchango/commit/d7e5b5e430401d6b2da87e628e93d5ab58efdb99))
+
+### Testing
+
+- Add comprehensive tests for DocsProjectConfig and PRD schemas
+  ([`e56aec0`](https://github.com/jrepp/docuchango/commit/e56aec0a0ae5a71bf528a0087b668e019ec5bf71))
+
+
 ## v1.1.0 (2025-10-29)
 
 ### Features
