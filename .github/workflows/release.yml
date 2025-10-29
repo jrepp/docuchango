@@ -64,15 +64,24 @@ jobs:
         run: |
           # Extract the changelog section for this version
           # The VERSION already includes 'v' prefix (e.g., v1.0.2)
-          CHANGELOG_SECTION=$(awk "/^## ${VERSION} /{flag=1; next} /^## /{flag=0} flag" CHANGELOG.md)
+          # Escape regex metacharacters in VERSION for safe use in awk pattern
+          ESCAPED_VERSION=$(printf '%s\n' "$VERSION" | sed -e 's/[]\\/$*.^[]/\\&/g')
+          CHANGELOG_SECTION=$(awk "/^## ${ESCAPED_VERSION} /{flag=1; next} /^## /{flag=0} flag" CHANGELOG.md)
 
           # Fallback to generic message if changelog section is empty
           if [ -z "$CHANGELOG_SECTION" ]; then
             CHANGELOG_SECTION="Release ${VERSION}"
           fi
 
+          # Write changelog section to a temporary file to safely handle multiline content
+          NOTES_FILE=$(mktemp)
+          printf "%s\n" "$CHANGELOG_SECTION" > "$NOTES_FILE"
+
           # Create GitHub release with changelog
           gh release create "${VERSION}" \
             --title "${VERSION}" \
-            --notes "${CHANGELOG_SECTION}" \
+            --notes-file "$NOTES_FILE" \
             --latest
+
+          # Clean up temporary file
+          rm -f "$NOTES_FILE"
