@@ -236,7 +236,6 @@ def init(path: Path | None, project_id: str, project_name: str, force: bool):
         docuchango init --force
     """
     import datetime
-    import shutil
     from importlib import resources
 
     # Set default path if not provided
@@ -246,11 +245,10 @@ def init(path: Path | None, project_id: str, project_name: str, force: bool):
     console.print("[bold blue]📁 Initializing docs-cms structure[/bold blue]\n")
 
     # Check if path exists
-    if path.exists() and not force:
-        if any(path.iterdir()):  # Check if directory is not empty
-            console.print(f"[yellow]⚠[/yellow]  Directory already exists: {path}")
-            console.print("[yellow]Use --force to overwrite existing files[/yellow]")
-            sys.exit(1)
+    if path.exists() and not force and any(path.iterdir()):  # Check if directory is not empty
+        console.print(f"[yellow]⚠[/yellow]  Directory already exists: {path}")
+        console.print("[yellow]Use --force to overwrite existing files[/yellow]")
+        sys.exit(1)
 
     # Create directory structure
     console.print(f"Creating structure at: {path}\n")

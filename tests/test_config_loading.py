@@ -3,7 +3,6 @@
 import tempfile
 from pathlib import Path
 
-import pytest
 import yaml
 
 from docuchango.validator import DocValidator
@@ -42,7 +41,7 @@ class TestConfigLoading:
             }
 
             config_path = docs_cms / "docs-project.yaml"
-            with open(config_path, "w") as f:
+            with config_path.open("w") as f:
                 yaml.dump(config_data, f)
 
             # Initialize validator
@@ -71,7 +70,7 @@ class TestConfigLoading:
             }
 
             config_path = docs_cms / "docs-project.yaml"
-            with open(config_path, "w") as f:
+            with config_path.open("w") as f:
                 yaml.dump(config_data, f)
 
             # Initialize validator
@@ -104,7 +103,7 @@ class TestConfigLoading:
             }
 
             config_path = docs_cms / "docs-project.yaml"
-            with open(config_path, "w") as f:
+            with config_path.open("w") as f:
                 yaml.dump(config_data, f)
 
             # Initialize validator
@@ -146,7 +145,7 @@ class TestConfigLoading:
             }
 
             config_path = docs_cms / "docs-project.yaml"
-            with open(config_path, "w") as f:
+            with config_path.open("w") as f:
                 yaml.dump(config_data, f)
 
             # Initialize validator
@@ -174,7 +173,7 @@ class TestConfigLoading:
             }
 
             config_path = docs_cms / "docs-project.yaml"
-            with open(config_path, "w") as f:
+            with config_path.open("w") as f:
                 yaml.dump(config_data, f)
 
             # Create ADR folder with a file
@@ -272,7 +271,7 @@ Test PRD content.
             }
 
             config_path = docs_cms / "docs-project.yaml"
-            with open(config_path, "w") as f:
+            with config_path.open("w") as f:
                 yaml.dump(config_data, f)
 
             # Create the docs folder
@@ -317,7 +316,7 @@ Test PRD content.
             }
 
             config_path = docs_cms / "docs-project.yaml"
-            with open(config_path, "w") as f:
+            with config_path.open("w") as f:
                 yaml.dump(config_data, f)
 
             # Initialize validator

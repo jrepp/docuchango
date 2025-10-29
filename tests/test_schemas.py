@@ -8,9 +8,6 @@ from pydantic import ValidationError
 from docuchango.schemas import (
     ADRFrontmatter,
     DocsProjectConfig,
-    DocsProjectInfo,
-    DocsProjectMetadata,
-    DocsProjectStructure,
     GenericDocFrontmatter,
     MemoFrontmatter,
     PRDFrontmatter,
