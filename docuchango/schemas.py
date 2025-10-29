@@ -13,6 +13,101 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 
 
+class DocsProjectStructure(BaseModel):
+    """Schema for docs-project.yaml structure configuration.
+
+    Defines the directory structure for different document types.
+    All paths are relative to the docs-cms directory.
+    """
+
+    adr_dir: str = Field(
+        default="adr",
+        description="Directory containing Architecture Decision Records (default: 'adr')",
+    )
+    rfc_dir: str = Field(
+        default="rfcs",
+        description="Directory containing Request for Comments documents (default: 'rfcs')",
+    )
+    memo_dir: str = Field(
+        default="memos",
+        description="Directory containing technical memos (default: 'memos')",
+    )
+    prd_dir: str = Field(
+        default="prd",
+        description="Directory containing Product Requirements Documents (default: 'prd')",
+    )
+    template_dir: str = Field(
+        default="templates",
+        description="Directory containing document templates (default: 'templates')",
+    )
+    document_folders: list[str] = Field(
+        default_factory=lambda: ["adr", "rfcs", "memos", "prd"],
+        description="List of folders to scan for documents. Override to customize which folders are validated. Default: ['adr', 'rfcs', 'memos', 'prd']",
+    )
+
+
+class DocsProjectMetadata(BaseModel):
+    """Schema for docs-project.yaml metadata section."""
+
+    created: datetime.date = Field(..., description="Project creation date")
+    maintainers: list[str] = Field(
+        default_factory=list,
+        description="List of project maintainers (teams or individuals)",
+    )
+    purpose: str | None = Field(
+        None,
+        description="Brief description of the project's documentation purpose",
+    )
+
+
+class DocsProjectInfo(BaseModel):
+    """Schema for docs-project.yaml project information."""
+
+    id: str = Field(
+        ...,
+        min_length=1,
+        description="Unique project identifier (lowercase with hyphens)",
+    )
+    name: str = Field(
+        ...,
+        min_length=1,
+        description="Human-readable project name",
+    )
+    description: str | None = Field(
+        None,
+        description="Brief project description",
+    )
+
+    @field_validator("id")
+    @classmethod
+    def validate_id_format(cls, v: str) -> str:
+        """Ensure project ID is lowercase with hyphens"""
+        if not re.match(r"^[a-z0-9\-]+$", v):
+            raise ValueError(f"Project ID must be lowercase with hyphens only. Got: {v}")
+        return v
+
+
+class DocsProjectConfig(BaseModel):
+    """Schema for docs-project.yaml configuration file.
+
+    This is the main configuration file for a documentation project,
+    defining project metadata, directory structure, and validation rules.
+    """
+
+    project: DocsProjectInfo = Field(
+        ...,
+        description="Project information including ID, name, and description",
+    )
+    structure: DocsProjectStructure = Field(
+        default_factory=DocsProjectStructure,
+        description="Directory structure configuration for document types",
+    )
+    metadata: DocsProjectMetadata | None = Field(
+        None,
+        description="Additional project metadata",
+    )
+
+
 class ADRFrontmatter(BaseModel):
     """Schema for Architecture Decision Record frontmatter.
 
@@ -259,6 +354,102 @@ class MemoFrontmatter(BaseModel):
         """Ensure ID is lowercase memo-XXX format"""
         if not re.match(r"^memo-\d{3}$", v):
             raise ValueError(f"Memo id must be lowercase 'memo-XXX' format (e.g., 'memo-001'). Got: {v}")
+        return v
+
+    @field_validator("doc_uuid")
+    @classmethod
+    def validate_uuid_format(cls, v: str) -> str:
+        """Ensure doc_uuid is a valid UUID v4"""
+        if not re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$", v):
+            raise ValueError(f"doc_uuid must be a valid UUID v4 format. Got: {v}")
+        return v
+
+
+class PRDFrontmatter(BaseModel):
+    """Schema for Product Requirements Document frontmatter.
+
+    REQUIRED FIELDS (all must be present):
+    - title: Title without PRD prefix (e.g., "User Authentication System"). ID displayed by sidebar.
+    - status: Current state (Draft/In Review/Approved/In Progress/Completed/Cancelled)
+    - author: Document author (person or team who wrote the PRD)
+    - created: Date PRD was first created in ISO 8601 format (YYYY-MM-DD)
+    - updated: Date PRD was last modified in ISO 8601 format (YYYY-MM-DD)
+    - target_release: Target release version or date (e.g., "v2.0.0" or "Q2 2025")
+    - tags: List of lowercase hyphenated tags for categorization
+    - id: Lowercase identifier matching filename (e.g., "prd-005" for prd-005-user-auth.md)
+    - project_id: Project identifier from docs-project.yaml (e.g., "my-project")
+    - doc_uuid: Unique identifier for backend tracking (UUID v4 format)
+    """
+
+    title: str = Field(
+        ...,
+        min_length=10,
+        description="PRD title without prefix (e.g., 'User Authentication System'). The ID prefix is in the 'id' field and displayed by sidebar.",
+    )
+    status: Literal["Draft", "In Review", "Approved", "In Progress", "Completed", "Cancelled"] = Field(
+        ...,
+        description="PRD status. Use 'Draft' for work-in-progress, 'Approved' for ready to implement, 'Completed' for finished",
+    )
+    author: str = Field(
+        ..., description="PRD author. Use person name or team name (e.g., 'Product Team', 'Jane Smith')"
+    )
+    created: datetime.date = Field(
+        ...,
+        description="Date PRD was first created in ISO 8601 format (YYYY-MM-DD). Do not change after initial creation",
+    )
+    updated: datetime.date = Field(
+        ...,
+        description="Date PRD was last modified in ISO 8601 format (YYYY-MM-DD). Update whenever content changes"
+    )
+    target_release: str = Field(
+        ...,
+        description="Target release version or date (e.g., 'v2.0.0', 'Q2 2025', '2025-06-01')",
+    )
+    tags: list[str] = Field(
+        default_factory=list,
+        description="List of lowercase, hyphenated tags (e.g., ['feature', 'authentication', 'user-experience'])",
+    )
+    id: str = Field(
+        ...,
+        description="Lowercase ID matching filename format: 'prd-XXX' where XXX is 3-digit number (e.g., 'prd-005')",
+    )
+    project_id: str = Field(
+        ...,
+        description="Project identifier from docs-project.yaml. Must match configured project ID (e.g., 'my-project')",
+    )
+    doc_uuid: str = Field(
+        ...,
+        description="Unique identifier for backend tracking. Must be valid UUID v4 format. Generated automatically by migration script",
+    )
+
+    # Title validator removed - titles should NOT include prefix (e.g., "PRD-001:")
+    # The ID prefix is in the 'id' field and displayed by the sidebar presentation layer
+
+    @field_validator("tags")
+    @classmethod
+    def validate_tags_format(cls, v: list[str]) -> list[str]:
+        """Ensure tags are lowercase and hyphenated"""
+        for tag in v:
+            if not re.match(r"^[a-z0-9\-]+$", tag):
+                raise ValueError(
+                    f"Invalid tag '{tag}' - tags must be lowercase with hyphens only (e.g., 'feature', 'user-experience')"
+                )
+        return v
+
+    @field_validator("author")
+    @classmethod
+    def validate_author(cls, v: str) -> str:
+        """Ensure author is not empty"""
+        if not v.strip():
+            raise ValueError("'author' field cannot be empty")
+        return v
+
+    @field_validator("id")
+    @classmethod
+    def validate_id_format(cls, v: str) -> str:
+        """Ensure ID is lowercase prd-XXX format"""
+        if not re.match(r"^prd-\d{3}$", v):
+            raise ValueError(f"PRD id must be lowercase 'prd-XXX' format (e.g., 'prd-001'). Got: {v}")
         return v
 
     @field_validator("doc_uuid")
