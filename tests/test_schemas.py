@@ -8,9 +8,6 @@ from pydantic import ValidationError
 from docuchango.schemas import (
     ADRFrontmatter,
     DocsProjectConfig,
-    DocsProjectInfo,
-    DocsProjectMetadata,
-    DocsProjectStructure,
     GenericDocFrontmatter,
     MemoFrontmatter,
     PRDFrontmatter,
@@ -406,6 +403,7 @@ class TestDocsProjectConfig:
         assert config.structure.adr_dir == "adr"
         assert config.structure.prd_dir == "prd"
         assert len(config.structure.document_folders) == 4
+        assert config.metadata is not None
         assert config.metadata.purpose == "Demonstrate best practices"
 
     def test_valid_config_with_defaults(self):

@@ -3,7 +3,6 @@
 import tempfile
 from pathlib import Path
 
-import pytest
 import yaml
 
 from docuchango.validator import DocValidator
@@ -42,7 +41,7 @@ class TestConfigLoading:
             }
 
             config_path = docs_cms / "docs-project.yaml"
-            with open(config_path, "w") as f:
+            with config_path.open("w") as f:
                 yaml.dump(config_data, f)
 
             # Initialize validator
@@ -71,7 +70,7 @@ class TestConfigLoading:
             }
 
             config_path = docs_cms / "docs-project.yaml"
-            with open(config_path, "w") as f:
+            with config_path.open("w") as f:
                 yaml.dump(config_data, f)
 
             # Initialize validator
@@ -104,7 +103,7 @@ class TestConfigLoading:
             }
 
             config_path = docs_cms / "docs-project.yaml"
-            with open(config_path, "w") as f:
+            with config_path.open("w") as f:
                 yaml.dump(config_data, f)
 
             # Initialize validator
@@ -146,7 +145,7 @@ class TestConfigLoading:
             }
 
             config_path = docs_cms / "docs-project.yaml"
-            with open(config_path, "w") as f:
+            with config_path.open("w") as f:
                 yaml.dump(config_data, f)
 
             # Initialize validator
@@ -174,7 +173,7 @@ class TestConfigLoading:
             }
 
             config_path = docs_cms / "docs-project.yaml"
-            with open(config_path, "w") as f:
+            with config_path.open("w") as f:
                 yaml.dump(config_data, f)
 
             # Create ADR folder with a file
@@ -272,7 +271,7 @@ Test PRD content.
             }
 
             config_path = docs_cms / "docs-project.yaml"
-            with open(config_path, "w") as f:
+            with config_path.open("w") as f:
                 yaml.dump(config_data, f)
 
             # Create the docs folder
@@ -284,7 +283,7 @@ Test PRD content.
 
             # Scan should warn about duplicate mapping
             # We check that the warning logic exists by verifying multiple types are mapped
-            folder_to_types = {}
+            folder_to_types: dict[str, list[str]] = {}
             folder_config = validator._get_folder_config()
             for key, doc_type in [("adr", "adr"), ("rfc", "rfc"), ("memo", "memo"), ("prd", "prd")]:
                 folder = folder_config[key]
@@ -317,7 +316,7 @@ Test PRD content.
             }
 
             config_path = docs_cms / "docs-project.yaml"
-            with open(config_path, "w") as f:
+            with config_path.open("w") as f:
                 yaml.dump(config_data, f)
 
             # Initialize validator
@@ -325,7 +324,7 @@ Test PRD content.
 
             # Verify that the unknown folder is not in the mapping
             folder_config = validator._get_folder_config()
-            folder_to_types = {}
+            folder_to_types: dict[str, list[str]] = {}
             for key, doc_type in [("adr", "adr"), ("rfc", "rfc"), ("memo", "memo"), ("prd", "prd")]:
                 folder = folder_config[key]
                 if folder not in folder_to_types:

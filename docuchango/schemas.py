@@ -398,8 +398,7 @@ class PRDFrontmatter(BaseModel):
         description="Date PRD was first created in ISO 8601 format (YYYY-MM-DD). Do not change after initial creation",
     )
     updated: datetime.date = Field(
-        ...,
-        description="Date PRD was last modified in ISO 8601 format (YYYY-MM-DD). Update whenever content changes"
+        ..., description="Date PRD was last modified in ISO 8601 format (YYYY-MM-DD). Update whenever content changes"
     )
     target_release: str = Field(
         ...,
