@@ -62,6 +62,17 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.release.outputs.version }}
         run: |
-          # Use python-semantic-release to create the GitHub release
-          # This automatically extracts the relevant changelog section
-          uv tool run python-semantic-release publish --tag "${VERSION}"
+          # Extract the changelog section for this version
+          # The VERSION already includes 'v' prefix (e.g., v1.0.2)
+          CHANGELOG_SECTION=$(awk "/^## ${VERSION} /{flag=1; next} /^## /{flag=0} flag" CHANGELOG.md)
+
+          # Fallback to generic message if changelog section is empty
+          if [ -z "$CHANGELOG_SECTION" ]; then
+            CHANGELOG_SECTION="Release ${VERSION}"
+          fi
+
+          # Create GitHub release with changelog
+          gh release create "${VERSION}" \
+            --title "${VERSION}" \
+            --notes "${CHANGELOG_SECTION}" \
+            --latest
