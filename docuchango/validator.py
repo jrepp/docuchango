@@ -177,7 +177,7 @@ class DocValidator:
         # Default folders to scan (includes prd now!)
         return ["adr", "rfcs", "memos", "prd"]
 
-    def _scan_document_folder(self, folder_name: str, doc_type: str, pattern: re.Pattern):
+    def _scan_document_folder(self, folder_name: str, doc_type: str, pattern: re.Pattern[str]):
         """Scan a specific document folder for markdown files"""
         folder_path = self.repo_root / "docs-cms" / folder_name
         if not folder_path.exists():
@@ -226,7 +226,7 @@ class DocValidator:
         }
 
         # Map folder names to document types and detect duplicates
-        folder_to_types = {}
+        folder_to_types: dict[str, list[str]] = {}
         for key, doc_type in [("adr", "adr"), ("rfc", "rfc"), ("memo", "memo"), ("prd", "prd")]:
             folder = folder_config[key]
             if folder not in folder_to_types:
