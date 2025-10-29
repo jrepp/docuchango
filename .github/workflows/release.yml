@@ -9,12 +9,16 @@ permissions:
   contents: write
   issues: write
   pull-requests: write
+  id-token: write  # IMPORTANT: mandatory for trusted publishing to PyPI
 
 jobs:
   release:
     name: Semantic Release
     runs-on: ubuntu-latest
     concurrency: release
+    environment:
+      name: pypi
+      url: https://pypi.org/p/docuchango
 
     steps:
       - name: Check out the repository
@@ -85,3 +89,13 @@ jobs:
 
           # Clean up temporary file
           rm -f "$NOTES_FILE"
+
+      - name: Build distribution packages
+        if: steps.release.outputs.released == 'true'
+        run: uv build
+
+      - name: Publish to PyPI
+        if: steps.release.outputs.released == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
