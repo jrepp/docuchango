@@ -2,6 +2,32 @@
 
 <!-- version list -->
 
+## v1.3.0 (2025-10-29)
+
+### Bug Fixes
+
+- Add type annotations to fix mypy errors
+  ([`09ae633`](https://github.com/jrepp/docuchango/commit/09ae633e4007eff7210df22fa806cef9b1cf1fcd))
+
+### Code Style
+
+- Fix ruff formatting issues
+  ([`40be174`](https://github.com/jrepp/docuchango/commit/40be174f57715072ce5fdc7b972777c7fed308b2))
+
+- Fix ruff lint errors
+  ([`41c2676`](https://github.com/jrepp/docuchango/commit/41c26765c90bc1b5f24b1b0dbdeb6576aaff26de))
+
+### Features
+
+- Add init command to scaffold docs-cms structure
+  ([`37d7ba1`](https://github.com/jrepp/docuchango/commit/37d7ba1d75bdff6fc953cbafdfe40bebb9237ddc))
+
+### Testing
+
+- Add comprehensive test suite for init command
+  ([`995f25c`](https://github.com/jrepp/docuchango/commit/995f25cbbe066964404324b46da1497c137d8e83))
+
+
 ## v1.2.0 (2025-10-29)
 
 ### Bug Fixes
