@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.0.2 (2025-10-29)
+
+### Bug Fixes
+
+- Correct semantic-release build command for uv environment
+  ([`552155a`](https://github.com/jrepp/docuchango/commit/552155a710367b8390f6d310a2a9ff17624be9c9))
+
+
 ## v1.0.1 (2025-10-29)
 
 ### Bug Fixes
