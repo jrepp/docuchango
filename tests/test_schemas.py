@@ -358,21 +358,22 @@ class TestPRDFrontmatter:
             )
         assert "prd-xxx" in str(exc_info.value).lower() or "lowercase" in str(exc_info.value).lower()
 
-    def test_prd_optional_updated(self):
-        """Test that PRD updated field is optional."""
-        prd = PRDFrontmatter(
-            title="Test PRD with no update",
-            status="Draft",
-            author="Team",
-            created=date(2025, 10, 15),
-            # updated is optional
-            target_release="Q1 2026",
-            tags=["test"],
-            id="prd-002",
-            project_id="test-project",
-            doc_uuid="9a234567-1234-4abc-8def-123456789abc",
-        )
-        assert prd.updated is None
+    def test_prd_updated_required(self):
+        """Test that PRD updated field is required (consistent with Memo)."""
+        with pytest.raises(ValidationError) as exc_info:
+            PRDFrontmatter(
+                title="Test PRD with no update",
+                status="Draft",
+                author="Team",
+                created=date(2025, 10, 15),
+                # updated is now required - missing it should fail
+                target_release="Q1 2026",
+                tags=["test"],
+                id="prd-002",
+                project_id="test-project",
+                doc_uuid="9a234567-1234-4abc-8def-123456789abc",
+            )
+        assert "updated" in str(exc_info.value).lower()
 
 
 class TestDocsProjectConfig:

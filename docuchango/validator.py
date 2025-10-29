@@ -225,20 +225,38 @@ class DocValidator:
             "prd": re.compile(r"^(prd)-(\d{3})-(.+)\.md$"),
         }
 
-        # Map folder names to document types
-        folder_to_type = {
-            folder_config["adr"]: "adr",
-            folder_config["rfc"]: "rfc",
-            folder_config["memo"]: "memo",
-            folder_config["prd"]: "prd",
-        }
+        # Map folder names to document types and detect duplicates
+        folder_to_types = {}
+        for key, doc_type in [("adr", "adr"), ("rfc", "rfc"), ("memo", "memo"), ("prd", "prd")]:
+            folder = folder_config[key]
+            if folder not in folder_to_types:
+                folder_to_types[folder] = []
+            folder_to_types[folder].append(doc_type)
+
+        # Warn about duplicate folder mappings
+        for folder, types in folder_to_types.items():
+            if len(types) > 1:
+                self.log(
+                    f"⚠️  Warning: Folder '{folder}' is mapped to multiple document types: {types}. "
+                    f"This may cause ambiguous validation. Consider using unique folder names.",
+                    force=True,
+                )
 
         # Scan configured document folders
         for folder_name in document_folders:
-            doc_type = folder_to_type.get(folder_name)
-            if doc_type and doc_type in patterns:
-                self.log(f"   Scanning {folder_name}/ ({doc_type} documents)...")
-                self._scan_document_folder(folder_name, doc_type, patterns[doc_type])
+            doc_types = folder_to_types.get(folder_name, [])
+            if not doc_types:
+                self.log(
+                    f"⚠️  Warning: Document folder '{folder_name}' is not recognized and will be skipped. "
+                    f"Please check your configuration.",
+                    force=True,
+                )
+                continue
+
+            for doc_type in doc_types:
+                if doc_type in patterns:
+                    self.log(f"   Scanning {folder_name}/ ({doc_type} documents)...")
+                    self._scan_document_folder(folder_name, doc_type, patterns[doc_type])
 
         # Scan general docs (root level)
         docs_dir = self.repo_root / "docs-cms"
