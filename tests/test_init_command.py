@@ -29,6 +29,7 @@ class TestInitCommand:
                 if result.exception:
                     print(f"Exception: {result.exception}")
                     import traceback
+
                     traceback.print_exception(type(result.exception), result.exception, result.exception.__traceback__)
 
             assert result.exit_code == 0
