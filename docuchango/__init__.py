@@ -16,7 +16,14 @@ Example:
     >>> validator.check_code_blocks()
 """
 
-__version__ = "0.1.2"
+from importlib.metadata import PackageNotFoundError, version
+
+try:
+    __version__ = version("docuchango")
+except PackageNotFoundError:
+    # Package is not installed, use fallback version
+    __version__ = "0.0.0.dev0"
+
 __author__ = "Jacob Repp"
 __email__ = "jacobrepp@gmail.com"
 
