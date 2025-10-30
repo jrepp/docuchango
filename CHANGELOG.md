@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.3.1 (2025-10-30)
+
+### Bug Fixes
+
+- Auto-populate version from package metadata
+  ([`322cd8b`](https://github.com/jrepp/docuchango/commit/322cd8be0b080084087a064c6cdd40167d42be86))
+
+
 ## v1.3.0 (2025-10-29)
 
 ### Bug Fixes
