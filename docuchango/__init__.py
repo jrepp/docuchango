@@ -1,12 +1,11 @@
 """Docuchango - Docusaurus Validation and Repair Framework.
 
-A comprehensive toolkit for Docusaurus documentation validation, testing, and repair.
+A comprehensive toolkit for Docusaurus documentation validation and repair.
 Designed for opinionated micro-CMS documentation systems with human-agent collaboration.
 
 This package provides:
 - Documentation validation (frontmatter, links, formatting)
 - Automated fixing of common documentation issues
-- Testing utilities for documentation workflows
 - CLI tools for all operations
 
 Example:
@@ -32,11 +31,9 @@ from docuchango.schemas import (
     ADRFrontmatter,
     GenericDocFrontmatter,
     MemoFrontmatter,
+    PRDFrontmatter,
     RFCFrontmatter,
 )
-
-# Testing framework exports
-from docuchango.testing import AGFAssertions, AGFCLIRunner, CLIResult, HealthChecker
 
 __all__ = [
     # Version info
@@ -47,10 +44,6 @@ __all__ = [
     "ADRFrontmatter",
     "RFCFrontmatter",
     "MemoFrontmatter",
+    "PRDFrontmatter",
     "GenericDocFrontmatter",
-    # Testing
-    "AGFCLIRunner",
-    "CLIResult",
-    "AGFAssertions",
-    "HealthChecker",
 ]

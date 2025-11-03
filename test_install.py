@@ -25,14 +25,6 @@ def test_basic_imports():
         return False
 
     try:
-        from docuchango.testing import AGFAssertions, AGFCLIRunner, HealthChecker  # noqa: F401
-
-        print("✓ Testing framework imported successfully")
-    except ImportError as e:
-        print(f"✗ Failed to import testing framework: {e}")
-        return False
-
-    try:
         from docuchango.cli import main  # noqa: F401
 
         print("✓ CLI imported successfully")
