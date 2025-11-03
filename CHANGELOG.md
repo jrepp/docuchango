@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v1.3.2 (2025-11-03)
+
+### Bug Fixes
+
+- Improve code quality and fix several issues
+  ([`0f5da60`](https://github.com/jrepp/docuchango/commit/0f5da6043b7c169c32c083155aaa2ede65f3ff74))
+
+### Refactoring
+
+- Optimize dependencies and separate concerns properly
+  ([`a3c667d`](https://github.com/jrepp/docuchango/commit/a3c667d160a8a79b0d20c0220c784ba3ca3d1515))
+
+- Remove unused testing utilities and their dependencies
+  ([`669c8bf`](https://github.com/jrepp/docuchango/commit/669c8bfdaa55ea0b0b0f948d55572fb814b52bb0))
+
+
 ## v1.3.1 (2025-10-30)
 
 ### Bug Fixes
