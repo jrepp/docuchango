@@ -20,9 +20,7 @@ Exit Codes:
     2 - Missing dependencies
 """
 
-import argparse
 import json
-import os
 import re
 import subprocess
 import sys
@@ -85,14 +83,14 @@ class Document:
     doc_uuid: str = ""  # Frontmatter doc_uuid field (UUID v4)
     links: list["Link"] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
-    _content_cache: str = ""  # Cached file content to avoid multiple reads
+    _content_cache: Optional[str] = None  # Cached file content to avoid multiple reads
 
     def __hash__(self):
         return hash(str(self.file_path))
 
     def get_content(self) -> str:
         """Get file content, using cache if available"""
-        if not self._content_cache:
+        if self._content_cache is None:
             self._content_cache = self.file_path.read_text(encoding="utf-8")
         return self._content_cache
 
@@ -641,12 +639,14 @@ class DocValidator:
             self.log("   ⚠️  Docusaurus directory not found, skipping typecheck")
             return True
 
-        original_dir = Path.cwd()
         try:
-            os.chdir(docusaurus_dir)
-
             result = subprocess.run(
-                ["npm", "run", "typecheck"], check=False, capture_output=True, text=True, timeout=60
+                ["npm", "run", "typecheck"],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=60,
+                cwd=docusaurus_dir,
             )
 
             if result.returncode == 0:
@@ -672,8 +672,6 @@ class DocValidator:
             self.errors.append(error)
             self.log(f"   ✗ {error}")
             return False
-        finally:
-            os.chdir(original_dir)
 
     def check_docusaurus_build(self, skip_build: bool = False):
         """Run Docusaurus build to catch compilation errors"""
@@ -689,16 +687,14 @@ class DocValidator:
             self.log("   ⚠️  Docusaurus directory not found, skipping build check")
             return True
 
-        original_dir = Path.cwd()
         try:
-            os.chdir(docusaurus_dir)
-
             result = subprocess.run(
                 ["npm", "run", "build"],
                 check=False,
                 capture_output=True,
                 text=True,
                 timeout=300,  # 5 minutes
+                cwd=docusaurus_dir,
             )
 
             output = result.stdout + result.stderr
@@ -748,8 +744,6 @@ class DocValidator:
             self.errors.append(error)
             self.log(f"   ✗ {error}")
             return False
-        finally:
-            os.chdir(original_dir)
 
     def check_code_blocks(self):
         """Check code block formatting - balanced and properly labeled
@@ -1172,6 +1166,8 @@ class DocValidator:
 
 
 def main():
+    import argparse
+
     parser = argparse.ArgumentParser(
         description="Validate documentation (run before pushing docs)",
         formatter_class=argparse.RawDescriptionHelpFormatter,

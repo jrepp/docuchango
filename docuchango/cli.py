@@ -397,13 +397,13 @@ def bootstrap(guide: str, output: Path | None):
 
 # Export the validate command as a separate entry point
 def validate_main():
-    """Entry point for agf-validate command."""
+    """Entry point for dcc-validate command."""
     validate()
 
 
 # Export the fix command as a separate entry point
 def fix_main():
-    """Entry point for agf-fix command."""
+    """Entry point for dcc-fix command."""
     fix()
 
 

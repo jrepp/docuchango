@@ -161,7 +161,7 @@ ignore = [
     "E501",  # line too long (handled by formatter)
     "B008",  # do not perform function calls in argument defaults
     "C901",  # too complex
-    "S603",  # subprocess without shell=True
+    "S603",  # subprocess without shell=True (we avoid shell=True for security)
     "S607",  # starting process with partial path
 ]
 
