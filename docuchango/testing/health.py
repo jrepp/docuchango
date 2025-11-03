@@ -2,6 +2,8 @@
 Health check utilities for AGF services.
 
 Checks if required services (API server, PostgreSQL, Temporal) are running.
+
+Requires: docuchango[testing] extras for PostgreSQL checks.
 """
 
 import socket
@@ -10,7 +12,10 @@ import time
 from dataclasses import dataclass
 from typing import Optional
 
-import psycopg2
+try:
+    import psycopg2
+except ImportError:
+    psycopg2 = None  # type: ignore
 
 
 @dataclass
@@ -77,6 +82,14 @@ class HealthChecker:
 
     def check_postgres(self) -> ServiceHealth:
         """Check if PostgreSQL is running and accessible."""
+        if psycopg2 is None:
+            return ServiceHealth(
+                name="PostgreSQL",
+                healthy=False,
+                message="psycopg2 not installed",
+                details="Install with: pip install docuchango[testing]",
+            )
+
         if not self.check_port(self.postgres_host, self.postgres_port):
             return ServiceHealth(
                 name="PostgreSQL",
