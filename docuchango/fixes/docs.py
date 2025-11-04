@@ -109,8 +109,8 @@ def fix_blank_lines_after_fences(file_path: Path) -> int:
     for i, line in enumerate(lines):
         stripped = line.strip()
 
-        # If previous line was a closing fence and this line is not blank and not end of file
-        if was_closing_fence and stripped and i < len(lines):
+        # If previous line was a closing fence and this line is not blank
+        if was_closing_fence and stripped:
             # Add blank line after the closing fence (insert before current line)
             new_lines.append("\n")
             changes += 1

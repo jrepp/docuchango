@@ -23,7 +23,7 @@ class TestValidateFixIntegration:
             "---\n"
             "title: Test Decision Record\n"
             "status: Proposed\n"
-            "date: 2025-10-13\n"
+            "date: 2024-10-13\n"
             "deciders: Team\n"
             'tags: ["test"]\n'
             'id: "adr-001"\n'
@@ -139,7 +139,7 @@ class TestValidateFixIntegration:
             broken_content = f"""---
 title: Test Decision {i}
 status: Proposed
-date: 2025-10-13
+date: 2024-10-13
 deciders: Team
 tags: ["test"]
 id: "adr-{i:03d}"
