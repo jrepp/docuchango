@@ -96,6 +96,49 @@ def fix_blank_lines_before_fences(file_path: Path) -> int:
     return changes
 
 
+def fix_blank_lines_after_fences(file_path: Path) -> int:
+    """Add blank line after code fences when missing."""
+    content = file_path.read_text()
+    lines = content.splitlines(keepends=True)
+
+    new_lines = []
+    changes = 0
+    in_code_block = False
+    was_closing_fence = False
+
+    for _i, line in enumerate(lines):
+        stripped = line.strip()
+
+        # If previous line was a closing fence and this line is not blank
+        if was_closing_fence and stripped:
+            # Add blank line after the closing fence (insert before current line)
+            new_lines.append("\n")
+            changes += 1
+            was_closing_fence = False
+
+        # Track fence state
+        if stripped.startswith("```"):
+            if not in_code_block:
+                # Opening fence
+                in_code_block = True
+                was_closing_fence = False
+            else:
+                # Closing fence
+                in_code_block = False
+                was_closing_fence = True
+        else:
+            # Reset closing fence flag if we already handled it
+            if not stripped:
+                was_closing_fence = False
+
+        new_lines.append(line)
+
+    if changes > 0:
+        file_path.write_text("".join(new_lines))
+
+    return changes
+
+
 def add_missing_frontmatter_fields(file_path: Path) -> int:
     """Add missing project_id and doc_uuid fields to frontmatter."""
     content = file_path.read_text()

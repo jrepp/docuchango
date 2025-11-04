@@ -144,6 +144,66 @@ command
         assert changes == 0
 
 
+class TestFixBlankLinesAfterFences:
+    """Test blank line after fence fix functionality."""
+
+    def test_add_blank_line_after_fence(self, tmp_path):
+        """Test that blank lines are added after code fences."""
+        test_file = tmp_path / "test.md"
+        content = """Some text
+
+```python
+code
+```
+More text
+"""
+        test_file.write_text(content)
+
+        from docuchango.fixes.docs import fix_blank_lines_after_fences
+
+        changes = fix_blank_lines_after_fences(test_file)
+        assert changes == 1
+
+        result = test_file.read_text()
+        assert "```\n\nMore text" in result
+
+    def test_preserve_existing_blank_lines_after_fence(self, tmp_path):
+        """Test that existing blank lines after fences are preserved."""
+        test_file = tmp_path / "test.md"
+        content = """Some text
+
+```python
+code
+```
+
+More text
+"""
+        test_file.write_text(content)
+
+        from docuchango.fixes.docs import fix_blank_lines_after_fences
+
+        changes = fix_blank_lines_after_fences(test_file)
+        assert changes == 0
+
+        result = test_file.read_text()
+        assert content == result
+
+    def test_no_blank_line_at_end_of_file(self, tmp_path):
+        """Test that blank lines are not added at end of file."""
+        test_file = tmp_path / "test.md"
+        content = """Some text
+
+```python
+code
+```"""
+        test_file.write_text(content)
+
+        from docuchango.fixes.docs import fix_blank_lines_after_fences
+
+        changes = fix_blank_lines_after_fences(test_file)
+        assert changes == 0
+
+
 class TestAddMissingFrontmatterFields:
     """Test frontmatter field addition functionality."""
 

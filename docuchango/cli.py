@@ -63,7 +63,7 @@ def validate(
     console.print(f"Auto-fix: {fix}\n")
 
     try:
-        validator = DocValidator(repo_root=repo_root, verbose=verbose)
+        validator = DocValidator(repo_root=repo_root, verbose=verbose, fix=fix)
         validator.scan_documents()
         validator.check_code_blocks()
         validator.check_formatting()
