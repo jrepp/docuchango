@@ -757,6 +757,10 @@ class DocValidator:
         """
         self.log("\n📝 Checking code blocks...")
 
+        # If fix mode is enabled, apply fixes before validation
+        if self.fix:
+            self._apply_code_block_fixes()
+
         total_valid = 0
         total_invalid = 0
 
@@ -897,9 +901,57 @@ class DocValidator:
             f"\n   Total: {total_valid} valid code blocks, {total_invalid} invalid code blocks across {len(self.documents)} documents"
         )
 
+    def _apply_code_block_fixes(self):
+        """Apply code block fixes to all documents"""
+        from docuchango.fixes.docs import (
+            fix_blank_lines_after_fences,
+            fix_blank_lines_before_fences,
+            fix_code_fence_languages,
+        )
+
+        self.log("   Applying code block fixes...")
+        total_fixes = 0
+
+        for doc in self.documents:
+            fence_fixes = fix_code_fence_languages(doc.file_path)
+            blank_before_fixes = fix_blank_lines_before_fences(doc.file_path)
+            blank_after_fixes = fix_blank_lines_after_fences(doc.file_path)
+            fixes = fence_fixes + blank_before_fixes + blank_after_fixes
+
+            if fixes > 0:
+                total_fixes += fixes
+                # Clear cache so re-reading gets the fixed content
+                doc._content_cache = None
+                self.log(f"   ✓ Fixed {fixes} code block issues in {doc.file_path.name}")
+
+        if total_fixes > 0:
+            self.log(f"   Applied {total_fixes} code block fixes")
+
+    def _apply_formatting_fixes(self):
+        """Apply formatting fixes to all documents"""
+        from docuchango.fixes.docs import fix_trailing_whitespace
+
+        self.log("   Applying formatting fixes...")
+        total_fixes = 0
+
+        for doc in self.documents:
+            fixes = fix_trailing_whitespace(doc.file_path)
+            if fixes > 0:
+                total_fixes += fixes
+                # Clear cache so re-reading gets the fixed content
+                doc._content_cache = None
+                self.log(f"   ✓ Fixed {fixes} formatting issues in {doc.file_path.name}")
+
+        if total_fixes > 0:
+            self.log(f"   Applied {total_fixes} formatting fixes")
+
     def check_formatting(self):
         """Check markdown formatting issues"""
         self.log("\n📝 Checking formatting...")
+
+        # If fix mode is enabled, apply fixes before validation
+        if self.fix:
+            self._apply_formatting_fixes()
 
         for doc in self.documents:
             try:
