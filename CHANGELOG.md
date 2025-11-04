@@ -2,6 +2,27 @@
 
 <!-- version list -->
 
+## v1.3.3 (2025-11-04)
+
+### Bug Fixes
+
+- Integrate --fix flag into validate command for automatic issue resolution
+  ([`6dd68a4`](https://github.com/jrepp/docuchango/commit/6dd68a40a0e510d74fcb3fe82b61b6b4834e4a0b))
+
+- Resolve lint issues
+  ([`2ea8acf`](https://github.com/jrepp/docuchango/commit/2ea8acfd99c681f924e59027d4969cb6d90fbd0e))
+
+### Code Style
+
+- Apply ruff formatting to test_validate_fix_integration.py
+  ([`b40204d`](https://github.com/jrepp/docuchango/commit/b40204d086142d08eafbdcad2e1a3bd932d6cf34))
+
+### Refactoring
+
+- Address code review feedback
+  ([`aa1b88f`](https://github.com/jrepp/docuchango/commit/aa1b88f56d03eee44c4873ed1c5ea91c6dbf4061))
+
+
 ## v1.3.2 (2025-11-03)
 
 ### Bug Fixes
