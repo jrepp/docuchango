@@ -1,7 +1,5 @@
 """Integration test for the --fix flag in the validate command."""
 
-from pathlib import Path
-
 import pytest
 
 from docuchango.validator import DocValidator

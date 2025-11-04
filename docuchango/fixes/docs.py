@@ -106,7 +106,7 @@ def fix_blank_lines_after_fences(file_path: Path) -> int:
     in_code_block = False
     was_closing_fence = False
 
-    for i, line in enumerate(lines):
+    for _i, line in enumerate(lines):
         stripped = line.strip()
 
         # If previous line was a closing fence and this line is not blank
