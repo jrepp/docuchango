@@ -117,10 +117,7 @@ class TestValidateFixIntegration:
         fixable_errors = [
             e
             for e in all_errors
-            if any(
-                keyword in e.lower()
-                for keyword in ["trailing whitespace", "code fence", "blank line", "fence"]
-            )
+            if any(keyword in e.lower() for keyword in ["trailing whitespace", "code fence", "blank line", "fence"])
         ]
 
         assert len(fixable_errors) == 0, f"Should have no fixable errors after fix: {fixable_errors}"
