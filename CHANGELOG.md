@@ -2,6 +2,29 @@
 
 <!-- version list -->
 
+## v1.3.6 (2025-11-06)
+
+### Bug Fixes
+
+- Resolve mypy unreachable code error in conftest.py
+  ([`6bb57a9`](https://github.com/jrepp/docuchango/commit/6bb57a9dfb64997b19ae1bf26b11939fcda92101))
+
+### Code Style
+
+- Apply ruff formatting to test files
+  ([`1629069`](https://github.com/jrepp/docuchango/commit/1629069ddd48f4c968d8b04a36f757d5847e5749))
+
+### Refactoring
+
+- Address code review feedback
+  ([`fb131ea`](https://github.com/jrepp/docuchango/commit/fb131ea5fa65456dcdf06b058698176ce7c8b60f))
+
+### Testing
+
+- Improve test coverage from 49.53% to 60.78% (+116 tests)
+  ([`a768fc1`](https://github.com/jrepp/docuchango/commit/a768fc187c87d34179ef4546f4f6fcfd70d3ca69))
+
+
 ## v1.3.5 (2025-11-06)
 
 ### Bug Fixes
