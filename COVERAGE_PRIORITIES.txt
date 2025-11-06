@@ -1,0 +1,82 @@
+================================================================================
+TEST COVERAGE PRIORITIES - Maximize ROI
+================================================================================
+
+Current: 49.53% (224 tests) → Target: 70%+ (330+ tests)
+
+RANK | MODULE                  | STMTS | MISS | COV%  | EFFORT | IMPACT | TESTS
+-----|-------------------------|-------|------|-------|--------|--------|-------
+  1  | internal_links.py       |   83  |  83  |  0%   | 20 min |  ⭐⭐⭐  | ~18
+  2  | mdx_syntax.py           |   76  |  76  |  0%   | 20 min |  ⭐⭐⭐  | ~16
+  3  | doc_links.py            |   70  |  70  |  0%   | 15 min |  ⭐⭐⭐  | ~15
+  4  | proto_imports.py        |   61  |  61  |  0%   | 20 min |  ⭐⭐⭐  | ~13
+  5  | migration_syntax.py     |   51  |  51  |  0%   | 15 min |  ⭐⭐⭐  | ~12
+  6  | mdx_code_blocks.py      |   50  |  50  |  0%   | 15 min |  ⭐⭐⭐  | ~12
+-----|-------------------------|-------|------|-------|--------|--------|-------
+     | SUBTOTAL (Quick Wins)   |  391  | 391  |  0%   | 2 hrs  | +20%   | +86
+================================================================================
+
+  7  | validator.py            |  787  | 409  | 48%   | 8 hrs  |  ⭐⭐⭐  | ~40
+  8  | docs.py                 |  132  |  34  | 75%   | 1 hr   |  ⭐⭐   | ~10
+  9  | cli.py                  |  182  |  42  | 77%   | 1 hr   |  ⭐⭐   | ~12
+ 10  | code_blocks.py          |  103  |  27  | 73%   | 45 min |  ⭐    | ~8
+ 11  | broken_links.py         |   44  |  19  | 55%   | 30 min |  ⭐    | ~8
+ 12  | code_blocks_proper.py   |   62  |  18  | 67%   | 30 min |  ⭐    | ~6
+ 13  | cross_plugin_links.py   |   29  |  15  | 42%   | 30 min |  ⭐    | ~8
+ 14  | schemas.py              |  193  |   9  | 93%   | 30 min |  ⭐    | ~5
+ 15  | __init__.py             |    9  |   2  | 78%   | 15 min |  ⭐    | ~2
+
+================================================================================
+RECOMMENDED APPROACH
+================================================================================
+
+Phase 1: Quick Wins (2-3 hours)
+  → Complete ranks 1-6
+  → Expected: 49.53% → 70%
+  → New tests: +86
+
+Phase 2: Validator Deep Dive (6-8 hours)
+  → Complete rank 7
+  → Expected: 70% → 75%
+  → New tests: +40
+
+Phase 3: Polish (3-4 hours)
+  → Complete ranks 8-15
+  → Expected: 75% → 80%+
+  → New tests: +30
+
+Total: 11-15 hours → 80% coverage → +156 tests
+
+================================================================================
+COMMANDS
+================================================================================
+
+# Check current coverage
+uv run pytest --cov=docuchango --cov-report=term tests/ | grep TOTAL
+
+# Test single module
+uv run pytest tests/test_internal_links.py -v --cov=docuchango.fixes.internal_links
+
+# Run all tests
+uv run pytest tests/ -v
+
+# Generate HTML report
+uv run pytest --cov=docuchango --cov-report=html tests/
+open htmlcov/index.html
+
+================================================================================
+KEY INSIGHTS
+================================================================================
+
+✓ Focus on Tier 1 first: 6 modules, 0% coverage → biggest bang for buck
+✓ Each takes ~15-20 minutes: similar patterns to existing tests
+✓ Copy test_broken_links.py as template: 80% of work is done
+✓ Don't aim for 100%: 65% per module is excellent
+✓ Skip main() functions: low value CLI wrappers
+
+Priorities Legend:
+  ⭐⭐⭐ = Very High ROI (do first)
+  ⭐⭐   = High ROI (do after quick wins)
+  ⭐     = Medium ROI (polish phase)
+
+================================================================================

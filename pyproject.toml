@@ -167,7 +167,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
-"tests/**/*" = ["B011", "S101", "ARG001"]
+"tests/**/*" = ["B011", "S101", "ARG001", "ARG002", "S311", "PTH101", "S103"]
 "test_install.py" = ["RET505"]
 "docuchango/cli.py" = ["ARG001"]
 "docuchango/fixes/*" = ["RET505"]
