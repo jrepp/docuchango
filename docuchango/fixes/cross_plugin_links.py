@@ -14,7 +14,7 @@ from pathlib import Path
 
 def fix_cross_plugin_links(file_path: Path, dry_run: bool = False) -> int:
     """Fix cross-plugin links in a single file."""
-    content = file_path.read_text()
+    content = file_path.read_text(encoding="utf-8")
     original_content = content
 
     # Pattern: [text](../rfcs/RFC-XXX-name.md) -> [text](/rfc/RFC-XXX-name)
@@ -28,7 +28,7 @@ def fix_cross_plugin_links(file_path: Path, dry_run: bool = False) -> int:
 
     if content != original_content:
         if not dry_run:
-            file_path.write_text(content)
+            file_path.write_text(content, encoding="utf-8")
         return 1
     return 0
 

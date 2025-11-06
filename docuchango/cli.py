@@ -288,10 +288,23 @@ def init(path: Path | None, project_id: str, project_name: str, force: bool):
             content = template_path.read_text()
 
             # Customize docs-project.yaml with provided values
+            # Use simultaneous replacement to prevent cascading replacement bugs
             if template_name == "docs-project.yaml":
-                content = content.replace("my-project", project_id)
-                content = content.replace("My Project", project_name)
-                content = content.replace("2025-01-01", datetime.date.today().isoformat())
+                # Using a temporary unique marker approach to avoid collision
+                markers = {
+                    "my-project": "\x00PROJECT_ID\x00",
+                    "My Project": "\x00PROJECT_NAME\x00",
+                    "2025-01-01": "\x00DATE\x00",
+                }
+
+                # First pass: replace placeholders with unique markers
+                for placeholder, marker in markers.items():
+                    content = content.replace(placeholder, marker)
+
+                # Second pass: replace markers with actual values
+                content = content.replace(markers["my-project"], project_id)
+                content = content.replace(markers["My Project"], project_name)
+                content = content.replace(markers["2025-01-01"], datetime.date.today().isoformat())
 
             dest_path.write_text(content)
             console.print(f"[green]✓[/green] Created: {dest_path.relative_to(path)}")

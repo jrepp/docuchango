@@ -49,7 +49,7 @@ LINK_FIXES = {
 def fix_links_in_file(file_path: Path, dry_run: bool = False) -> int:
     """Fix broken links in a single file."""
     try:
-        content = file_path.read_text()
+        content = file_path.read_text(encoding="utf-8")
         original_content = content
         changes = 0
 
@@ -63,7 +63,7 @@ def fix_links_in_file(file_path: Path, dry_run: bool = False) -> int:
             if dry_run:
                 print(f"Would fix {changes} links in: {file_path}")
             else:
-                file_path.write_text(content)
+                file_path.write_text(content, encoding="utf-8")
                 print(f"Fixed {changes} links in: {file_path}")
             return changes
 
