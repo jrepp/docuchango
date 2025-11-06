@@ -37,14 +37,14 @@ curl -sSL https://raw.githubusercontent.com/jrepp/docuchango/main/install.sh | b
 ## Quick Start
 
 ```bash
-# Validate your documentation
+# Bootstrap a new docs-cms project with templates and structure
+docuchango bootstrap
+
+# Validate your documentation against frontmatter schemas, links, and formatting rules
 docuchango validate
 
-# Automatically fix issues
+# Automatically fix detected issues (code blocks, whitespace, frontmatter)
 docuchango fix all
-
-# Bootstrap a new docs-cms project
-docuchango bootstrap
 ```
 
 ```mermaid
@@ -63,21 +63,12 @@ flowchart LR
     style F fill:#bfb,stroke:#333
 ```
 
-## Detailed Usage
+## Usage Examples
+
+### Validation Commands
 
 ```bash
-# Validate with verbose output
-docuchango validate --verbose
-
-# View bootstrap guides
-docuchango bootstrap --guide agent
-docuchango bootstrap --guide best-practices
-```
-
-## Example Usage
-
-```bash
-# Run validation
+# Run validation with verbose output
 $ docuchango validate --verbose
 
 📂 Scanning documents...
@@ -91,14 +82,43 @@ $ docuchango validate --verbose
    ✗ Missing field: 'deciders'
    ✗ Invalid status: 'Draft'
 
-# Fix automatically
+# Validate everything (default)
+docuchango validate
+
+# Skip slow build checks
+docuchango validate --skip-build
+```
+
+### Fix Commands
+
+```bash
+# Automatically fix all detected issues
 $ docuchango fix all
    ✓ Fixed 12 code blocks
    ✓ Removed trailing whitespace
    ✓ Added missing frontmatter
+
+# Fix specific issues
+docuchango fix code-blocks
+docuchango fix links
 ```
 
-## Document Structure
+### Bootstrap & Guides
+
+```bash
+# View agent integration guides
+docuchango bootstrap --guide agent
+docuchango bootstrap --guide best-practices
+```
+
+### CLI Shortcuts
+
+```bash
+dcc-validate        # Same as docuchango validate
+dcc-fix            # Same as docuchango fix
+```
+
+## CMS Folder Structure
 
 ```text
 docs-cms/
@@ -113,7 +133,7 @@ docs-cms/
     └── prd-001-*.md
 ```
 
-### Frontmatter Schema
+### Document Schema (frontmatter)
 
 Each document requires structured frontmatter. Here's an example with field descriptions:
 
@@ -189,30 +209,6 @@ graph TD
 - **Fixes automatically** (whitespace, code blocks, frontmatter)
 - **Fast** (100 docs in < 1s)
 - **CI-ready** (exit codes, clear errors)
-
-## Commands
-
-```bash
-# Validate everything
-docuchango validate
-
-# Validate with verbose output
-docuchango validate --verbose
-
-# Skip slow build checks
-docuchango validate --skip-build
-
-# Fix all issues
-docuchango fix all
-
-# Fix specific issues
-docuchango fix code-blocks
-docuchango fix links
-
-# CLI shortcuts
-dcc-validate        # Same as docuchango validate
-dcc-fix            # Same as docuchango fix
-```
 
 ## Python API
 
