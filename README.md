@@ -1,5 +1,6 @@
 # Docuchango
 
+[![PyPI version](https://badge.fury.io/py/docuchango.svg)](https://pypi.org/project/docuchango/)
 [![CI](https://github.com/jrepp/docuchango/workflows/CI/badge.svg)](https://github.com/jrepp/docuchango/actions)
 [![codecov](https://codecov.io/gh/jrepp/docuchango/branch/main/graph/badge.svg)](https://codecov.io/gh/jrepp/docuchango)
 [![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/downloads/)
@@ -11,7 +12,40 @@
 [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/jrepp/docuchango/graphs/commit-activity)
 [![Development Status](https://img.shields.io/badge/status-beta-orange.svg)](https://github.com/jrepp/docuchango)
 
-Validate and fix Docusaurus documentation. Checks frontmatter, links, code blocks, and formatting.
+A command-line tool to validate and automatically fix Docusaurus documentation, ensuring frontmatter, links, code blocks, and formatting meet quality standards.
+
+## Why Docuchango?
+
+- **Automated fixes** - Don't just find errors, fix them automatically (whitespace, code blocks, frontmatter)
+- **Docusaurus-specific** - Purpose-built for docs-cms projects with ADR, RFC, Memo, and PRD templates
+- **Strict validation** - Enforces consistent frontmatter schemas with Pydantic, catches issues before build time
+- **Fast & CI-ready** - Processes 100+ docs in under a second, perfect for pre-commit hooks and CI pipelines
+
+## Installation
+
+```bash
+# Install from PyPI (latest version)
+pip install docuchango
+
+# Or use uvx to run without installing
+uvx docuchango --help
+
+# Or use the install script (includes uv)
+curl -sSL https://raw.githubusercontent.com/jrepp/docuchango/main/install.sh | bash
+```
+
+## Quick Start
+
+```bash
+# Validate your documentation
+docuchango validate
+
+# Automatically fix issues
+docuchango fix all
+
+# Bootstrap a new docs-cms project
+docuchango bootstrap
+```
 
 ```mermaid
 flowchart LR
@@ -29,35 +63,15 @@ flowchart LR
     style F fill:#bfb,stroke:#333
 ```
 
-## Quick Start
-
-### 1. Bootstrap a docs-cms Project
+## Detailed Usage
 
 ```bash
-# Install uv (if not already installed)
-curl -LsSf https://astral.sh/uv/install.sh | sh
+# Validate with verbose output
+docuchango validate --verbose
 
-# Install docuchango
-curl -sSL https://raw.githubusercontent.com/jrepp/docuchango/main/install.sh | bash
-
-# View bootstrap guide
-docuchango bootstrap
-
-# View agent instructions
+# View bootstrap guides
 docuchango bootstrap --guide agent
-
-# View best practices
 docuchango bootstrap --guide best-practices
-```
-
-### 2. Validate and Fix Documentation
-
-```bash
-# Validate
-docuchango validate
-
-# Fix issues
-docuchango fix all
 ```
 
 ## Example Usage
@@ -99,19 +113,42 @@ docs-cms/
     └── prd-001-*.md
 ```
 
-Each doc needs frontmatter:
+### Frontmatter Schema
+
+Each document requires structured frontmatter. Here's an example with field descriptions:
+
 ```yaml
 ---
+# Unique identifier matching the filename (e.g., "adr-001", "rfc-042")
 id: "adr-001"
-title: "Use Click for CLI"
+
+# Human-readable title for the document
+title: "Use Click for CLI Framework"
+
+# Current status - valid values depend on doc type
+# ADR: Proposed, Accepted, Deprecated, Superseded
+# RFC: Draft, In Review, Accepted, Rejected, Implemented
+# Memo: Draft, Published, Archived
 status: Accepted
+
+# ISO 8601 date (YYYY-MM-DD) when the document was created
 date: 2025-01-26
+
+# Who made or approved this decision (ADR-specific field)
 deciders: Engineering Team
-tags: ["cli", "framework"]
+
+# Categorization tags for search and filtering
+tags: ["cli", "framework", "tooling"]
+
+# Project identifier for organizing docs across multiple projects
 project_id: "my-project"
-doc_uuid: "..."
+
+# Auto-generated UUID for tracking and references (generate once, never change)
+doc_uuid: "550e8400-e29b-41d4-a716-446655440000"
 ---
 ```
+
+**Note**: Different document types (ADR, RFC, Memo, PRD) have slightly different required fields. Use `docuchango bootstrap` to see templates for each type.
 
 ### Schema Structure
 
