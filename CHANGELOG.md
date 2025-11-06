@@ -2,6 +2,47 @@
 
 <!-- version list -->
 
+## v1.3.4 (2025-11-06)
+
+### Bug Fixes
+
+- Resolve encoding, regex, and string replacement bugs
+  ([`c0898a0`](https://github.com/jrepp/docuchango/commit/c0898a032a0ffba85bfaff5f72b216ec9d6357be))
+
+- Resolve lint errors in tests
+  ([`fd5e9ab`](https://github.com/jrepp/docuchango/commit/fd5e9abe8235b717f486d88f92a812f35cc3f2e9))
+
+### Documentation
+
+- Add comprehensive issues glossary to README
+  ([`6763911`](https://github.com/jrepp/docuchango/commit/6763911e598922e0cfe4f61d32a240f8cc0b686f))
+
+- Address code review feedback on glossary
+  ([`083b873`](https://github.com/jrepp/docuchango/commit/083b8738521fce5bc6ba12ce7ff949cf7b5c36e2))
+
+- Consolidate commands into Usage Examples section
+  ([`f188bd0`](https://github.com/jrepp/docuchango/commit/f188bd0e7dd468a0c6c4e196e7e0d7eeb8480944))
+
+- Improve Quick Start ordering and command descriptions
+  ([`0718e28`](https://github.com/jrepp/docuchango/commit/0718e284aff95f4f1a13dd0eeb3ee5074faa5c56))
+
+- Rename section to Document Schema (frontmatter)
+  ([`05dfe3b`](https://github.com/jrepp/docuchango/commit/05dfe3bc7e5a850fb97ea9b06203e15c83e22d64))
+
+- Update README with pip installation, PyPI badge, and detailed frontmatter schema
+  ([`a4ab206`](https://github.com/jrepp/docuchango/commit/a4ab206c9d7e03e0f0ee2ee5f4bbe8db23d39f4c))
+
+### Refactoring
+
+- Address code review feedback
+  ([`db93581`](https://github.com/jrepp/docuchango/commit/db935810b5b894d52d8bdcfa6bda0033dbc83f97))
+
+### Testing
+
+- Add comprehensive tests for bug fixes
+  ([`1f70c21`](https://github.com/jrepp/docuchango/commit/1f70c21a7f46acdd0e297a0546591cc84eb583cf))
+
+
 ## v1.3.3 (2025-11-04)
 
 ### Bug Fixes
