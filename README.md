@@ -106,7 +106,7 @@ docs-cms/
     └── prd-001-*.md
 ```
 
-### Frontmatter Schema
+### Document Schema (frontmatter)
 
 Each document requires structured frontmatter. Here's an example with field descriptions:
 
