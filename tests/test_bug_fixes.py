@@ -9,8 +9,6 @@ import re
 import tempfile
 from pathlib import Path
 
-import pytest
-
 
 class TestStringReplacementCollision:
     """Tests for bug fix: String replacement collision in cli.py (PR #29)
@@ -188,9 +186,9 @@ Special chars: ≥ ≤ ≠ → ← ↔
 
     def test_encoding_parameter_present_in_read_operations(self):
         """Verify that encoding parameter is specified in file read operations."""
-        from docuchango.fixes import broken_links, cross_plugin_links
-
         import inspect
+
+        from docuchango.fixes import broken_links, cross_plugin_links
 
         # Check broken_links.py
         source = inspect.getsource(broken_links.fix_links_in_file)
@@ -294,8 +292,9 @@ class TestBugFixIntegration:
 
     def test_init_command_with_problematic_values(self, tmp_path):
         """Test docuchango init with values that would trigger all three bugs."""
-        from docuchango.cli import init
         from click.testing import CliRunner
+
+        from docuchango.cli import init
 
         runner = CliRunner()
 
