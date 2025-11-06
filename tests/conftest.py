@@ -98,7 +98,7 @@ class MarkdownGenerator:
     ) -> str:
         """Generate frontmatter YAML."""
         gen = DataGenerator()
-        data = {
+        data: dict[str, Any] = {
             "title": title or gen.random_title(),
             "id": doc_id or gen.random_slug(),
             "project_id": project_id or f"project-{gen.random_string(5)}",
