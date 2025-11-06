@@ -61,6 +61,8 @@ def fix_mdx_issues(content: str) -> tuple[str, list[str]]:
         # - Match <digit with optional decimal
         # - Match optional unit (ms|min|s|%|MB|GB|KB)
         # - Match optional single word (limited to 20 chars to prevent ReDoS)
+        #   20 chars chosen because longest expected unit words (e.g., "milliseconds",
+        #   "microseconds") are ~12-13 chars, so 20 provides a safe upper bound
         pattern = r"(?<!`)<(\d+(?:\.\d+)?(?:ms|min|s|%|MB|GB|KB)?(?:\s+\w{1,20})?)"
 
         def replace_fn(match, line_num=i):
