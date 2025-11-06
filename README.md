@@ -269,6 +269,120 @@ Mozilla Public License Version 2.0 (MPL-2.0) - See [LICENSE](LICENSE) file
 
 This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+## Glossary: Issues Detected and Fixed
+
+This comprehensive reference lists all documentation issues that docuchango can detect and automatically fix.
+
+### Frontmatter Issues
+
+**Detected:**
+- Missing YAML frontmatter
+- Missing required fields (`id`, `title`, `status`, `date`, `tags`, `project_id`, `doc_uuid`)
+- Invalid field types or formats
+- Invalid status values for document type (e.g., "Draft" instead of "Proposed" for ADRs)
+- Missing document-type-specific fields (e.g., `deciders` for ADRs)
+- Invalid date formats (must be ISO 8601: YYYY-MM-DD)
+- Malformed UUID values
+- ID/filename mismatches (frontmatter `id` doesn't match filename)
+- ID/title mismatches (frontmatter `id` doesn't match title number)
+- Duplicate IDs across documents
+- Duplicate UUIDs across documents
+
+**Auto-Fixed:**
+- ✓ Generates missing frontmatter fields
+- ✓ Adds missing required fields with sensible defaults
+
+### Code Block Issues
+
+**Detected:**
+- Opening code fences without language specification (bare \`\`\`)
+- Closing code fences with language/text (should be bare \`\`\`)
+- Unclosed code blocks (missing closing fence)
+- Missing blank line before opening fence
+- Missing blank line after closing fence
+- Unbalanced code fences
+
+**Auto-Fixed:**
+- ✓ Adds "text" language to bare opening fences
+- ✓ Removes language from closing fences
+- ✓ Adds missing closing fences
+- ✓ Inserts blank lines before/after fences
+
+### Link Issues
+
+**Detected:**
+- Broken internal document links (file not found)
+- Invalid relative paths (`./path` or `../path` pointing to non-existent files)
+- Ambiguous link formats
+- Problematic cross-plugin links (multiple `../` levels)
+- Broken ADR/RFC cross-references
+
+**Auto-Fixed:**
+- ✓ Updates broken internal links to correct paths
+- ✓ Converts problematic cross-plugin links to absolute GitHub URLs
+- ✓ Fixes document link formats
+
+### MDX Compatibility Issues
+
+**Detected:**
+- Unescaped `<` before numbers (e.g., "< 10")
+- Unescaped `>` before numbers (e.g., "> 5")
+- MDX compilation errors
+- JSX syntax incompatibilities
+- Special characters that break MDX parsing
+
+**Auto-Fixed:**
+- ✓ Escapes special MDX characters (`&lt;`, `&gt;`)
+- ✓ Fixes MDX syntax issues
+- ✓ Corrects JSX-incompatible markdown
+
+### Formatting Issues
+
+**Detected:**
+- Trailing whitespace on lines
+- More than 2 consecutive blank lines
+- Inconsistent line endings
+
+**Auto-Fixed:**
+- ✓ Removes trailing whitespace
+- ✓ Normalizes multiple blank lines
+
+### Filename & Naming Issues
+
+**Detected:**
+- Invalid filename patterns (must be: `type-NNN-slug.md`)
+- Uppercase in filenames (deprecated, must be lowercase)
+- Inconsistent ADR/RFC/Memo numbering
+
+**Requires Manual Fix:** Flagged for user intervention
+
+### Build & Compilation Issues
+
+**Detected:**
+- TypeScript compilation errors in Docusaurus config
+- Full Docusaurus build failures
+- MDX compilation failures via @mdx-js/mdx
+- Build warnings
+
+**Requires Manual Fix:** Reported for debugging and manual resolution
+
+### Migration & Import Issues
+
+**Auto-Fixed:**
+- ✓ Proto import syntax issues
+- ✓ Migration syntax corrections
+
+---
+
+**Issue Categories:**
+1. **Frontmatter** - Schema validation, required fields, format checking
+2. **Code Blocks** - Fence formatting, language labels, balance
+3. **Links** - Broken links, cross-references, path resolution
+4. **MDX** - Compilation, special character escaping, JSX compatibility
+5. **Formatting** - Whitespace, blank lines
+6. **Identifiers** - IDs, UUIDs, filename consistency
+7. **Build** - TypeScript, Docusaurus compilation
+
 ## Links
 
 - [GitHub](https://github.com/jrepp/docuchango)
