@@ -6,8 +6,8 @@ import uuid
 from pathlib import Path
 
 try:
-    from rich.console import Console
     import yaml
+    from rich.console import Console
 except ImportError as e:
     print(f"❌ Missing dependency: {e}", file=sys.stderr)
     print("Run: uv sync", file=sys.stderr)
@@ -201,7 +201,7 @@ def main():
     project_config = docs_dir / "docs-project.yaml"
     if project_config.exists():
         try:
-            with open(project_config) as f:
+            with project_config.open() as f:
                 config = yaml.safe_load(f)
                 if config and "project" in config and "id" in config["project"]:
                     project_id = config["project"]["id"]
