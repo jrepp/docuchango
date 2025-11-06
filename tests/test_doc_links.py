@@ -1,6 +1,5 @@
 """Tests for doc_links.py fix module."""
 
-
 from docuchango.fixes.doc_links import fix_links_in_file
 
 

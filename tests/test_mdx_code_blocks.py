@@ -1,6 +1,5 @@
 """Tests for mdx_code_blocks.py fix module."""
 
-
 from docuchango.fixes.mdx_code_blocks import fix_code_blocks
 
 

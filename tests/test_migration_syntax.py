@@ -1,6 +1,5 @@
 """Tests for migration_syntax.py fix module."""
 
-
 from docuchango.fixes.migration_syntax import fix_migration_file
 
 
