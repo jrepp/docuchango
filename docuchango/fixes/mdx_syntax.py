@@ -57,7 +57,11 @@ def fix_mdx_issues(content: str) -> tuple[str, list[str]]:
                     continue
 
         # Find <digit patterns not in backticks
-        pattern = r"(?<!`)<(\d+(?:\.\d+)?(?:ms|min|s|%|MB|GB|KB)?(?:\s+\w+)?)"
+        # Limited pattern to prevent catastrophic backtracking:
+        # - Match <digit with optional decimal
+        # - Match optional unit (ms|min|s|%|MB|GB|KB)
+        # - Match optional single word (limited to 20 chars to prevent ReDoS)
+        pattern = r"(?<!`)<(\d+(?:\.\d+)?(?:ms|min|s|%|MB|GB|KB)?(?:\s+\w{1,20})?)"
 
         def replace_fn(match, line_num=i):
             full_match = match.group(0)
