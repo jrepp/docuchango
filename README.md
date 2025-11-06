@@ -65,6 +65,8 @@ flowchart LR
 
 ## Usage Examples
 
+### Validation Commands
+
 ```bash
 # Run validation with verbose output
 $ docuchango validate --verbose
@@ -80,15 +82,40 @@ $ docuchango validate --verbose
    ✗ Missing field: 'deciders'
    ✗ Invalid status: 'Draft'
 
-# Automatically fix detected issues
+# Validate everything (default)
+docuchango validate
+
+# Skip slow build checks
+docuchango validate --skip-build
+```
+
+### Fix Commands
+
+```bash
+# Automatically fix all detected issues
 $ docuchango fix all
    ✓ Fixed 12 code blocks
    ✓ Removed trailing whitespace
    ✓ Added missing frontmatter
 
+# Fix specific issues
+docuchango fix code-blocks
+docuchango fix links
+```
+
+### Bootstrap & Guides
+
+```bash
 # View agent integration guides
-$ docuchango bootstrap --guide agent
-$ docuchango bootstrap --guide best-practices
+docuchango bootstrap --guide agent
+docuchango bootstrap --guide best-practices
+```
+
+### CLI Shortcuts
+
+```bash
+dcc-validate        # Same as docuchango validate
+dcc-fix            # Same as docuchango fix
 ```
 
 ## CMS Folder Structure
@@ -182,30 +209,6 @@ graph TD
 - **Fixes automatically** (whitespace, code blocks, frontmatter)
 - **Fast** (100 docs in < 1s)
 - **CI-ready** (exit codes, clear errors)
-
-## Commands
-
-```bash
-# Validate everything
-docuchango validate
-
-# Validate with verbose output
-docuchango validate --verbose
-
-# Skip slow build checks
-docuchango validate --skip-build
-
-# Fix all issues
-docuchango fix all
-
-# Fix specific issues
-docuchango fix code-blocks
-docuchango fix links
-
-# CLI shortcuts
-dcc-validate        # Same as docuchango validate
-dcc-fix            # Same as docuchango fix
-```
 
 ## Python API
 
