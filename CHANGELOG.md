@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v1.3.5 (2025-11-06)
+
+### Bug Fixes
+
+- Resolve critical bugs with 100% failure rates
+  ([`e0269a2`](https://github.com/jrepp/docuchango/commit/e0269a205ff2dd7d3336c080b798702eda124356))
+
+- Resolve lint errors
+  ([`fd88b99`](https://github.com/jrepp/docuchango/commit/fd88b992e4a16d6274e30dc324baf39aaa047a20))
+
+### Refactoring
+
+- Move yaml import to top of file
+  ([`8821b39`](https://github.com/jrepp/docuchango/commit/8821b392558fa6f884ee735278cf4363c0809bf5))
+
+
 ## v1.3.4 (2025-11-06)
 
 ### Bug Fixes
