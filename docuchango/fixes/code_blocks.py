@@ -94,14 +94,14 @@ def fix_code_blocks(file_path: Path) -> tuple[bool, list[str]]:
                     in_code_block = False
 
                     # Check next line for blank line requirement
+                    # Add blank line AFTER the closing fence if next line has content
                     if i + 1 < len(lines):
                         next_line = lines[i + 1].strip()
                         if next_line:  # Next line has content
-                            # Insert blank line after closing fence
-                            i += 1  # Move to next line
-                            fixed_lines.append("")  # Add blank line
-                            changes.append(f"Line {i}: Added blank line after closing fence")
-                            continue  # Will process next line in next iteration
+                            # Add blank line to fixed_lines (it will appear between closing fence and next content)
+                            fixed_lines.append("")
+                            changes.append(f"Line {i + 2}: Added blank line after closing fence")
+                    # Note: Do NOT manipulate i or use continue here - let loop handle iteration
             else:
                 # Regular line (not a code fence)
                 if not in_code_block:
