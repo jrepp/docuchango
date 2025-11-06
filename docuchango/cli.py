@@ -290,8 +290,6 @@ def init(path: Path | None, project_id: str, project_name: str, force: bool):
             # Customize docs-project.yaml with provided values
             # Use simultaneous replacement to prevent cascading replacement bugs
             if template_name == "docs-project.yaml":
-                import re
-
                 # Create a regex pattern that matches any of our placeholders
                 # Using a temporary unique marker approach to avoid collision
                 markers = {
