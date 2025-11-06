@@ -139,8 +139,16 @@ def fix_blank_lines_after_fences(file_path: Path) -> int:
     return changes
 
 
-def add_missing_frontmatter_fields(file_path: Path) -> int:
-    """Add missing project_id and doc_uuid fields to frontmatter."""
+def add_missing_frontmatter_fields(file_path: Path, project_id: str = "my-project") -> int:
+    """Add missing project_id and doc_uuid fields to frontmatter.
+
+    Args:
+        file_path: Path to the markdown file
+        project_id: Project ID to use if missing (default: "my-project")
+
+    Returns:
+        Number of fields added
+    """
     content = file_path.read_text()
 
     # Check if file has frontmatter
@@ -159,7 +167,7 @@ def add_missing_frontmatter_fields(file_path: Path) -> int:
 
     # Check if project_id is missing
     if "project_id:" not in frontmatter:
-        frontmatter += 'project_id: "agf-devportal"\n'
+        frontmatter += f'project_id: "{project_id}"\n'
         changes += 1
 
     # Check if doc_uuid is missing
@@ -178,7 +186,30 @@ def main():
     """Fix all documentation issues."""
     console.print("[bold blue]🔧 Fixing Documentation Issues[/bold blue]\n")
 
-    docs_dir = Path("/Users/jrepp/hc/cloud-agf-devportal/docs-cms")
+    # Use current working directory or repo root to find docs-cms
+    repo_root = Path.cwd()
+    docs_dir = repo_root / "docs-cms"
+
+    if not docs_dir.exists():
+        console.print(f"[red]Error: docs-cms directory not found at {docs_dir}[/red]")
+        console.print("[yellow]Make sure you're running this from the repository root[/yellow]")
+        return 1
+
+    # Try to load project_id from docs-project.yaml
+    project_id = "my-project"  # default
+    project_config = docs_dir / "docs-project.yaml"
+    if project_config.exists():
+        try:
+            import yaml
+
+            with open(project_config) as f:
+                config = yaml.safe_load(f)
+                if config and "project" in config and "id" in config["project"]:
+                    project_id = config["project"]["id"]
+                    console.print(f"Using project_id from config: {project_id}\n")
+        except Exception as e:
+            console.print(f"[yellow]Warning: Could not load project config: {e}[/yellow]")
+            console.print(f"[yellow]Using default project_id: {project_id}[/yellow]\n")
 
     total_fixes = 0
     files_fixed = 0
@@ -210,7 +241,7 @@ def main():
             file_fixes += blank_fixes
 
         # Add missing frontmatter fields
-        fm_fixes = add_missing_frontmatter_fields(md_file)
+        fm_fixes = add_missing_frontmatter_fields(md_file, project_id=project_id)
         if fm_fixes > 0:
             console.print(f"  ✓ Added {fm_fixes} frontmatter fields to {md_file.name}")
             file_fixes += fm_fixes
