@@ -37,11 +37,11 @@ def fix_links_in_content(content: str) -> tuple[str, int]:
 
     # Match markdown links with date prefix in path
     # Captures: [text](../path/YYYY-MM-DD-type-NNN-name.md#anchor)
-    pattern = r"\[([^\]]+)\]\(([./]*[^)]*/)(\d{4}-\d{2}-\d{2}-)((adr|rfc|memo)-[^)#]+\.md)(#[^)]+)?\)"
+    pattern = r"\[([^\]]+)\]\(([./]*[^)]*/)(\d{4}-\d{2}-\d{2}-)((?:adr|rfc|memo)-[^)#]+\.md)(#[^)]+)?\)"
     content = re.sub(pattern, fix_link, content)
 
     # Also match without directory prefix: [text](YYYY-MM-DD-type-NNN-name.md)
-    pattern2 = r"\[([^\]]+)\]\((\d{4}-\d{2}-\d{2}-)((adr|rfc|memo)-[^)#]+\.md)(#[^)]+)?\)"
+    pattern2 = r"\[([^\]]+)\]\((\d{4}-\d{2}-\d{2}-)((?:adr|rfc|memo)-[^)#]+\.md)(#[^)]+)?\)"
 
     def fix_link2(match):
         nonlocal fixes
