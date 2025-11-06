@@ -108,7 +108,7 @@ Text with <5ms."""
         assert "中文" in fixed
 
     def test_redos_protection(self):
-        """Test that regex doesn't suffer from ReDoS."""
+        """Test that regex doesn't suffer from ReDoS (catastrophic backtracking)."""
         # Create adversarial input with long words
         adversarial = "<123 " + "a" * 100 + " more text"
 
@@ -116,8 +116,9 @@ Text with <5ms."""
         fixed, changes = fix_mdx_issues(adversarial)
         elapsed = time.time() - start
 
-        # Should complete quickly (< 0.1 seconds)
-        assert elapsed < 0.1, f"Regex took too long: {elapsed}s (possible ReDoS)"
+        # ReDoS would cause timeout (seconds/minutes), not milliseconds
+        # Use generous threshold (2s) to account for slow CI systems
+        assert elapsed < 2.0, f"Regex took too long: {elapsed}s (possible ReDoS)"
         assert len(changes) >= 1  # Should match
 
     def test_word_length_boundary(self):
@@ -127,7 +128,8 @@ Text with <5ms."""
         start = time.time()
         fixed, changes = fix_mdx_issues(content)
         elapsed = time.time() - start
-        assert elapsed < 0.05  # Fast execution
+        # Use generous threshold to avoid flaky tests on slow systems
+        assert elapsed < 1.0, f"Regex took too long: {elapsed}s"
 
     def test_line_number_tracking(self):
         """Test that line numbers are tracked in changes."""

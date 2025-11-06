@@ -11,30 +11,37 @@ from typing import Any, Optional
 
 import pytest
 
+# Set fixed seed for reproducible test data
+random.seed(42)
+
 
 class DataGenerator:
-    """Generator for random test data."""
+    """Generator for deterministic test data.
+
+    Uses a fixed seed (42) for reproducibility. All random methods will
+    generate the same values across test runs, ensuring deterministic behavior.
+    """
 
     @staticmethod
     def random_string(length: int = 10, chars: str = string.ascii_lowercase) -> str:
-        """Generate a random string."""
+        """Generate a deterministic pseudo-random string."""
         return "".join(random.choice(chars) for _ in range(length))
 
     @staticmethod
     def random_slug(words: int = 2) -> str:
-        """Generate a random slug (e.g., 'test-doc-001')."""
+        """Generate a deterministic pseudo-random slug (e.g., 'test-doc-001')."""
         word_list = ["test", "doc", "page", "guide", "manual", "reference", "api", "cli"]
         selected = random.sample(word_list, min(words, len(word_list)))
         return "-".join(selected) + f"-{random.randint(1, 999):03d}"
 
     @staticmethod
     def random_uuid() -> str:
-        """Generate a random UUID."""
+        """Generate a random UUID (uses uuid4, not affected by seed)."""
         return str(uuid.uuid4())
 
     @staticmethod
     def random_date(start_year: int = 2020, end_year: int = 2025) -> str:
-        """Generate a random date in YYYY-MM-DD format."""
+        """Generate a deterministic pseudo-random date in YYYY-MM-DD format."""
         start = datetime(start_year, 1, 1)
         end = datetime(end_year, 12, 31)
         delta = end - start
