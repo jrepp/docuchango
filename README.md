@@ -37,14 +37,14 @@ curl -sSL https://raw.githubusercontent.com/jrepp/docuchango/main/install.sh | b
 ## Quick Start
 
 ```bash
-# Validate your documentation
+# Bootstrap a new docs-cms project with templates and structure
+docuchango bootstrap
+
+# Validate your documentation against frontmatter schemas, links, and formatting rules
 docuchango validate
 
-# Automatically fix issues
+# Automatically fix detected issues (code blocks, whitespace, frontmatter)
 docuchango fix all
-
-# Bootstrap a new docs-cms project
-docuchango bootstrap
 ```
 
 ```mermaid
@@ -63,21 +63,10 @@ flowchart LR
     style F fill:#bfb,stroke:#333
 ```
 
-## Detailed Usage
+## Usage Examples
 
 ```bash
-# Validate with verbose output
-docuchango validate --verbose
-
-# View bootstrap guides
-docuchango bootstrap --guide agent
-docuchango bootstrap --guide best-practices
-```
-
-## Example Usage
-
-```bash
-# Run validation
+# Run validation with verbose output
 $ docuchango validate --verbose
 
 📂 Scanning documents...
@@ -91,14 +80,18 @@ $ docuchango validate --verbose
    ✗ Missing field: 'deciders'
    ✗ Invalid status: 'Draft'
 
-# Fix automatically
+# Automatically fix detected issues
 $ docuchango fix all
    ✓ Fixed 12 code blocks
    ✓ Removed trailing whitespace
    ✓ Added missing frontmatter
+
+# View agent integration guides
+$ docuchango bootstrap --guide agent
+$ docuchango bootstrap --guide best-practices
 ```
 
-## Document Structure
+## CMS Folder Structure
 
 ```text
 docs-cms/
