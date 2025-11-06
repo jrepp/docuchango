@@ -292,6 +292,18 @@ This comprehensive reference lists all documentation issues that docuchango can 
 - ✓ Generates missing frontmatter fields
 - ✓ Adds missing required fields with sensible defaults
 
+**Requires Manual Fix:**
+- Missing YAML frontmatter
+- Invalid field types or formats
+- Invalid status values for document type (e.g., "Draft" instead of "Proposed" for ADRs)
+- Missing document-type-specific fields (e.g., `deciders` for ADRs)
+- Invalid date formats (must be ISO 8601: YYYY-MM-DD)
+- Malformed UUID values
+- ID/filename mismatches (frontmatter `id` doesn't match filename)
+- ID/title mismatches (frontmatter `id` doesn't match title number)
+- Duplicate IDs across documents
+- Duplicate UUIDs across documents
+
 ### Code Block Issues
 
 **Detected:**
@@ -382,6 +394,7 @@ This comprehensive reference lists all documentation issues that docuchango can 
 5. **Formatting** - Whitespace, blank lines
 6. **Identifiers** - IDs, UUIDs, filename consistency
 7. **Build** - TypeScript, Docusaurus compilation
+8. **Migration** - Import syntax, migration corrections
 
 ## Links
 
