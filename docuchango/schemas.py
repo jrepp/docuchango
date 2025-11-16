@@ -132,6 +132,26 @@ class DocsProjectReadability(BaseModel):
         description="Minimum paragraph length in characters to analyze",
     )
 
+    def to_readability_config(self) -> "ReadabilityConfig":
+        """Convert to ReadabilityConfig for use with ReadabilityScorer.
+
+        Returns:
+            ReadabilityConfig with all fields mapped from this schema
+        """
+        from docuchango.readability import ReadabilityConfig
+
+        return ReadabilityConfig(
+            enabled=self.enabled,
+            flesch_reading_ease_min=self.flesch_reading_ease_min,
+            flesch_kincaid_grade_max=self.flesch_kincaid_grade_max,
+            gunning_fog_max=self.gunning_fog_max,
+            smog_index_max=self.smog_index_max,
+            automated_readability_index_max=self.automated_readability_index_max,
+            coleman_liau_index_max=self.coleman_liau_index_max,
+            dale_chall_max=self.dale_chall_max,
+            min_paragraph_length=self.min_paragraph_length,
+        )
+
 
 class DocsProjectConfig(BaseModel):
     """Schema for docs-project.yaml configuration file.

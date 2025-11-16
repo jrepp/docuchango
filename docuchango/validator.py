@@ -1001,18 +1001,7 @@ class DocValidator:
         self.log("\n📖 Checking readability...")
 
         # Convert project config to ReadabilityConfig
-        read_config = self.project_config.readability
-        config = ReadabilityConfig(
-            enabled=read_config.enabled,
-            flesch_reading_ease_min=read_config.flesch_reading_ease_min,
-            flesch_kincaid_grade_max=read_config.flesch_kincaid_grade_max,
-            gunning_fog_max=read_config.gunning_fog_max,
-            smog_index_max=read_config.smog_index_max,
-            automated_readability_index_max=read_config.automated_readability_index_max,
-            coleman_liau_index_max=read_config.coleman_liau_index_max,
-            dale_chall_max=read_config.dale_chall_max,
-            min_paragraph_length=read_config.min_paragraph_length,
-        )
+        config = self.project_config.readability.to_readability_config()
 
         scorer = ReadabilityScorer(config)
 

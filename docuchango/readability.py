@@ -167,6 +167,7 @@ class ReadabilityScorer:
         in_code_block = False
         in_frontmatter = False
         in_html_block = False
+        in_html_comment = False
         frontmatter_count = 0
 
         for i, line in enumerate(lines, start=1):
@@ -196,6 +197,21 @@ class ReadabilityScorer:
             if in_code_block:
                 continue
 
+            # Track HTML comments (multi-line support)
+            if "<!--" in stripped:
+                in_html_comment = True
+                # Flush current paragraph
+                if current_paragraph:
+                    para_text = " ".join(current_paragraph).strip()
+                    if len(para_text) >= self.config.min_paragraph_length:
+                        paragraphs.append((para_text, current_paragraph_start_line))
+                    current_paragraph = []
+
+            if in_html_comment:
+                if "-->" in stripped:
+                    in_html_comment = False
+                continue
+
             # Track HTML/MDX blocks (opening and closing tags)
             if stripped.startswith("<"):
                 # Flush current paragraph when entering HTML block
@@ -206,7 +222,7 @@ class ReadabilityScorer:
                     current_paragraph = []
 
                 # Check if this is a self-closing tag or opening tag
-                if not stripped.endswith("/>") and not stripped.startswith("<!--"):
+                if not stripped.endswith("/>"):
                     in_html_block = True
                 continue
 
@@ -261,44 +277,46 @@ class ReadabilityScorer:
         score = ParagraphScore(paragraph_text=text, line_number=line_number)
 
         # Calculate all metrics
+        # textstat may raise ZeroDivisionError, ValueError, or other exceptions for
+        # text that is too short or doesn't have enough sentences/syllables
         try:
             score.flesch_reading_ease = textstat.flesch_reading_ease(text)
-        except Exception:
-            pass  # Metric may fail on very short text
+        except (ZeroDivisionError, ValueError):
+            pass  # Metric calculation failed (insufficient text/sentences)
 
         try:
             score.flesch_kincaid_grade = textstat.flesch_kincaid_grade(text)
-        except Exception:
+        except (ZeroDivisionError, ValueError):
             pass
 
         try:
             score.gunning_fog = textstat.gunning_fog(text)
-        except Exception:
+        except (ZeroDivisionError, ValueError):
             pass
 
         try:
             score.smog_index = textstat.smog_index(text)
-        except Exception:
-            pass
+        except (ZeroDivisionError, ValueError):
+            pass  # SMOG requires at least 3 sentences
 
         try:
             score.automated_readability_index = textstat.automated_readability_index(text)
-        except Exception:
+        except (ZeroDivisionError, ValueError):
             pass
 
         try:
             score.coleman_liau_index = textstat.coleman_liau_index(text)
-        except Exception:
+        except (ZeroDivisionError, ValueError):
             pass
 
         try:
             score.dale_chall = textstat.dale_chall_readability_score(text)
-        except Exception:
+        except (ZeroDivisionError, ValueError):
             pass
 
         try:
             score.text_standard = textstat.text_standard(text, float_output=False)
-        except Exception:
+        except (ZeroDivisionError, ValueError):
             pass
 
         # Check thresholds
