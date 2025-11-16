@@ -131,6 +131,27 @@ def fix_list():
             ],
         },
         {
+            "command": "tags",
+            "description": "Normalize and fix tags fields",
+            "fixes": [
+                "Convert string tags to arrays",
+                "Normalize to lowercase with dashes (e.g., 'API Design' → 'api-design')",
+                "Remove duplicates",
+                "Sort alphabetically",
+                "Add missing tags field (empty array)",
+            ],
+        },
+        {
+            "command": "whitespace",
+            "description": "Clean whitespace and ensure required fields",
+            "fixes": [
+                "Trim leading/trailing whitespace from all string values",
+                "Remove empty strings and null values",
+                "Ensure required fields present (tags, doc_uuid, project_id)",
+                "Normalize empty arrays for list fields",
+            ],
+        },
+        {
             "command": "timestamps",
             "description": "Update document timestamps from git history",
             "fixes": [
@@ -301,6 +322,132 @@ def fix_frontmatter(repo_root: Path, dry_run: bool, verbose: bool):
         console.print(f"[green]✓[/green] Fixed {total_fixes} issues in {fixed_files} files")
     else:
         console.print("[green]✓[/green] No frontmatter issues found")
+
+    if dry_run:
+        console.print("\n[yellow]Dry run complete - no files were modified[/yellow]")
+
+
+@fix.command("tags")
+@click.option(
+    "--repo-root",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    default=Path.cwd(),
+    help="Repository root directory (default: current directory)",
+)
+@click.option("--dry-run", is_flag=True, help="Show what would be fixed without making changes")
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed output")
+def fix_tags(repo_root: Path, dry_run: bool, verbose: bool):
+    """Fix tags field issues.
+
+    Normalizes tags across all documents:
+    - Converts string tags to arrays
+    - Normalizes to lowercase with dashes
+    - Removes duplicates
+    - Sorts alphabetically
+    - Adds missing tags field
+    """
+    from docuchango.fixes.tags import fix_tags as fix_tags_func
+
+    console.print("[bold blue]🏷️  Fixing Tags[/bold blue]\n")
+    if dry_run:
+        console.print("[yellow]DRY RUN - No changes will be made[/yellow]\n")
+
+    # Find all markdown files in docs directories
+    doc_patterns = ["adr/**/*.md", "rfcs/**/*.md", "memos/**/*.md", "prd/**/*.md"]
+    all_files = []
+    for pattern in doc_patterns:
+        all_files.extend(repo_root.glob(pattern))
+
+    if not all_files:
+        console.print("[yellow]No documentation files found[/yellow]")
+        return
+
+    total_files = len(all_files)
+    fixed_files = 0
+    total_fixes = 0
+
+    console.print(f"Found {total_files} documentation files\n")
+
+    for file_path in all_files:
+        changed, messages = fix_tags_func(file_path, dry_run=dry_run)
+
+        if changed:
+            fixed_files += 1
+            total_fixes += len(messages)
+
+            if verbose or not dry_run:
+                rel_path = file_path.relative_to(repo_root)
+                console.print(f"[cyan]{rel_path}[/cyan]")
+                for msg in messages:
+                    console.print(f"  ✓ {msg}")
+
+    console.print()
+    if fixed_files > 0:
+        console.print(f"[green]✓[/green] Fixed {total_fixes} issues in {fixed_files} files")
+    else:
+        console.print("[green]✓[/green] No tag issues found")
+
+    if dry_run:
+        console.print("\n[yellow]Dry run complete - no files were modified[/yellow]")
+
+
+@fix.command("whitespace")
+@click.option(
+    "--repo-root",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    default=Path.cwd(),
+    help="Repository root directory (default: current directory)",
+)
+@click.option("--dry-run", is_flag=True, help="Show what would be fixed without making changes")
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed output")
+def fix_whitespace_cmd(repo_root: Path, dry_run: bool, verbose: bool):
+    """Fix whitespace and missing required fields.
+
+    Fixes:
+    - Trims leading/trailing whitespace from string values
+    - Removes empty strings and null values
+    - Ensures required fields are present (tags, doc_uuid, project_id)
+    """
+    from docuchango.fixes.whitespace import fix_whitespace_and_fields
+
+    console.print("[bold blue]🧹 Fixing Whitespace & Fields[/bold blue]\n")
+    if dry_run:
+        console.print("[yellow]DRY RUN - No changes will be made[/yellow]\n")
+
+    # Find all markdown files in docs directories
+    doc_patterns = ["adr/**/*.md", "rfcs/**/*.md", "memos/**/*.md", "prd/**/*.md"]
+    all_files = []
+    for pattern in doc_patterns:
+        all_files.extend(repo_root.glob(pattern))
+
+    if not all_files:
+        console.print("[yellow]No documentation files found[/yellow]")
+        return
+
+    total_files = len(all_files)
+    fixed_files = 0
+    total_fixes = 0
+
+    console.print(f"Found {total_files} documentation files\n")
+
+    for file_path in all_files:
+        changed, messages = fix_whitespace_and_fields(file_path, dry_run=dry_run)
+
+        if changed:
+            fixed_files += 1
+            total_fixes += len(messages)
+
+            if verbose or not dry_run:
+                rel_path = file_path.relative_to(repo_root)
+                console.print(f"[cyan]{rel_path}[/cyan]")
+                for msg in messages:
+                    console.print(f"  ✓ {msg}")
+
+    console.print()
+    if fixed_files > 0:
+        console.print(f"[green]✓[/green] Fixed {total_fixes} issues in {fixed_files} files")
+    else:
+        console.print("[green]✓[/green] No whitespace issues found")
 
     if dry_run:
         console.print("\n[yellow]Dry run complete - no files were modified[/yellow]")

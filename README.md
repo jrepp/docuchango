@@ -155,6 +155,32 @@ adr/adr-001.md
   ✓ Updated status: Proposed → Accepted
 
 ✓ 10 files would be updated
+
+# Fix tags normalization
+$ docuchango fix tags --dry-run
+🏷️  Fixing Tags
+
+Found 23 documentation files
+
+adr/adr-001.md
+  ✓ Normalized tags: 3 tags
+  ✓ Removed 1 duplicate/invalid tags
+  ✓ Sorted tags alphabetically
+
+✓ Fixed 8 issues in 5 files
+
+# Fix whitespace and required fields
+$ docuchango fix whitespace --dry-run
+🧹 Fixing Whitespace & Fields
+
+Found 23 documentation files
+
+adr/adr-002.md
+  ✓ Trimmed whitespace from 'title' field
+  ✓ Generated missing 'doc_uuid'
+  ✓ Added missing 'tags' field (empty array)
+
+✓ Fixed 15 issues in 7 files
 ```
 
 ### Bootstrap & Guides
@@ -346,6 +372,10 @@ This comprehensive reference lists all documentation issues that docuchango can 
 - ✓ Fixes invalid status values (maps common variations to valid values by doc type)
 - ✓ Converts invalid date formats to ISO 8601 (YYYY-MM-DD)
 - ✓ Converts date objects to ISO 8601 strings
+- ✓ Normalizes tags (converts to arrays, lowercase-with-dashes, removes duplicates, sorts)
+- ✓ Trims whitespace from all string values
+- ✓ Removes empty strings and null values
+- ✓ Updates timestamps from git history (created/updated fields)
 
 **Requires Manual Fix:**
 - Missing YAML frontmatter (complex cases)
