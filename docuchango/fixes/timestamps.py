@@ -43,6 +43,8 @@ def get_git_dates(file_path: Path) -> tuple[str | None, str | None]:
             return None, None
 
         first_commit = commits[0]
+        # Replace 'Z' with '+00:00' for Python 3.9/3.10 compatibility
+        first_commit = first_commit.replace('Z', '+00:00')
         created_date = datetime.fromisoformat(first_commit).strftime("%Y-%m-%d")
 
         # Get last commit date (update)
@@ -57,6 +59,8 @@ def get_git_dates(file_path: Path) -> tuple[str | None, str | None]:
         if not last_commit:
             return created_date, created_date
 
+        # Replace 'Z' with '+00:00' for Python 3.9/3.10 compatibility
+        last_commit = last_commit.replace('Z', '+00:00')
         updated_date = datetime.fromisoformat(last_commit).strftime("%Y-%m-%d")
 
         return created_date, updated_date
