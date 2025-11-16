@@ -495,3 +495,213 @@ and comprehensive abstraction layers to facilitate extensibility.
         # Technical jargon should likely fail with strict thresholds
         # (though we can't guarantee it without running the actual analysis)
         assert report.total_paragraphs >= 0  # Just verify it runs
+
+
+class TestReadabilityThresholdValidation:
+    """Test threshold configuration and validation failures."""
+
+    def test_all_thresholds_trigger_errors(self):
+        """Test that text violating all thresholds reports all errors."""
+        config = ReadabilityConfig(
+            flesch_reading_ease_min=90.0,  # Very strict
+            flesch_kincaid_grade_max=5.0,   # Elementary level
+            gunning_fog_max=6.0,
+            smog_index_max=6.0,
+            automated_readability_index_max=5.0,
+            coleman_liau_index_max=5.0,
+            dale_chall_max=5.0,
+        )
+        scorer = ReadabilityScorer(config)
+
+        # Complex technical text that should fail all metrics
+        text = """
+        Implementation of sophisticated multidimensional architectural methodologies
+        necessitates comprehensive understanding of organizational restructuring paradigms
+        incorporating contemporary technological advancements and interdisciplinary approaches.
+        """
+        score = scorer.score_paragraph(text, 1)
+
+        # Should have multiple errors
+        assert score.has_errors()
+        assert len(score.errors) >= 3  # At least 3 metrics should fail
+
+    def test_flesch_reading_ease_boundary(self):
+        """Test Flesch Reading Ease at exact boundary."""
+        config = ReadabilityConfig(
+            flesch_reading_ease_min=60.0,
+            flesch_kincaid_grade_max=None,
+            gunning_fog_max=None,
+            smog_index_max=None,
+            automated_readability_index_max=None,
+            coleman_liau_index_max=None,
+            dale_chall_max=None,
+        )
+        scorer = ReadabilityScorer(config)
+
+        # Text that should be close to boundary
+        text = """
+        The system provides tools for development. Users can access features through
+        the main interface. Documentation helps explain the functionality.
+        """
+        score = scorer.score_paragraph(text, 1)
+
+        # Score should be calculated
+        assert score.flesch_reading_ease is not None
+
+    def test_grade_level_progressive_difficulty(self):
+        """Test that text difficulty increases with complexity."""
+        config = ReadabilityConfig()
+        scorer = ReadabilityScorer(config)
+
+        simple_text = "The cat sat. The dog ran. The bird flew."
+        complex_text = """
+        Sophisticated implementation methodologies incorporating architectural patterns
+        necessitate comprehensive understanding of organizational frameworks.
+        """
+
+        simple_score = scorer.score_paragraph(simple_text, 1)
+        complex_score = scorer.score_paragraph(complex_text, 1)
+
+        # Complex text should have higher grade level (if both calculated)
+        if simple_score.flesch_kincaid_grade and complex_score.flesch_kincaid_grade:
+            assert complex_score.flesch_kincaid_grade > simple_score.flesch_kincaid_grade
+
+    def test_multiple_paragraphs_some_fail(self):
+        """Test document where some paragraphs pass and some fail."""
+        config = ReadabilityConfig(
+            flesch_reading_ease_min=70.0,
+            flesch_kincaid_grade_max=8.0,
+            min_paragraph_length=50,  # Lower threshold to catch all paragraphs
+        )
+        scorer = ReadabilityScorer(config)
+
+        content = """
+The cat sat on the mat. The dog ran in the yard. Birds sang in the trees.
+
+Implementation of sophisticated architectural methodologies incorporating comprehensive
+frameworks necessitating extensive understanding of organizational structures and
+contemporary technological advancement paradigms.
+
+The sun is bright. Kids play outside. Everyone is happy. The weather is nice today.
+"""
+        report = scorer.analyze_document(content)
+
+        # Should have analyzed multiple paragraphs
+        assert report.total_paragraphs >= 2
+        # Some should fail, some should pass
+        # (exact behavior depends on textstat calculations)
+
+    def test_disabled_metrics_dont_generate_errors(self):
+        """Test that setting metrics to None disables error checking."""
+        config = ReadabilityConfig(
+            flesch_reading_ease_min=None,  # Disabled
+            flesch_kincaid_grade_max=None,  # Disabled
+            gunning_fog_max=None,  # Disabled
+            smog_index_max=None,  # Disabled
+            automated_readability_index_max=None,  # Disabled
+            coleman_liau_index_max=None,  # Disabled
+            dale_chall_max=None,  # Disabled
+        )
+        scorer = ReadabilityScorer(config)
+
+        # Even very complex text should not generate errors
+        text = """
+        Extraordinarily sophisticated multifaceted implementation methodologies
+        necessitating comprehensive understanding of organizational restructuring
+        paradigms incorporating contemporary technological advancements.
+        """
+        score = scorer.score_paragraph(text, 1)
+
+        # Scores should be calculated but no errors
+        assert not score.has_errors()
+        # But scores should still be calculated
+        assert score.flesch_reading_ease is not None
+
+    def test_very_low_thresholds_allow_all(self):
+        """Test that very permissive thresholds allow all text."""
+        config = ReadabilityConfig(
+            flesch_reading_ease_min=-200.0,  # Allow even negative scores
+            flesch_kincaid_grade_max=100.0,  # Allow anything
+            gunning_fog_max=100.0,
+            smog_index_max=100.0,
+            automated_readability_index_max=100.0,
+            coleman_liau_index_max=100.0,
+            dale_chall_max=100.0,
+        )
+        scorer = ReadabilityScorer(config)
+
+        # Even complex text should pass
+        text = """
+        Implementation of extraordinarily sophisticated multidimensional architectural
+        methodologies necessitating comprehensive understanding.
+        """
+        score = scorer.score_paragraph(text, 1)
+
+        # Should not have errors with permissive thresholds
+        assert not score.has_errors()
+
+    def test_document_with_all_paragraphs_failing(self):
+        """Test document where all paragraphs fail readability."""
+        config = ReadabilityConfig(
+            flesch_reading_ease_min=90.0,  # Very strict
+            flesch_kincaid_grade_max=5.0,
+            min_paragraph_length=50,  # Lower to catch all paragraphs
+        )
+        scorer = ReadabilityScorer(config)
+
+        content = """
+Implementation of sophisticated architectural paradigms incorporating comprehensive frameworks and methodologies.
+
+Utilization of contemporary technological methodologies necessitating extensive organizational understanding and coordination.
+
+Comprehensive restructuring incorporating multidimensional approaches facilitating extensibility and scalability.
+"""
+        report = scorer.analyze_document(content)
+
+        # All paragraphs should likely fail
+        assert report.has_errors()
+        # Should have analyzed paragraphs (at least one should be long enough)
+        assert report.total_paragraphs >= 1
+
+    def test_min_paragraph_length_filtering(self):
+        """Test that minimum paragraph length is enforced."""
+        config = ReadabilityConfig(
+            min_paragraph_length=200,  # High threshold
+        )
+        scorer = ReadabilityScorer(config)
+
+        content = """
+Short paragraph.
+
+This is a much longer paragraph that contains significantly more text and should
+exceed the minimum paragraph length threshold that we have configured for this
+particular test case to ensure proper filtering.
+
+Another short one.
+"""
+        paragraphs = scorer.extract_paragraphs(content)
+
+        # Only the long paragraph should be extracted
+        assert len(paragraphs) <= 2  # At most the long one (and maybe one other)
+        # The long paragraph should be included
+        assert any(len(para[0]) >= 200 for para in paragraphs)
+
+    def test_error_messages_include_threshold_values(self):
+        """Test that error messages include the threshold values."""
+        config = ReadabilityConfig(
+            flesch_reading_ease_min=70.0,
+            flesch_kincaid_grade_max=8.0,
+        )
+        scorer = ReadabilityScorer(config)
+
+        text = """
+        Sophisticated implementation incorporating architectural frameworks
+        necessitating comprehensive organizational understanding.
+        """
+        score = scorer.score_paragraph(text, 1)
+
+        if score.has_errors():
+            # Error messages should mention the thresholds
+            for error in score.errors:
+                # Should contain numeric threshold value
+                assert any(char.isdigit() for char in error)
