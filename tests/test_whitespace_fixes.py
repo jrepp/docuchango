@@ -1,6 +1,5 @@
 """Tests for whitespace and required fields fixes."""
 
-
 import frontmatter
 
 from docuchango.fixes.whitespace import (

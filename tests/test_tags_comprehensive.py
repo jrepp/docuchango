@@ -1,6 +1,5 @@
 """Comprehensive tests for tags fixes - positive, negative, and edge cases."""
 
-
 import frontmatter
 
 from docuchango.fixes.tags import fix_tags, normalize_tag

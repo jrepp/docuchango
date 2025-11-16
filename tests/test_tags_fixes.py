@@ -1,6 +1,5 @@
 """Tests for tags normalization fixes."""
 
-
 import frontmatter
 
 from docuchango.fixes.tags import fix_tags, normalize_tag

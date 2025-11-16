@@ -40,7 +40,6 @@ def normalize_tag(tag: str) -> str:
     return tag.strip("-")
 
 
-
 def fix_tags(file_path: Path, dry_run: bool = False) -> tuple[bool, list[str]]:
     """Fix tags field issues in frontmatter.
 

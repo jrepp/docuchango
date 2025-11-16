@@ -1,6 +1,5 @@
 """Comprehensive tests for whitespace fixes - positive, negative, and edge cases."""
 
-
 import frontmatter
 import pytest
 
