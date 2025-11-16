@@ -224,6 +224,235 @@ def fix_frontmatter(repo_root: Path, dry_run: bool, verbose: bool):
         console.print("\n[yellow]Dry run complete - no files were modified[/yellow]")
 
 
+@fix.command("timestamps")
+@click.option(
+    "--repo-root",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    default=Path.cwd(),
+    help="Repository root directory (default: current directory)",
+)
+@click.option("--dry-run", is_flag=True, help="Show what would be updated without making changes")
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed output")
+@click.option(
+    "--path",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Specific file or directory to update (default: all docs)",
+)
+def fix_timestamps(repo_root: Path, dry_run: bool, verbose: bool, path: Path | None):
+    """Update document timestamps based on git history.
+
+    Updates 'created' and 'updated' fields based on git commit history:
+    - created: Date of first commit
+    - updated: Date of last commit
+
+    Also migrates legacy 'date' field to 'created'/'updated' fields.
+    """
+    from docuchango.fixes.timestamps import update_document_timestamps
+
+    console.print("[bold blue]📅 Updating Document Timestamps[/bold blue]\n")
+    if dry_run:
+        console.print("[yellow]DRY RUN - No changes will be made[/yellow]\n")
+
+    # Determine paths to process
+    if path:
+        if path.is_file():
+            paths = [path]
+        else:
+            paths = list(path.rglob("*.md"))
+    else:
+        # Process all docs in standard directories
+        doc_patterns = ["adr/**/*.md", "rfcs/**/*.md", "memos/**/*.md", "prd/**/*.md"]
+        paths = []
+        for pattern in doc_patterns:
+            paths.extend(repo_root.glob(pattern))
+
+    if not paths:
+        console.print("[yellow]No documentation files found[/yellow]")
+        return
+
+    console.print(f"Found {len(paths)} documentation files\n")
+
+    updated_count = 0
+    for file_path in sorted(paths):
+        changed, messages = update_document_timestamps(file_path, dry_run)
+
+        if changed:
+            updated_count += 1
+            if verbose or not dry_run:
+                rel_path = file_path.relative_to(repo_root)
+                console.print(f"[cyan]{rel_path}[/cyan]")
+                for msg in messages:
+                    console.print(f"  ✓ {msg}")
+
+    console.print()
+    console.print(f"[bold]Summary:[/bold]")
+    console.print(f"  Documents processed: {len(paths)}")
+    console.print(f"  Documents {'would be ' if dry_run else ''}updated: {updated_count}")
+
+    if dry_run and updated_count > 0:
+        console.print("\n[yellow]💡 Run without --dry-run to apply changes[/yellow]")
+
+
+@fix.command("bulk-update")
+@click.option(
+    "--repo-root",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    default=Path.cwd(),
+    help="Repository root directory (default: current directory)",
+)
+@click.option("--set", "set_field", metavar="FIELD=VALUE", help="Set field value")
+@click.option("--add", "add_field", metavar="FIELD=VALUE", help="Add field only if it doesn't exist")
+@click.option("--remove", "remove_field", metavar="FIELD", help="Remove field from frontmatter")
+@click.option("--rename", "rename_field", metavar="OLD=NEW", help="Rename field")
+@click.option(
+    "--type",
+    "doc_type",
+    type=click.Choice(["adr", "rfc", "memo", "prd"]),
+    help="Filter by document type",
+)
+@click.option(
+    "--path",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Specific file or directory to update",
+)
+@click.option("--dry-run", is_flag=True, help="Preview changes without modifying files")
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed output")
+def bulk_update(
+    repo_root: Path,
+    set_field: str | None,
+    add_field: str | None,
+    remove_field: str | None,
+    rename_field: str | None,
+    doc_type: str | None,
+    path: Path | None,
+    dry_run: bool,
+    verbose: bool,
+):
+    """Bulk update frontmatter fields across documentation.
+
+    Perform operations on frontmatter fields:
+    - --set: Update or create field
+    - --add: Create field only if it doesn't exist
+    - --remove: Delete field
+    - --rename: Rename field (OLD=NEW)
+
+    Examples:
+        # Set status to Accepted for all ADRs
+        docuchango fix bulk-update --type adr --set status=Accepted
+
+        # Add priority field to all RFCs
+        docuchango fix bulk-update --type rfc --add priority=high
+
+        # Remove deprecated field
+        docuchango fix bulk-update --remove deprecated
+
+        # Rename field
+        docuchango fix bulk-update --rename old_name=new_name
+    """
+    from docuchango.fixes.bulk_update import bulk_update_files
+
+    # Validate that exactly one operation is specified
+    operations = [set_field, add_field, remove_field, rename_field]
+    specified = [op for op in operations if op is not None]
+    if len(specified) != 1:
+        console.print("[red]Error: Specify exactly one operation (--set, --add, --remove, or --rename)[/red]")
+        import sys
+
+        sys.exit(1)
+
+    # Determine operation and parse field spec
+    if set_field:
+        operation = "set"
+        if "=" not in set_field:
+            console.print("[red]Error: --set requires FIELD=VALUE format[/red]")
+            import sys
+
+            sys.exit(1)
+        field_name, value = set_field.split("=", 1)
+    elif add_field:
+        operation = "add"
+        if "=" not in add_field:
+            console.print("[red]Error: --add requires FIELD=VALUE format[/red]")
+            import sys
+
+            sys.exit(1)
+        field_name, value = add_field.split("=", 1)
+    elif remove_field:
+        operation = "remove"
+        field_name = remove_field
+        value = None
+    else:  # rename_field
+        operation = "rename"
+        if "=" not in rename_field:
+            console.print("[red]Error: --rename requires OLD=NEW format[/red]")
+            import sys
+
+            sys.exit(1)
+        field_name, value = rename_field.split("=", 1)
+
+    console.print("[bold blue]🔧 Bulk Update Frontmatter[/bold blue]\n")
+    if dry_run:
+        console.print("[yellow]DRY RUN - No changes will be made[/yellow]\n")
+
+    # Determine paths to process
+    if path:
+        if path.is_file():
+            paths = [path]
+        else:
+            paths = list(path.rglob("*.md"))
+    else:
+        # Process based on doc_type filter or all docs
+        doc_patterns = ["adr/**/*.md", "rfcs/**/*.md", "memos/**/*.md", "prd/**/*.md"]
+        if doc_type:
+            if doc_type == "adr":
+                doc_patterns = ["adr/**/*.md"]
+            elif doc_type == "rfc":
+                doc_patterns = ["rfcs/**/*.md"]
+            elif doc_type == "memo":
+                doc_patterns = ["memos/**/*.md"]
+            elif doc_type == "prd":
+                doc_patterns = ["prd/**/*.md"]
+
+        paths = []
+        for pattern in doc_patterns:
+            paths.extend(repo_root.glob(pattern))
+
+    if not paths:
+        console.print("[yellow]No documentation files found[/yellow]")
+        return
+
+    console.print(f"Operation: {operation.upper()}")
+    console.print(f"Field: {field_name}" + (f" = {value}" if value else ""))
+    if doc_type:
+        console.print(f"Document type filter: {doc_type.upper()}")
+    console.print(f"Files found: {len(paths)}\n")
+
+    # Perform bulk update
+    results = bulk_update_files(paths, field_name, value, operation, dry_run)
+
+    # Display results
+    updated_count = 0
+    for file_path, changed, message in results:
+        if changed:
+            updated_count += 1
+
+        if (verbose or changed) and message:
+            rel_path = file_path.relative_to(repo_root)
+            icon = "✓" if changed else "ℹ"
+            console.print(f"[cyan]{rel_path}[/cyan]")
+            console.print(f"  {icon} {message}")
+
+    console.print()
+    console.print(f"[bold]Summary:[/bold]")
+    console.print(f"  Files processed: {len(results)}")
+    console.print(f"  Files {'would be ' if dry_run else ''}updated: {updated_count}")
+
+    if dry_run and updated_count > 0:
+        console.print("\n[yellow]💡 Run without --dry-run to apply changes[/yellow]")
+
+
 @main.group()
 def test():
     """Testing utilities and helpers."""

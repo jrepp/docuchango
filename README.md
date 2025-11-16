@@ -118,6 +118,31 @@ adr/adr-001.md
 
 # Apply the fixes
 docuchango fix frontmatter
+
+# Update timestamps based on git history
+$ docuchango fix timestamps --dry-run
+📅 Updating Document Timestamps
+
+Found 5 documentation files
+
+adr/adr-001.md
+  ✓ Migrated 'date' → 'created' and 'updated'
+
+✓ Fixed 5 issues in 5 files
+
+# Bulk update frontmatter fields
+$ docuchango fix bulk-update --type adr --set status=Accepted --dry-run
+🔧 Bulk Update Frontmatter
+
+Operation: SET
+Field: status = Accepted
+Document type filter: ADR
+Files found: 15
+
+adr/adr-001.md
+  ✓ Updated status: Proposed → Accepted
+
+✓ 10 files would be updated
 ```
 
 ### Bootstrap & Guides
@@ -223,7 +248,9 @@ graph TD
 
 - **Validates** frontmatter (required fields, valid formats)
 - **Checks links** (internal, relative, broken refs)
-- **Fixes automatically** (whitespace, code blocks, frontmatter)
+- **Fixes automatically** (whitespace, code blocks, frontmatter, timestamps)
+- **Bulk operations** (set, add, remove, rename frontmatter fields across all docs)
+- **Git-aware** (updates timestamps from commit history)
 - **Fast** (100 docs in < 1s)
 - **CI-ready** (exit codes, clear errors)
 
