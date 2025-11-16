@@ -7,6 +7,7 @@ Validates markdown documents for:
 - Markdown formatting issues
 - Consistent ADR/RFC numbering
 - MDX compilation compatibility
+- Document readability (Flesch Reading Ease, grade level metrics)
 - Docusaurus build validation
 
 Usage:
@@ -34,6 +35,8 @@ try:
     import yaml
     from pydantic import ValidationError
 
+    from docuchango.readability import TEXTSTAT_AVAILABLE, ReadabilityConfig, ReadabilityScorer
+
     # Import schemas from the docuchango package
     from docuchango.schemas import (
         ADRFrontmatter,
@@ -46,15 +49,22 @@ try:
 
     ENHANCED_VALIDATION = True
 except ImportError as e:
-    print("\n❌ CRITICAL ERROR: Required dependencies not found", file=sys.stderr)
-    print("   Missing: python-frontmatter and/or pydantic", file=sys.stderr)
-    print("   These are REQUIRED for proper frontmatter validation.", file=sys.stderr)
-    print("\n   Fix:", file=sys.stderr)
-    print("   $ uv sync", file=sys.stderr)
-    print("\n   Then run validation with:", file=sys.stderr)
-    print("   $ uv run tooling/validate_docs.py", file=sys.stderr)
-    print(f"\n   Error details: {e}\n", file=sys.stderr)
-    sys.exit(2)
+    # Don't fail if only textstat is missing - just readability features will be disabled
+    if "textstat" not in str(e):
+        print("\n❌ CRITICAL ERROR: Required dependencies not found", file=sys.stderr)
+        print("   Missing: python-frontmatter and/or pydantic", file=sys.stderr)
+        print("   These are REQUIRED for proper frontmatter validation.", file=sys.stderr)
+        print("\n   Fix:", file=sys.stderr)
+        print("   $ uv sync", file=sys.stderr)
+        print("\n   Then run validation with:", file=sys.stderr)
+        print("   $ uv run tooling/validate_docs.py", file=sys.stderr)
+        print(f"\n   Error details: {e}\n", file=sys.stderr)
+        sys.exit(2)
+    # textstat is optional - set flag
+    TEXTSTAT_AVAILABLE = False
+    ReadabilityConfig = None  # type: ignore[misc, assignment]
+    ReadabilityScorer = None  # type: ignore[misc, assignment]
+    ENHANCED_VALIDATION = True
 
 
 class LinkType(Enum):
@@ -976,6 +986,50 @@ class DocValidator:
             except Exception as e:
                 doc.errors.append(f"Error checking formatting: {e}")
 
+    def check_readability(self):
+        """Check document readability using textstat metrics."""
+        if not TEXTSTAT_AVAILABLE:
+            self.log("\n📖 Readability checking skipped (textstat not installed)")
+            return
+
+        if not self.project_config or not self.project_config.readability.enabled:
+            self.log("\n📖 Readability checking disabled")
+            return
+
+        self.log("\n📖 Checking readability...")
+
+        # Convert project config to ReadabilityConfig
+        read_config = self.project_config.readability
+        config = ReadabilityConfig(
+            enabled=read_config.enabled,
+            flesch_reading_ease_min=read_config.flesch_reading_ease_min,
+            flesch_kincaid_grade_max=read_config.flesch_kincaid_grade_max,
+            gunning_fog_max=read_config.gunning_fog_max,
+            smog_index_max=read_config.smog_index_max,
+            automated_readability_index_max=read_config.automated_readability_index_max,
+            coleman_liau_index_max=read_config.coleman_liau_index_max,
+            dale_chall_max=read_config.dale_chall_max,
+            min_paragraph_length=read_config.min_paragraph_length,
+        )
+
+        scorer = ReadabilityScorer(config)
+
+        for doc in self.documents:
+            try:
+                content = doc.get_content()
+                report = scorer.analyze_document(content, file_path=str(doc.file_path.relative_to(self.repo_root)))
+
+                if report.has_errors():
+                    for line_num, error_msg in report.get_all_errors():
+                        doc.errors.append(f"Line {line_num}: {error_msg}")
+                        self.log(f"   ✗ {doc.file_path.name}:{line_num}: {error_msg}")
+                else:
+                    self.log(f"   ✓ {doc.file_path.name}: {report.total_paragraphs} paragraphs analyzed, all readable")
+
+            except Exception as e:
+                doc.errors.append(f"Error checking readability: {e}")
+                self.log(f"   ✗ {doc.file_path.name}: Readability check failed: {e}")
+
     def check_ids(self):
         """Validate document IDs for consistency and uniqueness"""
         self.log("\n🆔 Checking document IDs...")
@@ -1207,6 +1261,7 @@ class DocValidator:
         self.check_mdx_compatibility()
         self.check_cross_plugin_links()
         self.check_formatting()
+        self.check_readability()  # Check document readability
 
         # Build validation (can be skipped for faster checks)
         build_passed = self.check_typescript_config()
@@ -1242,6 +1297,7 @@ What this checks:
     ✓ Internal link validity
     ✓ MDX syntax compatibility
     ✓ Cross-plugin link issues
+    ✓ Document readability metrics
     ✓ TypeScript compilation
     ✓ Full Docusaurus build
         """,

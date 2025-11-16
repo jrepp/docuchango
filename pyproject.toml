@@ -34,6 +34,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Readability analysis features
+readability = [
+    "textstat>=0.7.0",
+]
 # Development dependencies for running tests
 test = [
     "pytest>=8.0.0",
@@ -49,7 +53,7 @@ lint = [
 ]
 # Full development setup
 dev = [
-    "docuchango[test,lint]",
+    "docuchango[test,lint,readability]",
 ]
 
 [project.scripts]
@@ -173,6 +177,7 @@ ignore = [
 "docuchango/fixes/*" = ["RET505"]
 "docuchango/testing/*" = ["S311", "S107", "S110", "SIM105"]
 "docuchango/validator.py" = ["PTH123"]
+"docuchango/readability.py" = ["S110", "SIM105", "SIM102"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["docuchango"]
