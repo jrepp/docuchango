@@ -2,10 +2,10 @@
 title: "Document Title"
 description: "Brief document description"
 sidebar_position: 1
-tags: ["tag1", "tag2"]
-id: "document-slug"
+tags: ["tag1", "tag2"]  # Format: lowercase-with-dashes
+id: "document-slug"  # Lowercase slug format: my-document-name
 project_id: "your-project-id"
-doc_uuid: "00000000-0000-4000-8000-000000000000"
+doc_uuid: "00000000-0000-4000-8000-000000000000"  # Generate: uuidgen  OR  python -c "import uuid; print(uuid.uuid4())"
 ---
 
 # Document Title

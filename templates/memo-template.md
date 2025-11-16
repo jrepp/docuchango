@@ -1,25 +1,20 @@
 ---
-date: YYYY-MM-DD
-doc_uuid: 00000000-0000-4000-8000-000000000000
-id: memo-XXX
+id: memo-XXX  # Use sequential numbering: memo-001, memo-002, etc.
 slug: memo-XXX-brief-description
-project_id: your-project-id
-author: Author Name
-created: YYYY-MM-DD
-updated: YYYY-MM-DD
-tags:
+title: Memo Title
+status: Draft  # Valid values: Draft, Published, Archived
+created: YYYY-MM-DD  # Generate: date +%Y-%m-%d  OR  python -c "from datetime import date; print(date.today())"  OR  auto-set with: docuchango fix timestamps
+updated: YYYY-MM-DD  # Last modified date - auto-updated with: docuchango fix timestamps
+author: Author Name  # Generate: git config user.name
+tags:  # Format: lowercase-with-dashes
   - tag1
   - tag2
   - tag3
-title: Memo Title
+project_id: your-project-id
+doc_uuid: 00000000-0000-4000-8000-000000000000  # Generate: uuidgen  OR  python -c "import uuid; print(uuid.uuid4())"
 ---
 
 # Memo Title
-
-**Date**: Month DD, YYYY
-**Author**: Author Name
-**Purpose**: Brief purpose statement
-**Related**: [Link to related document](./related-doc.md)
 
 ## Executive Summary
 

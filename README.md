@@ -5,6 +5,8 @@
 [![codecov](https://codecov.io/gh/jrepp/docuchango/branch/main/graph/badge.svg)](https://codecov.io/gh/jrepp/docuchango)
 [![Python Version](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/downloads/)
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
+<!-- NOTE: Test count badge requires manual update after adding/removing tests -->
+[![Tests](https://img.shields.io/badge/tests-628%20passing-brightgreen)](https://github.com/jrepp/docuchango/actions)
 
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Type checked: mypy](https://img.shields.io/badge/type%20checked-mypy-blue.svg)](http://mypy-lang.org/)
@@ -92,6 +94,18 @@ docuchango validate --skip-build
 ### Fix Commands
 
 ```bash
+# List all available fixes and their descriptions
+$ docuchango fix list
+📋 Available Fixes
+
+docuchango fix frontmatter
+  Fix frontmatter issues
+  Fixes:
+    • Invalid status values (maps to valid values by doc type)
+    • Invalid date formats (converts to ISO 8601: YYYY-MM-DD)
+    • Missing frontmatter blocks (generates with defaults)
+    ...
+
 # Automatically fix all detected issues
 $ docuchango fix all
    ✓ Fixed 12 code blocks
@@ -101,6 +115,86 @@ $ docuchango fix all
 # Fix specific issues
 docuchango fix code-blocks
 docuchango fix links
+
+# Fix frontmatter issues (status values, dates, missing fields)
+$ docuchango fix frontmatter --dry-run --verbose
+📋 Fixing Frontmatter Issues
+
+DRY RUN - No changes will be made
+
+Found 23 documentation files
+
+adr/adr-001.md
+  ✓ Changed status from 'Draft' to 'Proposed'
+  ✓ Converted date from '2025/01/26' to '2025-01-26'
+
+✓ Fixed 12 issues in 8 files
+
+# Apply the fixes
+docuchango fix frontmatter
+
+# Update timestamps based on git history
+$ docuchango fix timestamps --dry-run
+📅 Updating Document Timestamps
+
+Found 5 documentation files
+
+adr/adr-001.md
+  ✓ Migrated 'date' → 'created' and 'updated'
+
+✓ Fixed 5 issues in 5 files
+
+# Bulk update frontmatter fields
+$ docuchango fix bulk-update --type adr --set status=Accepted --dry-run
+🔧 Bulk Update Frontmatter
+
+Operation: SET
+Field: status = Accepted
+Document type filter: ADR
+Files found: 15
+
+adr/adr-001.md
+  ✓ Updated status: Proposed → Accepted
+
+adr/adr-005.md
+  ℹ Field status already has value 'Accepted'
+
+✓ 10 files would be updated
+
+# Bulk update operations support:
+# • SET - Update or add field (smart value detection)
+# • ADD - Add field only if it doesn't exist
+# • REMOVE - Delete field from frontmatter
+# • RENAME - Rename field (preserves value)
+# • Handles empty frontmatter gracefully
+# • Detects duplicate file references
+# • Provides clear feedback for each operation
+
+# Fix tags normalization
+$ docuchango fix tags --dry-run
+🏷️  Fixing Tags
+
+Found 23 documentation files
+
+adr/adr-001.md
+  ✓ Normalized tags: 3 tags
+  ✓ Removed 1 duplicate/invalid tags
+  ✓ Sorted tags alphabetically
+
+✓ Fixed 8 issues in 5 files
+
+# Fix whitespace and required fields
+$ docuchango fix whitespace --dry-run
+🧹 Fixing Whitespace & Fields
+
+Found 23 documentation files
+
+adr/adr-002.md
+  ✓ Trimmed whitespace from 'title' field
+  ✓ Generated missing 'doc_uuid'
+  ✓ Added missing 'tags' field (empty array)
+
+✓ Fixed 15 issues in 7 files
 ```
 
 ### Bootstrap & Guides
@@ -206,7 +300,9 @@ graph TD
 
 - **Validates** frontmatter (required fields, valid formats)
 - **Checks links** (internal, relative, broken refs)
-- **Fixes automatically** (whitespace, code blocks, frontmatter)
+- **Fixes automatically** (whitespace, code blocks, frontmatter, timestamps)
+- **Bulk operations** (set, add, remove, rename frontmatter fields across all docs)
+- **Git-aware** (updates timestamps from commit history)
 - **Fast** (100 docs in < 1s)
 - **CI-ready** (exit codes, clear errors)
 
@@ -234,9 +330,17 @@ uv sync
 pip install -e ".[dev]"
 
 # Test
-pytest
-pytest --cov=docuchango
-pytest -n auto  # Parallel (for large test suites)
+pytest                      # Run all tests (628 tests)
+pytest --cov=docuchango     # With coverage report
+pytest -n auto              # Parallel execution
+pytest -v                   # Verbose output
+
+# Test Statistics
+# • 628 passing tests (with textstat installed)
+# • 569 core tests + 59 readability tests
+# • Zero flaky or xfail tests
+# • Full Python 3.9-3.13 compatibility
+# • Comprehensive edge case coverage (frontmatter, links, timestamps, bulk updates)
 
 # Lint
 ruff format .
@@ -285,15 +389,29 @@ This comprehensive reference lists all documentation issues that docuchango can 
 - Duplicate UUIDs across documents
 
 **Auto-Fixed:**
-- ✓ Generates missing frontmatter fields
-- ✓ Adds missing required fields with sensible defaults
+- ✓ Generates missing frontmatter blocks with sensible defaults
+- ✓ Adds missing required fields (id, title, status, date, tags, project_id, doc_uuid)
+- ✓ Fixes invalid status values (maps common variations to valid values by doc type)
+  - Handles empty strings, special characters, and whitespace
+  - Supports fuzzy matching for common misspellings
+- ✓ Converts invalid date formats to ISO 8601 (YYYY-MM-DD)
+  - Supports multiple input formats (slash, dot, long month names)
+  - Converts datetime objects to ISO 8601 strings
+- ✓ Normalizes tags (converts to arrays, lowercase-with-dashes, removes duplicates, sorts)
+- ✓ Trims whitespace from all string values
+- ✓ Removes empty strings and null values
+- ✓ Updates timestamps from git history (created/updated fields)
+  - Automatically adds missing `created` or `updated` fields
+  - Migrates legacy `date` field to `created`/`updated` pair
+  - Works without `status` field requirement
+- ✓ Handles empty frontmatter blocks (initializes with empty metadata)
+- ✓ Validates operation types with clear error messages
+- ✓ Detects and reports binary files (non-UTF-8 content)
 
 **Requires Manual Fix:**
-- Missing YAML frontmatter
+- Missing YAML frontmatter (complex cases)
 - Invalid field types or formats
-- Invalid status values for document type (e.g., "Draft" instead of "Proposed" for ADRs)
 - Missing document-type-specific fields (e.g., `deciders` for ADRs)
-- Invalid date formats (must be ISO 8601: YYYY-MM-DD)
 - Malformed UUID values
 - ID/filename mismatches (frontmatter `id` doesn't match filename)
 - ID/title mismatches (frontmatter `id` doesn't match title number)

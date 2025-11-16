@@ -282,7 +282,7 @@ toml = [
 
 [[package]]
 name = "docuchango"
-version = "1.3.3"
+version = "1.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "click", version = "8.1.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
@@ -292,7 +292,6 @@ dependencies = [
     { name = "python-frontmatter" },
     { name = "pyyaml" },
     { name = "rich" },
-    { name = "textstat" },
 ]
 
 [package.optional-dependencies]
@@ -303,12 +302,16 @@ dev = [
     { name = "pytest-timeout" },
     { name = "pytest-xdist" },
     { name = "ruff" },
+    { name = "textstat" },
     { name = "types-pyyaml" },
 ]
 lint = [
     { name = "mypy" },
     { name = "ruff" },
     { name = "types-pyyaml" },
+]
+readability = [
+    { name = "textstat" },
 ]
 test = [
     { name = "pytest" },
@@ -320,7 +323,7 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.0.0" },
-    { name = "docuchango", extras = ["test", "lint"], marker = "extra == 'dev'" },
+    { name = "docuchango", extras = ["test", "lint", "readability"], marker = "extra == 'dev'" },
     { name = "eval-type-backport", marker = "python_full_version < '3.10'", specifier = ">=0.2.0" },
     { name = "mypy", marker = "extra == 'lint'", specifier = ">=1.0.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
@@ -332,10 +335,10 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "rich", specifier = ">=13.0.0" },
     { name = "ruff", marker = "extra == 'lint'", specifier = ">=0.1.0" },
-    { name = "textstat", specifier = ">=0.7.0" },
+    { name = "textstat", marker = "extra == 'readability'", specifier = ">=0.7.0" },
     { name = "types-pyyaml", marker = "extra == 'lint'", specifier = ">=6.0.0" },
 ]
-provides-extras = ["test", "lint", "dev"]
+provides-extras = ["readability", "test", "lint", "dev"]
 
 [[package]]
 name = "eval-type-backport"

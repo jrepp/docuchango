@@ -1,24 +1,17 @@
 ---
-id: "prdfaq-XXX"
+id: "prdfaq-XXX"  # Use sequential numbering: prdfaq-001, prdfaq-002, etc.
 slug: prdfaq-XXX-product-name
 title: "Product Name FAQ"
-status: Draft
-date: YYYY-MM-DD
-created: YYYY-MM-DD
-updated: YYYY-MM-DD
-author: Product Manager
-tags: ["product", "faq", "prdfaq"]
+status: Draft  # Valid values: Draft, In Review, Approved, In Progress, Completed, Cancelled
+created: YYYY-MM-DD  # Generate: date +%Y-%m-%d  OR  python -c "from datetime import date; print(date.today())"  OR  auto-set with: docuchango fix timestamps
+updated: YYYY-MM-DD  # Last modified date - auto-updated with: docuchango fix timestamps
+author: Product Manager  # Generate: git config user.name
+tags: ["product", "faq", "prdfaq"]  # Format: lowercase-with-dashes
 project_id: "your-project-id"
-doc_uuid: "00000000-0000-4000-8000-000000000000"
+doc_uuid: "00000000-0000-4000-8000-000000000000"  # Generate: uuidgen  OR  python -c "import uuid; print(uuid.uuid4())"
 ---
 
 # PRDFAQ: Product Name
-
-**Status:** Draft
-**Author:** Product Manager
-**Created:** YYYY-MM-DD
-**Updated:** YYYY-MM-DD
-**Related PRD:** [PRD-XXX](./prd-XXX.md)
 
 ## Press Release
 
