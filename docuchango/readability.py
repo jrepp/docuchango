@@ -36,7 +36,7 @@ try:
 except ImportError:
     TEXTSTAT_AVAILABLE = False
     # Make textstat optional - readability features will be disabled if not available
-    textstat = None  # type: ignore[assignment]
+    textstat = None  # type: ignore[assignment, unused-ignore]
 
 
 class ReadabilityMetric(Enum):
@@ -142,7 +142,10 @@ class ReadabilityScorer:
         """
         self.config = config
         if not TEXTSTAT_AVAILABLE:
-            raise ImportError("textstat library is required for readability analysis. Install it with: uv sync")
+            raise ImportError(
+                "textstat library is required for readability analysis. "
+                "Install it with: uv sync --extra readability or pip install docuchango[readability]"
+            )
 
     def extract_paragraphs(self, markdown_content: str) -> list[tuple[str, int]]:
         """Extract readable paragraphs from markdown content.
@@ -163,6 +166,7 @@ class ReadabilityScorer:
         current_paragraph_start_line = 0
         in_code_block = False
         in_frontmatter = False
+        in_html_block = False
         frontmatter_count = 0
 
         for i, line in enumerate(lines, start=1):
@@ -192,15 +196,33 @@ class ReadabilityScorer:
             if in_code_block:
                 continue
 
-            # Skip headings, lists, empty lines, HTML comments
+            # Track HTML/MDX blocks (opening and closing tags)
+            if stripped.startswith("<"):
+                # Flush current paragraph when entering HTML block
+                if current_paragraph:
+                    para_text = " ".join(current_paragraph).strip()
+                    if len(para_text) >= self.config.min_paragraph_length:
+                        paragraphs.append((para_text, current_paragraph_start_line))
+                    current_paragraph = []
+
+                # Check if this is a self-closing tag or opening tag
+                if not stripped.endswith("/>") and not stripped.startswith("<!--"):
+                    in_html_block = True
+                continue
+
+            # Check if we're closing an HTML block
+            if in_html_block:
+                if stripped.startswith("</") or stripped.endswith(">"):
+                    in_html_block = False
+                continue
+
+            # Skip headings, lists, empty lines, blockquotes
             if (
                 stripped.startswith("#")
                 or stripped.startswith("-")
                 or stripped.startswith("*")
                 or stripped.startswith("+")
                 or stripped.startswith(">")  # blockquotes
-                or stripped.startswith("<")  # HTML/MDX tags
-                or stripped.startswith("<!--")
                 or not stripped
             ):
                 # Flush current paragraph

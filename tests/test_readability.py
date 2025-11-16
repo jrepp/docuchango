@@ -279,13 +279,17 @@ lines in the source.
             flesch_reading_ease_min=None,
             flesch_kincaid_grade_max=None,
             gunning_fog_max=None,
+            smog_index_max=None,
+            automated_readability_index_max=None,
+            coleman_liau_index_max=None,
+            dale_chall_max=None,
         )
         scorer = ReadabilityScorer(config)
 
         text = "Complex sophisticated implementation of architectural patterns."
         score = scorer.score_paragraph(text, line_number=1)
 
-        # Should have scores but no errors since thresholds are disabled
+        # Should have scores but no errors since all thresholds are disabled
         assert score.flesch_reading_ease is not None
         assert not score.has_errors()
 

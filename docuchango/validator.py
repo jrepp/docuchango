@@ -50,7 +50,14 @@ try:
     ENHANCED_VALIDATION = True
 except ImportError as e:
     # Don't fail if only textstat is missing - just readability features will be disabled
-    if "textstat" not in str(e):
+    if "textstat" in str(e):
+        # textstat is optional - set flag and continue
+        TEXTSTAT_AVAILABLE = False
+        ReadabilityConfig = None  # type: ignore[misc, assignment]
+        ReadabilityScorer = None  # type: ignore[misc, assignment]
+        ENHANCED_VALIDATION = True
+    else:
+        # Critical dependencies missing
         print("\n❌ CRITICAL ERROR: Required dependencies not found", file=sys.stderr)
         print("   Missing: python-frontmatter and/or pydantic", file=sys.stderr)
         print("   These are REQUIRED for proper frontmatter validation.", file=sys.stderr)
@@ -60,11 +67,6 @@ except ImportError as e:
         print("   $ uv run tooling/validate_docs.py", file=sys.stderr)
         print(f"\n   Error details: {e}\n", file=sys.stderr)
         sys.exit(2)
-    # textstat is optional - set flag
-    TEXTSTAT_AVAILABLE = False
-    ReadabilityConfig = None  # type: ignore[misc, assignment]
-    ReadabilityScorer = None  # type: ignore[misc, assignment]
-    ENHANCED_VALIDATION = True
 
 
 class LinkType(Enum):
