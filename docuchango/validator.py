@@ -327,7 +327,7 @@ class DocValidator:
                     _content_cache=content,
                 )
 
-                for error in e.errors():
+                for error in e.errors():  # type: ignore[assignment]
                     field_name = ".".join(str(loc) for loc in error["loc"])
                     msg = error["msg"]
                     error_type = error["type"]
