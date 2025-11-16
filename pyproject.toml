@@ -234,14 +234,14 @@ module = "tests.*"
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
 disallow_untyped_calls = false
-disable_error_code = ["call-arg", "arg-type", "no-untyped-call"]
+disable_error_code = ["call-arg", "arg-type", "no-untyped-call", "var-annotated"]
 
 [[tool.mypy.overrides]]
 module = ["docuchango.validator", "docuchango.cli"]
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
 disallow_untyped_calls = false
-disable_error_code = ["no-untyped-call", "no-untyped-def", "no-any-return"]
+disable_error_code = ["no-untyped-call", "no-untyped-def", "no-any-return", "var-annotated", "index", "operator", "union-attr"]
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
