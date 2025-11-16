@@ -109,6 +109,88 @@ def fix():
     pass
 
 
+@fix.command("list")
+def fix_list():
+    """List all available fixes and their descriptions."""
+    console.print("[bold blue]📋 Available Fixes[/bold blue]\n")
+
+    fixes = [
+        {
+            "command": "all",
+            "description": "Run all automatic fixes on documentation",
+            "scope": "All fixes listed below",
+        },
+        {
+            "command": "frontmatter",
+            "description": "Fix frontmatter issues",
+            "fixes": [
+                "Invalid status values (maps to valid values by doc type)",
+                "Invalid date formats (converts to ISO 8601: YYYY-MM-DD)",
+                "Missing frontmatter blocks (generates with defaults)",
+                "Date objects to strings conversion",
+            ],
+        },
+        {
+            "command": "timestamps",
+            "description": "Update document timestamps from git history",
+            "fixes": [
+                "Sets 'created' field to first git commit date",
+                "Sets 'updated' field to last git commit date",
+                "Migrates legacy 'date' field to 'created'/'updated'",
+            ],
+        },
+        {
+            "command": "bulk-update",
+            "description": "Bulk update frontmatter fields",
+            "operations": [
+                "--set FIELD=VALUE: Update or create field",
+                "--add FIELD=VALUE: Add field only if it doesn't exist",
+                "--remove FIELD: Delete field from frontmatter",
+                "--rename OLD=NEW: Rename field (preserves value)",
+            ],
+        },
+        {
+            "command": "code-blocks",
+            "description": "Fix code block formatting issues",
+            "fixes": [
+                "Add language to bare opening fences",
+                "Remove language from closing fences",
+                "Add missing closing fences",
+                "Insert blank lines before/after fences",
+            ],
+        },
+        {
+            "command": "links",
+            "description": "Fix broken links in documentation",
+            "fixes": [
+                "Update broken internal links",
+                "Convert problematic cross-plugin links",
+                "Fix document link formats",
+            ],
+        },
+    ]
+
+    for fix in fixes:
+        console.print(f"[cyan]docuchango fix {fix['command']}[/cyan]")
+        console.print(f"  {fix['description']}")
+
+        if "scope" in fix:
+            console.print(f"  [dim]Scope: {fix['scope']}[/dim]")
+        elif "fixes" in fix:
+            console.print("  [bold]Fixes:[/bold]")
+            for item in fix["fixes"]:
+                console.print(f"    • {item}")
+        elif "operations" in fix:
+            console.print("  [bold]Operations:[/bold]")
+            for item in fix["operations"]:
+                console.print(f"    • {item}")
+
+        console.print()
+
+    console.print("[dim]💡 Use --dry-run with any fix command to preview changes[/dim]")
+    console.print("[dim]💡 Use --verbose or -v for detailed output[/dim]")
+
+
 @fix.command("all")
 @click.option(
     "--repo-root",

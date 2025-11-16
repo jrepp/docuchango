@@ -92,6 +92,18 @@ docuchango validate --skip-build
 ### Fix Commands
 
 ```bash
+# List all available fixes and their descriptions
+$ docuchango fix list
+📋 Available Fixes
+
+docuchango fix frontmatter
+  Fix frontmatter issues
+  Fixes:
+    • Invalid status values (maps to valid values by doc type)
+    • Invalid date formats (converts to ISO 8601: YYYY-MM-DD)
+    • Missing frontmatter blocks (generates with defaults)
+    ...
+
 # Automatically fix all detected issues
 $ docuchango fix all
    ✓ Fixed 12 code blocks
