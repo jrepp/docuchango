@@ -87,6 +87,72 @@ class DocsProjectInfo(BaseModel):
         return v
 
 
+class DocsProjectReadability(BaseModel):
+    """Schema for readability configuration in docs-project.yaml.
+
+    Controls readability analysis thresholds for documentation.
+    All grade-level metrics are maximum allowed values (lower = easier).
+    Flesch Reading Ease is minimum allowed value (higher = easier).
+    """
+
+    enabled: bool = Field(
+        default=True,
+        description="Enable/disable readability validation",
+    )
+    flesch_reading_ease_min: float | None = Field(
+        default=60.0,
+        description="Minimum Flesch Reading Ease score (0-100, higher = easier). 60+ = standard readability",
+    )
+    flesch_kincaid_grade_max: float | None = Field(
+        default=10.0,
+        description="Maximum Flesch-Kincaid grade level (lower = easier). 10 = 10th grade",
+    )
+    gunning_fog_max: float | None = Field(
+        default=12.0,
+        description="Maximum Gunning FOG index (lower = easier). 12 = high school senior",
+    )
+    smog_index_max: float | None = Field(
+        default=12.0,
+        description="Maximum SMOG index (lower = easier). 12 = high school senior",
+    )
+    automated_readability_index_max: float | None = Field(
+        default=10.0,
+        description="Maximum Automated Readability Index (lower = easier). 10 = 10th grade",
+    )
+    coleman_liau_index_max: float | None = Field(
+        default=10.0,
+        description="Maximum Coleman-Liau index (lower = easier). 10 = 10th grade",
+    )
+    dale_chall_max: float | None = Field(
+        default=9.0,
+        description="Maximum Dale-Chall score (lower = easier). 9.0 = college level",
+    )
+    min_paragraph_length: int = Field(
+        default=100,
+        description="Minimum paragraph length in characters to analyze",
+    )
+
+    def to_readability_config(self):  # type: ignore[no-untyped-def]
+        """Convert to ReadabilityConfig for use with ReadabilityScorer.
+
+        Returns:
+            ReadabilityConfig with all fields mapped from this schema
+        """
+        from docuchango.readability import ReadabilityConfig
+
+        return ReadabilityConfig(
+            enabled=self.enabled,
+            flesch_reading_ease_min=self.flesch_reading_ease_min,
+            flesch_kincaid_grade_max=self.flesch_kincaid_grade_max,
+            gunning_fog_max=self.gunning_fog_max,
+            smog_index_max=self.smog_index_max,
+            automated_readability_index_max=self.automated_readability_index_max,
+            coleman_liau_index_max=self.coleman_liau_index_max,
+            dale_chall_max=self.dale_chall_max,
+            min_paragraph_length=self.min_paragraph_length,
+        )
+
+
 class DocsProjectConfig(BaseModel):
     """Schema for docs-project.yaml configuration file.
 
@@ -105,6 +171,10 @@ class DocsProjectConfig(BaseModel):
     metadata: DocsProjectMetadata | None = Field(
         None,
         description="Additional project metadata",
+    )
+    readability: DocsProjectReadability = Field(
+        default_factory=DocsProjectReadability,
+        description="Readability analysis configuration and thresholds",
     )
 
 

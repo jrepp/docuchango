@@ -34,6 +34,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Readability analysis features
+readability = [
+    "textstat>=0.7.0",
+]
 # Development dependencies for running tests
 test = [
     "pytest>=8.0.0",
@@ -49,7 +53,7 @@ lint = [
 ]
 # Full development setup
 dev = [
-    "docuchango[test,lint]",
+    "docuchango[test,lint,readability]",
 ]
 
 [project.scripts]
@@ -173,6 +177,12 @@ ignore = [
 "docuchango/fixes/*" = ["RET505"]
 "docuchango/testing/*" = ["S311", "S107", "S110", "SIM105"]
 "docuchango/validator.py" = ["PTH123"]
+# readability.py suppressions:
+# - S110 (try-except-pass): Intentional silent failure when textstat metrics cannot be calculated
+#   for insufficient text or edge cases (short paragraphs, single sentences)
+# - SIM105 (use contextlib.suppress): try-except-pass is more explicit for metric calculation failures
+# - SIM102 (nested if): Complex conditional logic for filtering markdown elements cannot be easily flattened
+"docuchango/readability.py" = ["S110", "SIM105", "SIM102"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["docuchango"]
@@ -213,6 +223,10 @@ module = [
     "frontmatter.*",
 ]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "docuchango.readability"
+disable_error_code = ["unused-ignore"]
 
 [[tool.mypy.overrides]]
 module = "tests.*"

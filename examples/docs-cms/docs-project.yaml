@@ -23,3 +23,30 @@ metadata:
     - Human Team
     - AI Agents
   purpose: Demonstrate best practices for docs-cms organization
+
+readability:
+  # Enable readability analysis for documentation quality
+  enabled: true
+
+  # Flesch Reading Ease: 0-100 scale (higher = easier to read)
+  # 90-100: Very Easy (5th grade)
+  # 60-70:  Standard (8th-9th grade) - Good for technical docs
+  # 30-50:  Difficult (College level)
+  flesch_reading_ease_min: 60.0
+
+  # Grade-level metrics: US grade level required to understand
+  # 10 = 10th grade level, 12 = high school senior
+  # Technical documentation typically targets 10-12
+  flesch_kincaid_grade_max: 10.0
+  gunning_fog_max: 12.0
+  smog_index_max: 12.0
+  automated_readability_index_max: 10.0
+  coleman_liau_index_max: 10.0
+
+  # Dale-Chall: measures use of familiar vs uncommon words
+  # 4.9 or less = easily understood by 4th grader
+  # 9.0-9.9 = 13th-15th grade (college level)
+  dale_chall_max: 9.0
+
+  # Only analyze paragraphs with at least this many characters
+  min_paragraph_length: 100
