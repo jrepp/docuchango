@@ -218,9 +218,7 @@ class TestReadabilityDataStructures:
 class TestReadabilityParagraphExtraction:
     """Test paragraph extraction logic independently."""
 
-    @pytest.mark.skipif(
-        True, reason="Would need to mock textstat for ReadabilityScorer instantiation"
-    )
+    @pytest.mark.skipif(True, reason="Would need to mock textstat for ReadabilityScorer instantiation")
     def test_extract_paragraphs_logic(self):
         """Test paragraph extraction without requiring textstat calculations."""
         # This would require restructuring to separate extraction from scoring
