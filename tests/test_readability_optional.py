@@ -1,7 +1,7 @@
 """Tests for readability module when textstat is not available."""
 
 import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -15,7 +15,7 @@ class TestReadabilityWithoutTextstat:
         with patch.dict(sys.modules, {"textstat": None}):
             # Should be able to import the module
             try:
-                import docuchango.readability as readability
+                import docuchango.readability  # noqa: F401
 
                 # TEXTSTAT_AVAILABLE should be False
                 # (actual value depends on whether textstat is installed in test environment)
@@ -25,10 +25,9 @@ class TestReadabilityWithoutTextstat:
     def test_scorer_raises_without_textstat(self):
         """Test that ReadabilityScorer raises ImportError when textstat is unavailable."""
         # We need to test this by mocking TEXTSTAT_AVAILABLE
-        from docuchango.readability import ReadabilityConfig, ReadabilityScorer
-
         # Temporarily mock TEXTSTAT_AVAILABLE
         import docuchango.readability as readability_module
+        from docuchango.readability import ReadabilityConfig, ReadabilityScorer
 
         original_available = readability_module.TEXTSTAT_AVAILABLE
 
@@ -109,8 +108,9 @@ class TestReadabilityConfigWithoutTextstat:
 
     def test_config_serialization_without_textstat(self):
         """Test config can be converted to dict without textstat."""
-        from docuchango.readability import ReadabilityConfig
         from dataclasses import asdict
+
+        from docuchango.readability import ReadabilityConfig
 
         config = ReadabilityConfig(
             flesch_reading_ease_min=70.0,
@@ -128,9 +128,8 @@ class TestReadabilityErrorMessages:
 
     def test_import_error_message_clarity(self):
         """Test that ImportError message is clear and helpful."""
-        from docuchango.readability import ReadabilityConfig
-
         import docuchango.readability as readability_module
+        from docuchango.readability import ReadabilityConfig
 
         original_available = readability_module.TEXTSTAT_AVAILABLE
 
