@@ -101,6 +101,23 @@ $ docuchango fix all
 # Fix specific issues
 docuchango fix code-blocks
 docuchango fix links
+
+# Fix frontmatter issues (status values, dates, missing fields)
+$ docuchango fix frontmatter --dry-run --verbose
+📋 Fixing Frontmatter Issues
+
+DRY RUN - No changes will be made
+
+Found 23 documentation files
+
+adr/adr-001.md
+  ✓ Changed status from 'Draft' to 'Proposed'
+  ✓ Converted date from '2025/01/26' to '2025-01-26'
+
+✓ Fixed 12 issues in 8 files
+
+# Apply the fixes
+docuchango fix frontmatter
 ```
 
 ### Bootstrap & Guides
@@ -285,15 +302,16 @@ This comprehensive reference lists all documentation issues that docuchango can 
 - Duplicate UUIDs across documents
 
 **Auto-Fixed:**
-- ✓ Generates missing frontmatter fields
-- ✓ Adds missing required fields with sensible defaults
+- ✓ Generates missing frontmatter blocks with sensible defaults
+- ✓ Adds missing required fields (id, title, status, date, tags, project_id, doc_uuid)
+- ✓ Fixes invalid status values (maps common variations to valid values by doc type)
+- ✓ Converts invalid date formats to ISO 8601 (YYYY-MM-DD)
+- ✓ Converts date objects to ISO 8601 strings
 
 **Requires Manual Fix:**
-- Missing YAML frontmatter
+- Missing YAML frontmatter (complex cases)
 - Invalid field types or formats
-- Invalid status values for document type (e.g., "Draft" instead of "Proposed" for ADRs)
 - Missing document-type-specific fields (e.g., `deciders` for ADRs)
-- Invalid date formats (must be ISO 8601: YYYY-MM-DD)
 - Malformed UUID values
 - ID/filename mismatches (frontmatter `id` doesn't match filename)
 - ID/title mismatches (frontmatter `id` doesn't match title number)

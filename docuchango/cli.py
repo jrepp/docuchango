@@ -168,6 +168,62 @@ def fix_code_blocks(repo_root: Path, dry_run: bool):
     console.print("Fixing code blocks...")
 
 
+@fix.command("frontmatter")
+@click.option(
+    "--repo-root",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    default=Path.cwd(),
+    help="Repository root directory (default: current directory)",
+)
+@click.option("--dry-run", is_flag=True, help="Show what would be fixed without making changes")
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed output")
+def fix_frontmatter(repo_root: Path, dry_run: bool, verbose: bool):
+    """Fix frontmatter issues (status values, dates, missing fields)."""
+    from docuchango.fixes.frontmatter import fix_all_frontmatter
+
+    console.print("[bold blue]📋 Fixing Frontmatter Issues[/bold blue]\n")
+    if dry_run:
+        console.print("[yellow]DRY RUN - No changes will be made[/yellow]\n")
+
+    # Find all markdown files in docs directories
+    doc_patterns = ["adr/**/*.md", "rfcs/**/*.md", "memos/**/*.md", "prd/**/*.md"]
+    all_files = []
+    for pattern in doc_patterns:
+        all_files.extend(repo_root.glob(pattern))
+
+    if not all_files:
+        console.print("[yellow]No documentation files found[/yellow]")
+        return
+
+    total_files = len(all_files)
+    fixed_files = 0
+    total_fixes = 0
+
+    console.print(f"Found {total_files} documentation files\n")
+
+    for file_path in all_files:
+        messages = fix_all_frontmatter(file_path, dry_run=dry_run)
+
+        if messages:
+            fixed_files += 1
+            total_fixes += len(messages)
+
+            if verbose:
+                rel_path = file_path.relative_to(repo_root)
+                console.print(f"[cyan]{rel_path}[/cyan]")
+                for msg in messages:
+                    console.print(f"  {msg}")
+
+    console.print()
+    if fixed_files > 0:
+        console.print(f"[green]✓[/green] Fixed {total_fixes} issues in {fixed_files} files")
+    else:
+        console.print("[green]✓[/green] No frontmatter issues found")
+
+    if dry_run:
+        console.print("\n[yellow]Dry run complete - no files were modified[/yellow]")
+
+
 @main.group()
 def test():
     """Testing utilities and helpers."""
