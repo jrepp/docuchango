@@ -2,6 +2,64 @@
 
 <!-- version list -->
 
+## v1.5.0 (2025-11-16)
+
+### Bug Fixes
+
+- Address PR #33 code review comments
+  ([`fe87734`](https://github.com/jrepp/docuchango/commit/fe8773490aff526b2d329e081e944229af66b829))
+
+- Python 3.9/3.10 compatibility for ISO 8601 timestamps
+  ([`9f2da99`](https://github.com/jrepp/docuchango/commit/9f2da990aff0e1511fded31f5d1dda4ff53544b8))
+
+- Relax mypy type checking for CLI and test files
+  ([`a5b3f78`](https://github.com/jrepp/docuchango/commit/a5b3f782de5eec697fbdcdd026eb5e7c8baf0475))
+
+- Remove unused type: ignore comments from validator
+  ([`0bbcbc8`](https://github.com/jrepp/docuchango/commit/0bbcbc8957ff4ed805ee0a2afbf072459a091b02))
+
+- Resolve all xfail tests and enhance documentation
+  ([`d940745`](https://github.com/jrepp/docuchango/commit/d940745748629a6b848f64c7686a7c2c8b05bd09))
+
+- Resolve CI lint and test failures
+  ([`f89cdb1`](https://github.com/jrepp/docuchango/commit/f89cdb138ec48dce9ff7d5bb9ac98efb6e4aef8c))
+
+- Restore necessary type: ignore for error iteration
+  ([`ccdc25d`](https://github.com/jrepp/docuchango/commit/ccdc25da20f50f6b7bdd159404182899881eb82c))
+
+### Code Style
+
+- Apply ruff formatting to fix CI lint failures
+  ([`aff09a0`](https://github.com/jrepp/docuchango/commit/aff09a0667d32bfccca17e698bb5aa5f5cb1458d))
+
+### Features
+
+- Add 'fix list' command to show all available fixes
+  ([`e78e9e9`](https://github.com/jrepp/docuchango/commit/e78e9e92e5228e8f8a844ccced22fdb6de1ce5f3))
+
+- Add auto-fix for frontmatter issues (status, dates, missing fields)
+  ([`18f2185`](https://github.com/jrepp/docuchango/commit/18f21859a08dbf9496da1ee10ed8b04cdd1df44b))
+
+- Add high-probability frontmatter auto-fixes (tags, whitespace, required fields)
+  ([`4cb7078`](https://github.com/jrepp/docuchango/commit/4cb7078e37454ba3e966333a787b0540ab7306ea))
+
+- Add timestamp updates and bulk frontmatter operations
+  ([`326eef1`](https://github.com/jrepp/docuchango/commit/326eef1c9dd6dcdc64537cb8f40f95b9aa83d70a))
+
+- Enhance ADR template with comprehensive structure and guidance
+  ([`34a8160`](https://github.com/jrepp/docuchango/commit/34a8160ef288207ac92fe47ba2a825960b1bf8c3))
+
+### Refactoring
+
+- Standardize on frontmatter-only properties in templates
+  ([`4e2c614`](https://github.com/jrepp/docuchango/commit/4e2c614813f1fedccfa2c50647f53fa0bb0e356b))
+
+### Testing
+
+- Add comprehensive edge case tests for all fixes (122 tests)
+  ([`9b08f6a`](https://github.com/jrepp/docuchango/commit/9b08f6a490421baae369f8d6db05e654e1082c9e))
+
+
 ## v1.4.0 (2025-11-16)
 
 ### Bug Fixes
