@@ -13,10 +13,6 @@ doc_uuid: "00000000-0000-4000-8000-000000000000"  # Generate: uuidgen  OR  pytho
 
 # FRD: Feature Name
 
-**Status:** Draft
-**Author:** Product Manager
-**Related PRD:** [PRD-XXX](./prd-XXX.md)
-
 ## Feature Overview
 
 Brief description of the feature and how it fits into the product.

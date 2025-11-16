@@ -13,10 +13,6 @@ doc_uuid: "00000000-0000-4000-8000-000000000000"  # Generate: uuidgen  OR  pytho
 
 # ADR-XXX: Decision Title
 
-**Status:** Proposed
-**Deciders:** Team Name
-**Technical Story:** Related RFC or context
-
 ## Context
 
 Describe the issue or problem that requires a decision. What forces are at play?

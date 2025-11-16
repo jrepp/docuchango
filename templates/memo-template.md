@@ -16,11 +16,6 @@ doc_uuid: 00000000-0000-4000-8000-000000000000  # Generate: uuidgen  OR  python 
 
 # Memo Title
 
-**Date**: Month DD, YYYY
-**Author**: Author Name
-**Purpose**: Brief purpose statement
-**Related**: [Link to related document](./related-doc.md)
-
 ## Executive Summary
 
 Brief summary of key points (2-3 sentences).

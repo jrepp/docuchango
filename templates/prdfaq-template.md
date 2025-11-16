@@ -13,10 +13,6 @@ doc_uuid: "00000000-0000-4000-8000-000000000000"  # Generate: uuidgen  OR  pytho
 
 # PRDFAQ: Product Name
 
-**Status:** Draft
-**Author:** Product Manager
-**Related PRD:** [PRD-XXX](./prd-XXX.md)
-
 ## Press Release
 
 ### Headline

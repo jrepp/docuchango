@@ -13,9 +13,6 @@ doc_uuid: "00000000-0000-4000-8000-000000000000"  # Generate: uuidgen  OR  pytho
 
 # RFC-XXX: Title
 
-**Status:** Draft
-**Author:** Author Name
-
 ## Summary
 
 Brief one-paragraph description of the proposed change.
