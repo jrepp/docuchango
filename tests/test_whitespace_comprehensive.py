@@ -356,7 +356,7 @@ title: "  Title  "
         """Test file with UTF-8 BOM."""
         doc = tmp_path / "test.md"
         content = '---\nid: " test "\n---\n# Test'
-        doc.write_bytes(b'\xef\xbb\xbf' + content.encode('utf-8'))
+        doc.write_bytes(b"\xef\xbb\xbf" + content.encode("utf-8"))
 
         # Should handle BOM
         try:

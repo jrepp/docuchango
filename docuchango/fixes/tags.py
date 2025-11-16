@@ -28,16 +28,16 @@ def normalize_tag(tag: str) -> str:
     tag = tag.lower().strip()
 
     # Replace spaces and underscores with dashes
-    tag = re.sub(r'[\s_]+', '-', tag)
+    tag = re.sub(r"[\s_]+", "-", tag)
 
     # Remove special characters except dashes
-    tag = re.sub(r'[^a-z0-9-]', '', tag)
+    tag = re.sub(r"[^a-z0-9-]", "", tag)
 
     # Remove multiple consecutive dashes
-    tag = re.sub(r'-+', '-', tag)
+    tag = re.sub(r"-+", "-", tag)
 
     # Remove leading/trailing dashes
-    tag = tag.strip('-')
+    tag = tag.strip("-")
 
     return tag
 

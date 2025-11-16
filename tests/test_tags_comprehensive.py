@@ -104,7 +104,7 @@ tags: null
     def test_tags_with_mixed_types(self, tmp_path):
         """Test tags array with mixed types."""
         doc = tmp_path / "test.md"
-        doc.write_text("---\nid: test\ntags: [\"backend\", 123, true]\n---\n# Test")
+        doc.write_text('---\nid: test\ntags: ["backend", 123, true]\n---\n# Test')
 
         changed, messages = fix_tags(doc)
         # Should skip non-string tags
