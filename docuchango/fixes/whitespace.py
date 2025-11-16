@@ -93,7 +93,7 @@ def normalize_empty_values(metadata: dict) -> tuple[dict, list[str]]:
     return updated, messages
 
 
-def ensure_required_fields(metadata: dict, doc_type: str | None) -> tuple[dict, list[str]]:  # noqa: ARG001
+def ensure_required_fields(metadata: dict, doc_type: str | None) -> tuple[dict, list[str]]:  # noqa: ARG001 - Reserved for document type-specific required fields
     """Ensure required fields are present with defaults.
 
     Args:
@@ -150,9 +150,9 @@ def fix_whitespace_and_fields(file_path: Path, dry_run: bool = False) -> tuple[b
     path_str = str(file_path).lower()
     if "/adr/" in path_str:
         doc_type = "adr"
-    elif "/rfc" in path_str:
+    elif "/rfcs/" in path_str:
         doc_type = "rfc"
-    elif "/memo" in path_str:
+    elif "/memos/" in path_str:
         doc_type = "memo"
     elif "/prd/" in path_str:
         doc_type = "prd"

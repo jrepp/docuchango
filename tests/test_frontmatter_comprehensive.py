@@ -362,8 +362,9 @@ id: adr-001
         changed, msg = add_missing_frontmatter(doc)
         assert changed
         post = frontmatter.loads(doc.read_text())
-        # Should use full filename
-        assert "random-file" in post.metadata["id"]
+        # Should generate UUID-based fallback ID (format: doc_type-uuid)
+        assert post.metadata["id"].startswith("adr-")
+        assert len(post.metadata["id"]) == 12  # "adr-" + 8 hex chars
 
     def test_filename_with_special_characters(self, tmp_path):
         """Test filename with special characters."""

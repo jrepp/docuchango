@@ -246,9 +246,10 @@ def add_missing_frontmatter(file_path: Path, dry_run: bool = False) -> tuple[boo
             return False, "Could not determine document type"
 
         # Extract ID from filename (e.g., "adr-001" from "adr-001-some-title.md")
+        # Fallback: generate a valid ID using doc_type and a short UUID if no match
         filename = file_path.stem
-        id_match = re.match(r"^([a-z]+-\d+)", filename)
-        doc_id = id_match.group(1) if id_match else filename
+        id_match = re.match(r"^([a-zA-Z]+-\d+)", filename)
+        doc_id = id_match.group(1) if id_match else f"{doc_type}-{uuid.uuid4().hex[:8]}"
 
         # Generate title from filename
         title_parts = filename.replace("-", " ").split()

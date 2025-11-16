@@ -14,8 +14,6 @@ doc_uuid: "00000000-0000-4000-8000-000000000000"  # Generate: uuidgen  OR  pytho
 # ADR-XXX: Decision Title
 
 **Status:** Proposed
-**Created:** YYYY-MM-DD
-**Updated:** YYYY-MM-DD
 **Deciders:** Team Name
 **Technical Story:** Related RFC or context
 

@@ -15,8 +15,6 @@ doc_uuid: "00000000-0000-4000-8000-000000000000"  # Generate: uuidgen  OR  pytho
 
 **Status:** Draft
 **Author:** Product Manager
-**Created:** YYYY-MM-DD
-**Updated:** YYYY-MM-DD
 
 ## Overview
 

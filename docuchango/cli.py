@@ -584,8 +584,6 @@ def bulk_update(
     specified = [op for op in operations if op is not None]
     if len(specified) != 1:
         console.print("[red]Error: Specify exactly one operation (--set, --add, --remove, or --rename)[/red]")
-        import sys
-
         sys.exit(1)
 
     # Determine operation and parse field spec
@@ -593,16 +591,12 @@ def bulk_update(
         operation = "set"
         if "=" not in set_field:
             console.print("[red]Error: --set requires FIELD=VALUE format[/red]")
-            import sys
-
             sys.exit(1)
         field_name, value = set_field.split("=", 1)
     elif add_field:
         operation = "add"
         if "=" not in add_field:
             console.print("[red]Error: --add requires FIELD=VALUE format[/red]")
-            import sys
-
             sys.exit(1)
         field_name, value = add_field.split("=", 1)
     elif remove_field:
@@ -613,8 +607,6 @@ def bulk_update(
         operation = "rename"
         if "=" not in rename_field:
             console.print("[red]Error: --rename requires OLD=NEW format[/red]")
-            import sys
-
             sys.exit(1)
         field_name, value = rename_field.split("=", 1)
 

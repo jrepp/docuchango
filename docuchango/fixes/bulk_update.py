@@ -14,6 +14,9 @@ from pathlib import Path
 import frontmatter
 import yaml
 
+# Valid bulk update operations
+VALID_OPERATIONS = {"set", "add", "remove", "rename"}
+
 
 def should_skip_file(file_path: Path) -> bool:
     """Check if file should be skipped.
@@ -69,9 +72,8 @@ def update_frontmatter_bulk(
         ValueError: If operation is not one of: set, add, remove, rename
     """
     # Validate operation
-    valid_operations = {"set", "add", "remove", "rename"}
-    if operation not in valid_operations:
-        raise ValueError(f"Invalid operation '{operation}'. Must be one of: {', '.join(valid_operations)}")
+    if operation not in VALID_OPERATIONS:
+        raise ValueError(f"Invalid operation '{operation}'. Must be one of: {', '.join(VALID_OPERATIONS)}")
 
     try:
         post = frontmatter.loads(content)

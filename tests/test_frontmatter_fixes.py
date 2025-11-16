@@ -1,5 +1,6 @@
 """Tests for frontmatter auto-fixes."""
 
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -353,10 +354,8 @@ title: "Existing"
         doc_uuid = post.metadata["doc_uuid"]
 
         # Verify it's a valid UUID format
-        import uuid as uuid_mod
-
         try:
-            uuid_mod.UUID(doc_uuid)
+            uuid.UUID(doc_uuid)
         except ValueError:
             pytest.fail(f"Invalid UUID: {doc_uuid}")
 
