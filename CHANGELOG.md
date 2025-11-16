@@ -2,6 +2,54 @@
 
 <!-- version list -->
 
+## v1.4.0 (2025-11-16)
+
+### Bug Fixes
+
+- Address PR feedback and resolve CI failures
+  ([`b4f2661`](https://github.com/jrepp/docuchango/commit/b4f2661eca1c7e2275dee22c389eabd98711081a))
+
+- Remove type annotation to avoid circular import
+  ([`44aafca`](https://github.com/jrepp/docuchango/commit/44aafca6fb907a9f0b1aa769ddba4c6e916809e1))
+
+- Resolve mypy errors in test_validator_skips_without_textstat
+  ([`4996469`](https://github.com/jrepp/docuchango/commit/499646980b68b8deb6c3b608ea1c936d4aad02a2))
+
+- Resolve ruff lint errors in test files
+  ([`d545274`](https://github.com/jrepp/docuchango/commit/d545274ed497da625d898ad800376e82cf1b4e32))
+
+### Code Style
+
+- Apply ruff formatting
+  ([`b421195`](https://github.com/jrepp/docuchango/commit/b421195ce424f37dccfcd828b98b8e3f876fe339))
+
+- Apply ruff formatting to test files
+  ([`27d7e9a`](https://github.com/jrepp/docuchango/commit/27d7e9a7a1e8aa5f4fa3b8569976fed3787efda3))
+
+### Documentation
+
+- Add comprehensive readability feature documentation
+  ([`b9956ba`](https://github.com/jrepp/docuchango/commit/b9956ba8e5225f70a7d32e184c9d2ba5fd537e7b))
+
+### Features
+
+- Add document readability scoring using textstat library
+  ([`7b6d0cc`](https://github.com/jrepp/docuchango/commit/7b6d0ccb156b0df7b5ea8cd31155a221aea6c0f8))
+
+- Add readability threshold configuration and validation tests
+  ([`a58054d`](https://github.com/jrepp/docuchango/commit/a58054dde9e0324b2fe810415eb1f6f28a91bcea))
+
+### Refactoring
+
+- Address Copilot PR review feedback
+  ([`cea9010`](https://github.com/jrepp/docuchango/commit/cea90100009f21e0a6c1568ed9a160fdcedf368a))
+
+### Testing
+
+- Add comprehensive readability feature tests
+  ([`2110e73`](https://github.com/jrepp/docuchango/commit/2110e730a7a04a17c972cdeac937430119d18ab1))
+
+
 ## v1.3.6 (2025-11-06)
 
 ### Bug Fixes
