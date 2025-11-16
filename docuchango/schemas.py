@@ -132,7 +132,7 @@ class DocsProjectReadability(BaseModel):
         description="Minimum paragraph length in characters to analyze",
     )
 
-    def to_readability_config(self) -> "ReadabilityConfig":
+    def to_readability_config(self):  # type: ignore[no-untyped-def]
         """Convert to ReadabilityConfig for use with ReadabilityScorer.
 
         Returns:
