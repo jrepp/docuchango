@@ -504,7 +504,7 @@ class TestReadabilityThresholdValidation:
         """Test that text violating all thresholds reports all errors."""
         config = ReadabilityConfig(
             flesch_reading_ease_min=90.0,  # Very strict
-            flesch_kincaid_grade_max=5.0,   # Elementary level
+            flesch_kincaid_grade_max=5.0,  # Elementary level
             gunning_fog_max=6.0,
             smog_index_max=6.0,
             automated_readability_index_max=5.0,
