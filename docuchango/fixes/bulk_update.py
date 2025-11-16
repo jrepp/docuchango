@@ -9,7 +9,6 @@ This module provides flexible operations for updating YAML frontmatter fields:
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import frontmatter
@@ -30,10 +29,7 @@ def should_skip_file(file_path: Path) -> bool:
         return True
 
     # Skip index files
-    if file_path.name == "index.md":
-        return True
-
-    return False
+    return file_path.name == "index.md"
 
 
 def serialize_frontmatter(metadata: dict) -> str:
@@ -68,14 +64,28 @@ def update_frontmatter_bulk(
 
     Returns:
         Tuple of (updated_content, was_modified, message)
+
+    Raises:
+        ValueError: If operation is not one of: set, add, remove, rename
     """
+    # Validate operation
+    valid_operations = {"set", "add", "remove", "rename"}
+    if operation not in valid_operations:
+        raise ValueError(f"Invalid operation '{operation}'. Must be one of: {', '.join(valid_operations)}")
+
     try:
         post = frontmatter.loads(content)
     except Exception as e:
         return content, False, f"Error parsing frontmatter: {e}"
 
-    if not post.metadata:
+    # Empty frontmatter is OK for operations that add fields (set, add)
+    # For other operations (remove, rename), we need existing metadata
+    if not post.metadata and operation not in ("set", "add"):
         return content, False, "No frontmatter found"
+
+    # Initialize empty metadata if needed
+    if not post.metadata:
+        post.metadata = {}
 
     modified = False
     message = ""
@@ -90,6 +100,8 @@ def update_frontmatter_bulk(
                 message = f"Added {field_name}={new_value}"
             else:
                 message = f"Updated {field_name}: {old_value} → {new_value}"
+        else:
+            message = f"Field {field_name} already has value '{new_value}'"
 
     elif operation == "add":
         # Add field only if it doesn't exist
@@ -138,18 +150,22 @@ def bulk_update_files(
 ) -> list[tuple[Path, bool, str]]:
     """Bulk update frontmatter fields across multiple files.
 
+    Note: Each file path in the list is processed independently. If the same file
+    appears multiple times in the list, it will be processed multiple times.
+
     Args:
-        file_paths: List of file paths to process
+        file_paths: List of file paths to process (may contain duplicates)
         field_name: Field to update
         value: New value for the field (or new name for rename)
         operation: Operation type (set, add, remove, rename)
         dry_run: Preview changes without modifying files
 
     Returns:
-        List of (file_path, changed, message) tuples
+        List of (file_path, changed, message) tuples - one per input file path
     """
     results = []
 
+    # Process each file path in the list, including duplicates
     for file_path in file_paths:
         # Skip certain files
         if should_skip_file(file_path):

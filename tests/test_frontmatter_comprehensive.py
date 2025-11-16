@@ -1,7 +1,5 @@
 """Comprehensive tests for frontmatter fixes - positive, negative, and edge cases."""
 
-import tempfile
-from datetime import datetime
 from pathlib import Path
 
 import frontmatter
@@ -44,11 +42,23 @@ class TestGetDocTypeEdgeCases:
         assert get_doc_type(Path("rfc/test.md")) is None  # missing 's'
         assert get_doc_type(Path("memoranda/test.md")) is None  # different word
 
-    @pytest.mark.xfail(reason="Windows paths on Unix systems may not parse correctly")
     def test_windows_paths(self):
-        """Test Windows-style paths."""
-        assert get_doc_type(Path("C:\\docs\\adr\\adr-001.md")) == "adr"
-        assert get_doc_type(Path("D:\\project\\rfcs\\rfc-001.md")) == "rfc"
+        """Test Windows-style paths.
+
+        Note: On Unix systems, Windows-style backslash paths are treated as a single
+        path component, so they won't match directory patterns. This is expected behavior.
+        """
+        import platform
+
+        if platform.system() == "Windows":
+            # On Windows, these paths should work
+            assert get_doc_type(Path("C:\\docs\\adr\\adr-001.md")) == "adr"
+            assert get_doc_type(Path("D:\\project\\rfcs\\rfc-001.md")) == "rfc"
+        else:
+            # On Unix, Windows paths with backslashes are single path components
+            # and won't match directory patterns - this is expected
+            assert get_doc_type(Path("C:\\docs\\adr\\adr-001.md")) is None
+            assert get_doc_type(Path("D:\\project\\rfcs\\rfc-001.md")) is None
 
 
 class TestFixStatusValueEdgeCases:
@@ -106,7 +116,6 @@ status: 123
         assert not changed
         assert "not a string" in msg
 
-    @pytest.mark.xfail(reason="Documents current behavior - empty status handling")
     def test_empty_status(self, tmp_path):
         """Test empty status value."""
         doc = tmp_path / "adr" / "adr-001.md"
@@ -123,6 +132,7 @@ status: ""
         changed, msg = fix_status_value(doc)
         # Empty string should not match any mapping
         assert not changed
+        assert "empty" in msg.lower()
 
     def test_very_long_status(self, tmp_path):
         """Test very long status strings."""
@@ -417,15 +427,15 @@ class TestFixAllFrontmatterEdgeCases:
         messages = fix_all_frontmatter(doc)
         assert isinstance(messages, list)
 
-    @pytest.mark.xfail(reason="Documents current behavior - binary content handling")
     def test_file_with_binary_content(self, tmp_path):
         """Test file with binary content."""
         doc = tmp_path / "adr" / "adr-001.md"
         doc.parent.mkdir(parents=True)
 
-        doc.write_bytes(b"\x00\x01\x02\x03")
+        # Write actual binary content that will fail UTF-8 decoding
+        doc.write_bytes(b"\xff\xfe\x00\x01\x02\x03")
 
-        with pytest.raises(Exception):
+        with pytest.raises((ValueError, UnicodeDecodeError)):
             fix_all_frontmatter(doc)
 
     def test_extremely_large_frontmatter(self, tmp_path):

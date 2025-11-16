@@ -1,9 +1,7 @@
 """Tests for tags normalization fixes."""
 
-from pathlib import Path
 
 import frontmatter
-import pytest
 
 from docuchango.fixes.tags import fix_tags, normalize_tag
 

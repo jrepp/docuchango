@@ -1,15 +1,14 @@
 ---
-id: "frd-XXX"
+id: "frd-XXX"  # Use sequential numbering: frd-001, frd-002, etc.
 slug: frd-XXX-feature-name
 title: "Feature Name"
-status: Draft
-date: YYYY-MM-DD
-created: YYYY-MM-DD
-updated: YYYY-MM-DD
-author: Product Manager
-tags: ["feature", "requirements", "frd"]
+status: Draft  # Valid values: Draft, In Review, Approved, In Progress, Completed, Cancelled
+created: YYYY-MM-DD  # Generate: date +%Y-%m-%d  OR  python -c "from datetime import date; print(date.today())"  OR  auto-set with: docuchango fix timestamps
+updated: YYYY-MM-DD  # Last modified date - auto-updated with: docuchango fix timestamps
+author: Product Manager  # Generate: git config user.name
+tags: ["feature", "requirements", "frd"]  # Format: lowercase-with-dashes
 project_id: "your-project-id"
-doc_uuid: "00000000-0000-4000-8000-000000000000"
+doc_uuid: "00000000-0000-4000-8000-000000000000"  # Generate: uuidgen  OR  python -c "import uuid; print(uuid.uuid4())"
 ---
 
 # FRD: Feature Name

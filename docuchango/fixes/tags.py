@@ -37,9 +37,8 @@ def normalize_tag(tag: str) -> str:
     tag = re.sub(r"-+", "-", tag)
 
     # Remove leading/trailing dashes
-    tag = tag.strip("-")
+    return tag.strip("-")
 
-    return tag
 
 
 def fix_tags(file_path: Path, dry_run: bool = False) -> tuple[bool, list[str]]:
@@ -75,10 +74,7 @@ def fix_tags(file_path: Path, dry_run: bool = False) -> tuple[bool, list[str]]:
 
         # Convert string to array
         if isinstance(tags, str):
-            if tags.strip():
-                tags = [tags.strip()]
-            else:
-                tags = []
+            tags = [tags.strip()] if tags.strip() else []
             messages.append("Converted string tags to array")
             changed = True
 

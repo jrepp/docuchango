@@ -55,7 +55,6 @@ class TestShouldSkipFileEdgeCases:
 class TestUpdateFrontmatterBulkEdgeCases:
     """Edge case tests for bulk frontmatter updates."""
 
-    @pytest.mark.xfail(reason="Documents current behavior - may not detect same value")
     def test_set_with_same_value(self):
         """Test setting field to same value it already has."""
         content = """---
@@ -68,8 +67,8 @@ status: Accepted
 
         assert not modified
         assert "status" in message.lower()
+        assert "already" in message.lower()
 
-    @pytest.mark.xfail(reason="Documents current behavior - empty frontmatter handling")
     def test_set_on_empty_frontmatter(self):
         """Test set operation on empty frontmatter."""
         content = """---
@@ -185,7 +184,6 @@ id: test
         # Should be stored as string
         assert post.metadata["priority"] == "123"
 
-    @pytest.mark.xfail(reason="Documents current behavior - invalid operation handling")
     def test_invalid_operation(self):
         """Test with invalid operation."""
         content = """---
@@ -193,9 +191,8 @@ id: test
 ---
 # Test
 """
-        # Should handle gracefully or raise exception
-        # Documents current behavior
-        with pytest.raises(Exception):
+        # Should raise ValueError for invalid operations
+        with pytest.raises(ValueError, match="Invalid operation"):
             update_frontmatter_bulk(content, "field", "value", "invalid_op")
 
     def test_very_long_field_name(self):
@@ -305,16 +302,24 @@ class TestBulkUpdateFilesEdgeCases:
         assert len(results) == 2
         assert all(changed for _, changed, _ in results)
 
-    @pytest.mark.xfail(reason="Documents current behavior - duplicate file handling")
     def test_duplicate_files_in_list(self, tmp_path):
-        """Test same file listed multiple times."""
+        """Test same file listed multiple times.
+
+        Note: Each file path in the list is processed independently.
+        The first occurrence will add the field, subsequent ones will
+        update it (but since it's the same value, no change).
+        """
         doc = tmp_path / "doc.md"
         doc.write_text("---\nid: test\n---\n# Test")
 
         results = bulk_update_files([doc, doc, doc], "field", "value", "set")
 
         # Should process each occurrence
+        # First one modifies, next two don't (already has same value)
         assert len(results) == 3
+        assert results[0][1] is True  # First one is modified
+        assert results[1][1] is False  # Second one is not modified
+        assert results[2][1] is False  # Third one is not modified
 
     def test_dry_run_with_multiple_files(self, tmp_path):
         """Test dry run mode with multiple files."""

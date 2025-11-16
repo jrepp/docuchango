@@ -1,9 +1,7 @@
 """Tests for whitespace and required fields fixes."""
 
-from pathlib import Path
 
 import frontmatter
-import pytest
 
 from docuchango.fixes.whitespace import (
     ensure_required_fields,

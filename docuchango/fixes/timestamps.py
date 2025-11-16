@@ -44,7 +44,7 @@ def get_git_dates(file_path: Path) -> tuple[str | None, str | None]:
 
         first_commit = commits[0]
         # Replace 'Z' with '+00:00' for Python 3.9/3.10 compatibility
-        first_commit = first_commit.replace('Z', '+00:00')
+        first_commit = first_commit.replace("Z", "+00:00")
         created_date = datetime.fromisoformat(first_commit).strftime("%Y-%m-%d")
 
         # Get last commit date (update)
@@ -60,7 +60,7 @@ def get_git_dates(file_path: Path) -> tuple[str | None, str | None]:
             return created_date, created_date
 
         # Replace 'Z' with '+00:00' for Python 3.9/3.10 compatibility
-        last_commit = last_commit.replace('Z', '+00:00')
+        last_commit = last_commit.replace("Z", "+00:00")
         updated_date = datetime.fromisoformat(last_commit).strftime("%Y-%m-%d")
 
         return created_date, updated_date
@@ -91,8 +91,7 @@ def update_frontmatter_field(content: str, field_name: str, new_value: str) -> s
         return f"{prefix}{new_value}{suffix}"
 
     # Update the field
-    updated_content = re.sub(pattern, replacer, content, flags=re.MULTILINE)
-    return updated_content
+    return re.sub(pattern, replacer, content, flags=re.MULTILINE)
 
 
 def migrate_date_to_created_updated(content: str, created_date: str, updated_date: str) -> str:
@@ -110,11 +109,25 @@ def migrate_date_to_created_updated(content: str, created_date: str, updated_dat
     date_pattern = r"^date:.*\n"
     new_content = re.sub(date_pattern, "", content, flags=re.MULTILINE)
 
-    # Insert created/updated after the status line
+    # Try to insert created/updated after the status line
     insert_pattern = r"(status:.*\n)"
     created_line = f"created: {created_date}\n"
     updated_line = f"updated: {updated_date}\n"
-    new_content = re.sub(insert_pattern, rf"\1{created_line}{updated_line}", new_content, flags=re.MULTILINE)
+
+    if re.search(insert_pattern, new_content, flags=re.MULTILINE):
+        # Status field exists, insert after it
+        new_content = re.sub(insert_pattern, rf"\1{created_line}{updated_line}", new_content, flags=re.MULTILINE)
+    else:
+        # No status field, insert after the id field or at the beginning of frontmatter
+        id_pattern = r"(id:.*\n)"
+        if re.search(id_pattern, new_content, flags=re.MULTILINE):
+            new_content = re.sub(id_pattern, rf"\1{created_line}{updated_line}", new_content, flags=re.MULTILINE)
+        else:
+            # Insert right after the opening ---
+            frontmatter_pattern = r"(---\n)"
+            new_content = re.sub(
+                frontmatter_pattern, rf"\1{created_line}{updated_line}", new_content, flags=re.MULTILINE
+            )
 
     return new_content
 
@@ -166,6 +179,7 @@ def update_document_timestamps(file_path: Path, dry_run: bool = False) -> tuple[
         messages.append("Migrated 'date' → 'created' and 'updated'")
     else:
         # Standard handling for created/updated fields
+        # Update or add created field
         if "created" in post.metadata:
             old_created = post.metadata["created"]
             old_created_str = old_created if isinstance(old_created, str) else old_created.strftime("%Y-%m-%d")
@@ -174,7 +188,17 @@ def update_document_timestamps(file_path: Path, dry_run: bool = False) -> tuple[
                 new_content = update_frontmatter_field(new_content, "created", created_date)
                 updated = True
                 messages.append(f"Updated 'created': {old_created_str} → {created_date}")
+        else:
+            # Add missing created field
+            # Try to insert after status field
+            insert_pattern = r"(status:.*\n)"
+            created_line = f"created: {created_date}\n"
+            if re.search(insert_pattern, new_content, flags=re.MULTILINE):
+                new_content = re.sub(insert_pattern, rf"\1{created_line}", new_content, flags=re.MULTILINE)
+                updated = True
+                messages.append(f"Added 'created': {created_date}")
 
+        # Update or add updated field
         if "updated" in post.metadata:
             old_updated = post.metadata["updated"]
             old_updated_str = old_updated if isinstance(old_updated, str) else old_updated.strftime("%Y-%m-%d")
@@ -183,6 +207,20 @@ def update_document_timestamps(file_path: Path, dry_run: bool = False) -> tuple[
                 new_content = update_frontmatter_field(new_content, "updated", updated_date)
                 updated = True
                 messages.append(f"Updated 'updated': {old_updated_str} → {updated_date}")
+        else:
+            # Add missing updated field
+            # Try to insert after created field if it exists, otherwise after status
+            created_pattern = r"(created:.*\n)"
+            status_pattern = r"(status:.*\n)"
+            updated_line = f"updated: {updated_date}\n"
+            if re.search(created_pattern, new_content, flags=re.MULTILINE):
+                new_content = re.sub(created_pattern, rf"\1{updated_line}", new_content, flags=re.MULTILINE)
+                updated = True
+                messages.append(f"Added 'updated': {updated_date}")
+            elif re.search(status_pattern, new_content, flags=re.MULTILINE):
+                new_content = re.sub(status_pattern, rf"\1{updated_line}", new_content, flags=re.MULTILINE)
+                updated = True
+                messages.append(f"Added 'updated': {updated_date}")
 
     # Write updated content
     if updated and not dry_run:

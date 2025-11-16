@@ -1,15 +1,14 @@
 ---
-id: "rfc-XXX"
+id: "rfc-XXX"  # Use sequential numbering: rfc-001, rfc-002, etc.
 slug: rfc-XXX-brief-description
 title: "RFC Title"
-status: Draft
-date: YYYY-MM-DD
-created: YYYY-MM-DD
-updated: YYYY-MM-DD
-author: Author Name
-tags: ["tag1", "tag2", "md"]
+status: Draft  # Valid values: Draft, In Review, Accepted, Rejected, Implemented
+created: YYYY-MM-DD  # Generate: date +%Y-%m-%d  OR  python -c "from datetime import date; print(date.today())"  OR  auto-set with: docuchango fix timestamps
+updated: YYYY-MM-DD  # Last modified date - auto-updated with: docuchango fix timestamps
+author: Author Name  # Generate: git config user.name
+tags: ["tag1", "tag2", "md"]  # Format: lowercase-with-dashes, e.g., ["api-design", "performance"]
 project_id: "your-project-id"
-doc_uuid: "00000000-0000-4000-8000-000000000000"
+doc_uuid: "00000000-0000-4000-8000-000000000000"  # Generate: uuidgen  OR  python -c "import uuid; print(uuid.uuid4())"
 ---
 
 # RFC-XXX: Title

@@ -1,9 +1,7 @@
 """Comprehensive tests for tags fixes - positive, negative, and edge cases."""
 
-from pathlib import Path
 
 import frontmatter
-import pytest
 
 from docuchango.fixes.tags import fix_tags, normalize_tag
 

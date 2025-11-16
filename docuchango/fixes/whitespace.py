@@ -93,12 +93,12 @@ def normalize_empty_values(metadata: dict) -> tuple[dict, list[str]]:
     return updated, messages
 
 
-def ensure_required_fields(metadata: dict, doc_type: str | None) -> tuple[dict, list[str]]:
+def ensure_required_fields(metadata: dict, doc_type: str | None) -> tuple[dict, list[str]]:  # noqa: ARG001
     """Ensure required fields are present with defaults.
 
     Args:
         metadata: Frontmatter metadata dictionary
-        doc_type: Document type (adr, rfc, memo, prd)
+        doc_type: Document type (adr, rfc, memo, prd) - reserved for future use
 
     Returns:
         Tuple of (updated_metadata, messages)

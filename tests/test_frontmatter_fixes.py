@@ -1,6 +1,5 @@
 """Tests for frontmatter auto-fixes."""
 
-import tempfile
 from datetime import datetime
 from pathlib import Path
 

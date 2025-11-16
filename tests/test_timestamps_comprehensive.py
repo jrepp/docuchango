@@ -2,10 +2,8 @@
 
 import subprocess
 from datetime import datetime
-from pathlib import Path
 
 import frontmatter
-import pytest
 
 from docuchango.fixes.timestamps import (
     get_git_dates,
@@ -203,7 +201,6 @@ updated: 2021-01-01  # Last modified
 class TestMigrateDateFieldEdgeCases:
     """Edge case tests for date field migration."""
 
-    @pytest.mark.xfail(reason="Documents current behavior - migration without status field")
     def test_migrate_with_no_status_field(self):
         """Test migration when status field doesn't exist."""
         content = """---
@@ -214,7 +211,7 @@ date: 2020-01-01
 """
         updated = migrate_date_to_created_updated(content, "2021-01-01", "2022-01-01")
 
-        # Should still work, might not insert in expected location
+        # Should still work, inserts after id field
         assert "date:" not in updated
         assert "created: 2021-01-01" in updated
         assert "updated: 2022-01-01" in updated
@@ -277,7 +274,6 @@ class TestUpdateDocumentTimestampsEdgeCases:
             # Should skip templates
             assert not changed
 
-    @pytest.mark.xfail(reason="Documents current behavior - one-sided timestamp updates")
     def test_document_with_only_created(self, tmp_path):
         """Test document with created but no updated."""
         repo = tmp_path / "repo"
@@ -294,12 +290,12 @@ class TestUpdateDocumentTimestampsEdgeCases:
 
         changed, messages = update_document_timestamps(doc)
 
-        # Should add updated field
-        if changed:
-            post = frontmatter.loads(doc.read_text())
-            assert "updated" in post.metadata
+        # Should add updated field and update created field
+        assert changed
+        post = frontmatter.loads(doc.read_text())
+        assert "created" in post.metadata
+        assert "updated" in post.metadata
 
-    @pytest.mark.xfail(reason="Documents current behavior - one-sided timestamp updates")
     def test_document_with_only_updated(self, tmp_path):
         """Test document with updated but no created."""
         repo = tmp_path / "repo"
@@ -310,16 +306,17 @@ class TestUpdateDocumentTimestampsEdgeCases:
         subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True, capture_output=True)
 
         doc = repo / "test.md"
-        doc.write_text("---\nid: test\nupdated: 2020-01-01\n---\n# Test")
+        doc.write_text("---\nid: test\nstatus: Draft\nupdated: 2020-01-01\n---\n# Test")
         subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
         subprocess.run(["git", "commit", "-m", "add"], cwd=repo, check=True, capture_output=True)
 
         changed, messages = update_document_timestamps(doc)
 
-        # Should add created field
-        if changed:
-            post = frontmatter.loads(doc.read_text())
-            assert "created" in post.metadata
+        # Should add created field and update updated field
+        assert changed
+        post = frontmatter.loads(doc.read_text())
+        assert "created" in post.metadata
+        assert "updated" in post.metadata
 
     def test_corrupt_frontmatter(self, tmp_path):
         """Test file with corrupt frontmatter."""

@@ -485,10 +485,7 @@ def fix_timestamps(repo_root: Path, dry_run: bool, verbose: bool, path: Path | N
 
     # Determine paths to process
     if path:
-        if path.is_file():
-            paths = [path]
-        else:
-            paths = list(path.rglob("*.md"))
+        paths = [path] if path.is_file() else list(path.rglob("*.md"))
     else:
         # Process all docs in standard directories
         doc_patterns = ["adr/**/*.md", "rfcs/**/*.md", "memos/**/*.md", "prd/**/*.md"]
@@ -515,7 +512,7 @@ def fix_timestamps(repo_root: Path, dry_run: bool, verbose: bool, path: Path | N
                     console.print(f"  ✓ {msg}")
 
     console.print()
-    console.print(f"[bold]Summary:[/bold]")
+    console.print("[bold]Summary:[/bold]")
     console.print(f"  Documents processed: {len(paths)}")
     console.print(f"  Documents {'would be ' if dry_run else ''}updated: {updated_count}")
 
@@ -627,10 +624,7 @@ def bulk_update(
 
     # Determine paths to process
     if path:
-        if path.is_file():
-            paths = [path]
-        else:
-            paths = list(path.rglob("*.md"))
+        paths = [path] if path.is_file() else list(path.rglob("*.md"))
     else:
         # Process based on doc_type filter or all docs
         doc_patterns = ["adr/**/*.md", "rfcs/**/*.md", "memos/**/*.md", "prd/**/*.md"]
@@ -674,7 +668,7 @@ def bulk_update(
             console.print(f"  {icon} {message}")
 
     console.print()
-    console.print(f"[bold]Summary:[/bold]")
+    console.print("[bold]Summary:[/bold]")
     console.print(f"  Files processed: {len(results)}")
     console.print(f"  Files {'would be ' if dry_run else ''}updated: {updated_count}")
 

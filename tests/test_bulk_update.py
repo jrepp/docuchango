@@ -3,7 +3,6 @@
 from pathlib import Path
 
 import frontmatter
-import pytest
 
 from docuchango.fixes.bulk_update import (
     bulk_update_files,

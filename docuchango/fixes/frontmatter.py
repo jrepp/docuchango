@@ -14,7 +14,6 @@ from typing import Optional
 
 import frontmatter
 
-
 # Valid status values by document type
 VALID_STATUSES = {
     "adr": ["Proposed", "Accepted", "Deprecated", "Superseded"],
@@ -102,6 +101,10 @@ def fix_status_value(file_path: Path, dry_run: bool = False) -> tuple[bool, str]
         if not isinstance(status, str):
             return False, f"Status is not a string: {type(status)}"
 
+        # Skip empty strings
+        if not status.strip():
+            return False, "Status is empty"
+
         # Check if already valid
         valid_statuses = VALID_STATUSES.get(doc_type, [])
         if status in valid_statuses:
@@ -109,7 +112,7 @@ def fix_status_value(file_path: Path, dry_run: bool = False) -> tuple[bool, str]
 
         # Try to map to valid status
         mappings = STATUS_MAPPINGS.get(doc_type, {})
-        status_lower = status.lower()
+        status_lower = status.lower().strip()
 
         # Direct mapping
         if status_lower in mappings:
@@ -300,8 +303,18 @@ def fix_all_frontmatter(file_path: Path, dry_run: bool = False) -> list[str]:
 
     Returns:
         List of messages describing changes made
+
+    Raises:
+        UnicodeDecodeError: If file contains binary content
+        ValueError: If file is not a valid text file
     """
     messages = []
+
+    # Check if file is readable as text
+    try:
+        file_path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as e:
+        raise ValueError(f"File contains binary content: {e}") from e
 
     # Try to add missing frontmatter first
     changed, msg = add_missing_frontmatter(file_path, dry_run)

@@ -1,6 +1,5 @@
 """Comprehensive tests for whitespace fixes - positive, negative, and edge cases."""
 
-from pathlib import Path
 
 import frontmatter
 import pytest
@@ -217,7 +216,7 @@ class TestNormalizeEmptyValuesEdgeCases:
         updated, messages = normalize_empty_values(metadata)
 
         # These are valid non-empty strings
-        assert all(key in updated for key in metadata.keys())
+        assert all(key in updated for key in metadata)
 
 
 class TestEnsureRequiredFieldsEdgeCases:
@@ -359,10 +358,10 @@ title: "  Title  "
         doc.write_bytes(b"\xef\xbb\xbf" + content.encode("utf-8"))
 
         # Should handle BOM
-        try:
+        try:  # noqa: SIM105
             changed, messages = fix_whitespace_and_fields(doc)
             # May or may not work depending on implementation
-        except Exception:
+        except Exception:  # noqa: S110
             # Expected to fail with BOM
             pass
 

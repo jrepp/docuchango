@@ -1,19 +1,21 @@
 ---
-id: "adr-XXX"
+id: "adr-XXX"  # Use sequential numbering: adr-001, adr-002, etc.
 slug: adr-XXX-brief-description
 title: "Decision Title"
-status: Proposed
-date: YYYY-MM-DD
+status: Proposed  # Valid values: Proposed, Accepted, Deprecated, Superseded
+created: YYYY-MM-DD  # Generate: date +%Y-%m-%d  OR  python -c "from datetime import date; print(date.today())"  OR  auto-set with: docuchango fix timestamps
+updated: YYYY-MM-DD  # Last modified date - auto-updated with: docuchango fix timestamps
 deciders: Team Name
-tags: ["tag1", "tag2", "md"]
+tags: ["tag1", "tag2", "md"]  # Format: lowercase-with-dashes, e.g., ["api-design", "performance"]
 project_id: "your-project-id"
-doc_uuid: "00000000-0000-4000-8000-000000000000"
+doc_uuid: "00000000-0000-4000-8000-000000000000"  # Generate: uuidgen  OR  python -c "import uuid; print(uuid.uuid4())"
 ---
 
 # ADR-XXX: Decision Title
 
 **Status:** Proposed
-**Date:** YYYY-MM-DD
+**Created:** YYYY-MM-DD
+**Updated:** YYYY-MM-DD
 **Deciders:** Team Name
 **Technical Story:** Related RFC or context
 
