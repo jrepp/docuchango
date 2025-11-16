@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.6.0 (2025-11-16)
+
+### Features
+
+- Comprehensively enhance all document templates
+  ([`dd7a71d`](https://github.com/jrepp/docuchango/commit/dd7a71d9bed5a98281e9cb71a9fc9e274897ccef))
+
+
 ## v1.5.0 (2025-11-16)
 
 ### Bug Fixes
