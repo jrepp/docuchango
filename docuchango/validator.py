@@ -873,7 +873,7 @@ class DocValidator:
                             # Closing fence has extra text - this might indicate an unclosed block earlier
                             # If the remainder looks like a language specifier (single word, lowercase/numbers),
                             # this is likely an opening fence that's being misinterpreted as closing
-                            looks_like_language = remainder and ' ' not in remainder and len(remainder) <= 20
+                            looks_like_language = remainder and " " not in remainder and len(remainder) <= 20
 
                             if looks_like_language and opening_line:
                                 # Strong signal: unclosed block earlier
@@ -895,7 +895,9 @@ class DocValidator:
                                 # Actual closing fence with extra text
                                 error = f"Line {line_num}: Closing code fence has extra text (```{remainder}), should be just ```"
                                 doc.errors.append(error)
-                                self.log(f"   ✗ {doc.file_path.name}:{line_num} - Closing fence with text '```{remainder}'")
+                                self.log(
+                                    f"   ✗ {doc.file_path.name}:{line_num} - Closing fence with text '```{remainder}'"
+                                )
                                 doc_invalid_blocks += 1
                                 total_invalid += 1
                         else:

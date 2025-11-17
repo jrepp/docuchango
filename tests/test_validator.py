@@ -162,13 +162,21 @@ More content.
         UNCLOSED_BLOCK_START_LINE = 18
 
         # First error should mention the unclosed block at the original location
-        unclosed_errors = [e for e in all_errors if f"Unclosed code block starting at line {UNCLOSED_BLOCK_START_LINE}" in e]
-        assert len(unclosed_errors) > 0, f"Should detect unclosed block at line {UNCLOSED_BLOCK_START_LINE}. Errors: {all_errors}"
+        unclosed_errors = [
+            e for e in all_errors if f"Unclosed code block starting at line {UNCLOSED_BLOCK_START_LINE}" in e
+        ]
+        assert len(unclosed_errors) > 0, (
+            f"Should detect unclosed block at line {UNCLOSED_BLOCK_START_LINE}. Errors: {all_errors}"
+        )
 
         # Should have a cascading error explanation
-        cascading_errors = [e for e in all_errors if "appears to be a new opening fence" in e and "interpreted as a closing fence" in e]
+        cascading_errors = [
+            e for e in all_errors if "appears to be a new opening fence" in e and "interpreted as a closing fence" in e
+        ]
         assert len(cascading_errors) > 0, f"Should explain cascading error. Errors: {all_errors}"
 
         # Should NOT have confusing "Closing fence has extra text" errors without context
-        confusing_errors = [e for e in all_errors if "Closing code fence has extra text" in e and "appears to be" not in e]
+        confusing_errors = [
+            e for e in all_errors if "Closing code fence has extra text" in e and "appears to be" not in e
+        ]
         assert len(confusing_errors) == 0, f"Should not have confusing closing fence errors. Found: {confusing_errors}"
