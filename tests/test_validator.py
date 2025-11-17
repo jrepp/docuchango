@@ -102,3 +102,81 @@ class TestMarkdownValidation:
                 all_errors.extend(doc.errors)
 
             assert len(all_errors) > 0, f"Fixture {fixture_file.name} should fail but passed validation"
+
+    def test_unclosed_code_fence_error_message(self, tmp_path):
+        """Test that unclosed code fence errors are clear and point to the root cause (Issue #31)."""
+        docs_root = tmp_path / "test_issue31"
+        target_dir = docs_root / "docs-cms" / "memos"
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create a document with an unclosed code fence that causes cascading errors
+        content = """---
+id: "memo-999"
+slug: memo-999-test
+title: "Test Unclosed Fence"
+date: "2025-11-16"
+author: "Test Author"
+created: "2025-11-16"
+updated: "2025-11-16"
+tags: ["test"]
+project_id: "test-project"
+doc_uuid: "12345678-1234-4000-8000-123456789012"
+---
+
+## Section 1
+
+Some content here.
+
+```markdown
+This is markdown content.
+More markdown content here.
+
+## Section 2
+
+This should trigger confusion because the markdown fence above is unclosed.
+
+```text
+This looks like a new code block.
+```
+
+## Section 3
+
+More content.
+"""
+        target_file = target_dir / "memo-999-test-unclosed.md"
+        target_file.write_text(content)
+
+        validator = DocValidator(repo_root=docs_root, verbose=False)
+        validator.scan_documents()
+        validator.check_code_blocks()
+
+        # Collect all errors
+        all_errors = []
+        for doc in validator.documents:
+            all_errors.extend(doc.errors)
+
+        # Should have at least 2 errors: unclosed block + cascading error
+        assert len(all_errors) >= 2, f"Expected at least 2 errors, got {len(all_errors)}: {all_errors}"
+
+        # Line 18 is where the ```markdown code block starts in the test content above (after frontmatter)
+        unclosed_block_start_line = 18
+
+        # First error should mention the unclosed block at the original location
+        unclosed_errors = [
+            e for e in all_errors if f"Unclosed code block starting at line {unclosed_block_start_line}" in e
+        ]
+        assert len(unclosed_errors) > 0, (
+            f"Should detect unclosed block at line {unclosed_block_start_line}. Errors: {all_errors}"
+        )
+
+        # Should have a cascading error explanation
+        cascading_errors = [
+            e for e in all_errors if "appears to be a new opening fence" in e and "interpreted as a closing fence" in e
+        ]
+        assert len(cascading_errors) > 0, f"Should explain cascading error. Errors: {all_errors}"
+
+        # Should NOT have confusing "Closing fence has extra text" errors without context
+        confusing_errors = [
+            e for e in all_errors if "Closing code fence has extra text" in e and "appears to be" not in e
+        ]
+        assert len(confusing_errors) == 0, f"Should not have confusing closing fence errors. Found: {confusing_errors}"
