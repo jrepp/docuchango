@@ -265,15 +265,23 @@ class TestEnsureRequiredFieldsEdgeCases:
         assert updated["project_id"] != ""
 
     def test_required_fields_basic(self):
-        """Test basic required fields are added."""
-        metadata = {"id": "test"}
+        """Test basic required fields are added consistently across document types."""
+        # Test different document types to ensure required fields work regardless of doc type
+        test_cases = [
+            {"id": "test-adr", "doc_type": "adr"},
+            {"id": "test-rfc", "doc_type": "rfc"},
+            {"id": "test-memo", "doc_type": "memo"},
+            {"id": "test-prd", "doc_type": "prd"},
+            {"id": "test-generic"},  # No doc_type specified
+        ]
 
-        updated, messages = ensure_required_fields(metadata)
+        for metadata in test_cases:
+            updated, messages = ensure_required_fields(metadata)
 
-        # All should get these fields
-        assert "tags" in updated
-        assert "doc_uuid" in updated
-        assert "project_id" in updated
+            # All should get these fields regardless of document type
+            assert "tags" in updated, f"tags missing for {metadata.get('id')}"
+            assert "doc_uuid" in updated, f"doc_uuid missing for {metadata.get('id')}"
+            assert "project_id" in updated, f"project_id missing for {metadata.get('id')}"
 
     def test_preserving_extra_fields(self):
         """Test that extra fields are preserved."""
