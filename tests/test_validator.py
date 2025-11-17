@@ -159,14 +159,14 @@ More content.
         assert len(all_errors) >= 2, f"Expected at least 2 errors, got {len(all_errors)}: {all_errors}"
 
         # Line 18 is where the ```markdown code block starts in the test content above (after frontmatter)
-        UNCLOSED_BLOCK_START_LINE = 18
+        unclosed_block_start_line = 18
 
         # First error should mention the unclosed block at the original location
         unclosed_errors = [
-            e for e in all_errors if f"Unclosed code block starting at line {UNCLOSED_BLOCK_START_LINE}" in e
+            e for e in all_errors if f"Unclosed code block starting at line {unclosed_block_start_line}" in e
         ]
         assert len(unclosed_errors) > 0, (
-            f"Should detect unclosed block at line {UNCLOSED_BLOCK_START_LINE}. Errors: {all_errors}"
+            f"Should detect unclosed block at line {unclosed_block_start_line}. Errors: {all_errors}"
         )
 
         # Should have a cascading error explanation

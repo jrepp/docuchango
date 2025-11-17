@@ -891,15 +891,13 @@ class DocValidator:
                                 opening_language = remainder
                                 previous_line_blank = False
                                 continue
-                            else:
-                                # Actual closing fence with extra text
-                                error = f"Line {line_num}: Closing code fence has extra text (```{remainder}), should be just ```"
-                                doc.errors.append(error)
-                                self.log(
-                                    f"   ✗ {doc.file_path.name}:{line_num} - Closing fence with text '```{remainder}'"
-                                )
-                                doc_invalid_blocks += 1
-                                total_invalid += 1
+
+                            # Actual closing fence with extra text
+                            error = f"Line {line_num}: Closing code fence has extra text (```{remainder}), should be just ```"
+                            doc.errors.append(error)
+                            self.log(f"   ✗ {doc.file_path.name}:{line_num} - Closing fence with text '```{remainder}'")
+                            doc_invalid_blocks += 1
+                            total_invalid += 1
                         else:
                             # Valid closing fence
                             doc_valid_blocks += 1
