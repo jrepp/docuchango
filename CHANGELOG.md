@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.6.3 (2025-11-17)
+
+### Bug Fixes
+
+- Address PR #34 code review feedback
+  ([`e5e6b47`](https://github.com/jrepp/docuchango/commit/e5e6b473dc2852fc15cd70649c14b4e6e87053ff))
+
+
 ## v1.6.2 (2025-11-17)
 
 ### Bug Fixes
