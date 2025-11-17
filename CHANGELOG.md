@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.6.4 (2025-11-17)
+
+### Bug Fixes
+
+- Expand test_required_fields_basic to test all doc types
+  ([`6867481`](https://github.com/jrepp/docuchango/commit/68674810816aa690e00305f3f5d4d3af07966eec))
+
+
 ## v1.6.3 (2025-11-17)
 
 ### Bug Fixes
