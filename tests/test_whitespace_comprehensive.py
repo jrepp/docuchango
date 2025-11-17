@@ -226,8 +226,8 @@ class TestEnsureRequiredFieldsEdgeCases:
         metadata1 = {"id": "test1"}
         metadata2 = {"id": "test2"}
 
-        updated1, _ = ensure_required_fields(metadata1, "adr")
-        updated2, _ = ensure_required_fields(metadata2, "adr")
+        updated1, _ = ensure_required_fields(metadata1)
+        updated2, _ = ensure_required_fields(metadata2)
 
         # UUIDs should be different
         assert updated1["doc_uuid"] != updated2["doc_uuid"]
@@ -238,7 +238,7 @@ class TestEnsureRequiredFieldsEdgeCases:
 
         metadata = {"id": "test"}
 
-        updated, _ = ensure_required_fields(metadata, "adr")
+        updated, _ = ensure_required_fields(metadata)
 
         # Should be valid UUID
         try:
@@ -255,7 +255,7 @@ class TestEnsureRequiredFieldsEdgeCases:
             "project_id": "",  # Should be set
         }
 
-        updated, messages = ensure_required_fields(metadata, "adr")
+        updated, messages = ensure_required_fields(metadata)
 
         # Empty tags left as-is (not our job to fix here)
         assert updated["tags"] == ""
@@ -264,17 +264,16 @@ class TestEnsureRequiredFieldsEdgeCases:
         # Empty project_id should be replaced
         assert updated["project_id"] != ""
 
-    def test_different_doc_types(self):
-        """Test required fields for different document types."""
-        for doc_type in ["adr", "rfc", "memo", "prd", None]:
-            metadata = {"id": "test"}
+    def test_required_fields_basic(self):
+        """Test basic required fields are added."""
+        metadata = {"id": "test"}
 
-            updated, messages = ensure_required_fields(metadata, doc_type)
+        updated, messages = ensure_required_fields(metadata)
 
-            # All should get these fields
-            assert "tags" in updated
-            assert "doc_uuid" in updated
-            assert "project_id" in updated
+        # All should get these fields
+        assert "tags" in updated
+        assert "doc_uuid" in updated
+        assert "project_id" in updated
 
     def test_preserving_extra_fields(self):
         """Test that extra fields are preserved."""
@@ -284,7 +283,7 @@ class TestEnsureRequiredFieldsEdgeCases:
             "another": 123,
         }
 
-        updated, messages = ensure_required_fields(metadata, "adr")
+        updated, messages = ensure_required_fields(metadata)
 
         # Custom fields should be preserved
         assert updated["custom_field"] == "custom_value"
@@ -294,7 +293,7 @@ class TestEnsureRequiredFieldsEdgeCases:
         """Test metadata with many existing fields."""
         metadata = {f"field{i}": f"value{i}" for i in range(1000)}
 
-        updated, messages = ensure_required_fields(metadata, "adr")
+        updated, messages = ensure_required_fields(metadata)
 
         # Should add required fields
         assert "tags" in updated
