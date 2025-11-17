@@ -158,9 +158,12 @@ More content.
         # Should have at least 2 errors: unclosed block + cascading error
         assert len(all_errors) >= 2, f"Expected at least 2 errors, got {len(all_errors)}: {all_errors}"
 
-        # First error should mention the unclosed block at the original location (line 18)
-        unclosed_errors = [e for e in all_errors if "Unclosed code block starting at line 18" in e]
-        assert len(unclosed_errors) > 0, f"Should detect unclosed block at line 18. Errors: {all_errors}"
+        # Line 18 is where the ```markdown code block starts in the test content above (after frontmatter)
+        UNCLOSED_BLOCK_START_LINE = 18
+
+        # First error should mention the unclosed block at the original location
+        unclosed_errors = [e for e in all_errors if f"Unclosed code block starting at line {UNCLOSED_BLOCK_START_LINE}" in e]
+        assert len(unclosed_errors) > 0, f"Should detect unclosed block at line {UNCLOSED_BLOCK_START_LINE}. Errors: {all_errors}"
 
         # Should have a cascading error explanation
         cascading_errors = [e for e in all_errors if "appears to be a new opening fence" in e and "interpreted as a closing fence" in e]

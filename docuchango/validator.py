@@ -873,7 +873,7 @@ class DocValidator:
                             # Closing fence has extra text - this might indicate an unclosed block earlier
                             # If the remainder looks like a language specifier (single word, lowercase/numbers),
                             # this is likely an opening fence that's being misinterpreted as closing
-                            looks_like_language = remainder and not ' ' in remainder and len(remainder) <= 20
+                            looks_like_language = remainder and ' ' not in remainder and len(remainder) <= 20
 
                             if looks_like_language and opening_line:
                                 # Strong signal: unclosed block earlier
