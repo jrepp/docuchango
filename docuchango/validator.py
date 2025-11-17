@@ -870,13 +870,34 @@ class DocValidator:
                     else:
                         # Closing fence
                         if remainder:
-                            # Closing fence has extra text - INVALID
-                            # Per CommonMark: closing fence should have no info string
-                            error = f"Line {line_num}: Closing code fence has extra text (```{remainder}), should be just ```"
-                            doc.errors.append(error)
-                            self.log(f"   ✗ {doc.file_path.name}:{line_num} - Closing fence with text '```{remainder}'")
-                            doc_invalid_blocks += 1
-                            total_invalid += 1
+                            # Closing fence has extra text - this might indicate an unclosed block earlier
+                            # If the remainder looks like a language specifier (single word, lowercase/numbers),
+                            # this is likely an opening fence that's being misinterpreted as closing
+                            looks_like_language = remainder and not ' ' in remainder and len(remainder) <= 20
+
+                            if looks_like_language and opening_line:
+                                # Strong signal: unclosed block earlier
+                                error = f"Unclosed code block starting at line {opening_line} (```{opening_language})"
+                                doc.errors.append(error)
+                                self.log(f"   ✗ {doc.file_path.name} - Unclosed block at line {opening_line}")
+                                error = f"Line {line_num}: This appears to be a new opening fence (```{remainder}), but was interpreted as a closing fence due to the unclosed block above"
+                                doc.errors.append(error)
+                                self.log(f"   ℹ {doc.file_path.name}:{line_num} - Cascading error from unclosed block")
+                                doc_invalid_blocks += 2  # Count both errors
+                                total_invalid += 2
+                                # Reset state and treat this as opening fence
+                                in_code_block = True
+                                opening_line = line_num
+                                opening_language = remainder
+                                previous_line_blank = False
+                                continue
+                            else:
+                                # Actual closing fence with extra text
+                                error = f"Line {line_num}: Closing code fence has extra text (```{remainder}), should be just ```"
+                                doc.errors.append(error)
+                                self.log(f"   ✗ {doc.file_path.name}:{line_num} - Closing fence with text '```{remainder}'")
+                                doc_invalid_blocks += 1
+                                total_invalid += 1
                         else:
                             # Valid closing fence
                             doc_valid_blocks += 1
