@@ -2,6 +2,25 @@
 
 <!-- version list -->
 
+## v1.6.1 (2025-11-17)
+
+### Bug Fixes
+
+- Address CI lint failures
+  ([`7fb89fb`](https://github.com/jrepp/docuchango/commit/7fb89fb4f42aeefaf323857205d86e7cc9960445))
+
+- Address PR review feedback
+  ([`755da5c`](https://github.com/jrepp/docuchango/commit/755da5cf9aeaad5113ed0b42c84bffd90cd18d43))
+
+- Improve error messages for unclosed code fences (issue #31)
+  ([`2ca205d`](https://github.com/jrepp/docuchango/commit/2ca205d93bd7b64a1ba09a8daa7d6c2af9fc9026))
+
+### Code Style
+
+- Apply ruff formatting
+  ([`d6dc507`](https://github.com/jrepp/docuchango/commit/d6dc507903e39ddf129cc42d367eeed9ed4f3f7f))
+
+
 ## v1.6.0 (2025-11-16)
 
 ### Features
