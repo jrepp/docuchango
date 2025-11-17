@@ -93,12 +93,11 @@ def normalize_empty_values(metadata: dict) -> tuple[dict, list[str]]:
     return updated, messages
 
 
-def ensure_required_fields(metadata: dict, doc_type: str | None) -> tuple[dict, list[str]]:  # noqa: ARG001 - Reserved for document type-specific required fields
+def ensure_required_fields(metadata: dict) -> tuple[dict, list[str]]:
     """Ensure required fields are present with defaults.
 
     Args:
         metadata: Frontmatter metadata dictionary
-        doc_type: Document type (adr, rfc, memo, prd) - reserved for future use
 
     Returns:
         Tuple of (updated_metadata, messages)
@@ -145,18 +144,6 @@ def fix_whitespace_and_fields(file_path: Path, dry_run: bool = False) -> tuple[b
     if not post.metadata:
         return False, ["No frontmatter found"]
 
-    # Determine document type from path
-    doc_type = None
-    path_str = str(file_path).lower()
-    if "/adr/" in path_str:
-        doc_type = "adr"
-    elif "/rfcs/" in path_str:
-        doc_type = "rfc"
-    elif "/memos/" in path_str:
-        doc_type = "memo"
-    elif "/prd/" in path_str:
-        doc_type = "prd"
-
     original = post.metadata.copy()
 
     # Apply fixes
@@ -171,7 +158,7 @@ def fix_whitespace_and_fields(file_path: Path, dry_run: bool = False) -> tuple[b
     messages.extend(empty_msgs)
 
     # 3. Ensure required fields
-    metadata, required_msgs = ensure_required_fields(metadata, doc_type)
+    metadata, required_msgs = ensure_required_fields(metadata)
     messages.extend(required_msgs)
 
     # Check if anything changed

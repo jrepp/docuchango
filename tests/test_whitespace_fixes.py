@@ -134,7 +134,7 @@ class TestEnsureRequiredFields:
         """Test adding missing tags field."""
         metadata = {"id": "test"}
 
-        updated, messages = ensure_required_fields(metadata, "adr")
+        updated, messages = ensure_required_fields(metadata)
 
         assert "tags" in updated
         assert updated["tags"] == []
@@ -144,7 +144,7 @@ class TestEnsureRequiredFields:
         """Test adding missing doc_uuid."""
         metadata = {"id": "test"}
 
-        updated, messages = ensure_required_fields(metadata, "adr")
+        updated, messages = ensure_required_fields(metadata)
 
         assert "doc_uuid" in updated
         assert isinstance(updated["doc_uuid"], str)
@@ -155,7 +155,7 @@ class TestEnsureRequiredFields:
         """Test adding missing project_id."""
         metadata = {"id": "test"}
 
-        updated, messages = ensure_required_fields(metadata, "adr")
+        updated, messages = ensure_required_fields(metadata)
 
         assert "project_id" in updated
         assert updated["project_id"] == "my-project"
@@ -165,7 +165,7 @@ class TestEnsureRequiredFields:
         """Test replacing empty doc_uuid."""
         metadata = {"id": "test", "doc_uuid": ""}
 
-        updated, messages = ensure_required_fields(metadata, "adr")
+        updated, messages = ensure_required_fields(metadata)
 
         assert updated["doc_uuid"] != ""
         assert len(updated["doc_uuid"]) > 0
@@ -179,7 +179,7 @@ class TestEnsureRequiredFields:
             "project_id": "my-custom-project",
         }
 
-        updated, messages = ensure_required_fields(metadata, "adr")
+        updated, messages = ensure_required_fields(metadata)
 
         assert updated["tags"] == ["existing"]
         assert updated["doc_uuid"] == "existing-uuid"
