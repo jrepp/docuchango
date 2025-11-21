@@ -2,14 +2,6 @@
 
 <!-- version list -->
 
-## v1.7.0 (2025-11-21)
-
-### Features
-
-- Add docuchango logo to README
-  ([`362fe9d`](https://github.com/jrepp/docuchango/commit/362fe9d3dcdfdedb74b87febb993e10d4e17d2b1))
-
-
 ## v1.6.4 (2025-11-17)
 
 ### Bug Fixes
