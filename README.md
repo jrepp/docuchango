@@ -12,7 +12,7 @@
 [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/jrepp/docuchango/graphs/commit-activity)
 [![Development Status](https://img.shields.io/badge/status-beta-orange.svg)](https://github.com/jrepp/docuchango)
 
-![Docuchango](docs-cms/imgs/docuchango.png)
+![Docuchango logo](docs-cms/imgs/docuchango.png)
 
 A command-line tool to validate and automatically fix Docusaurus documentation, ensuring frontmatter, links, code blocks, and formatting meet quality standards.
 
