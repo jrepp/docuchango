@@ -33,23 +33,34 @@ def main():
 )
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
 @click.option("--skip-build", is_flag=True, help="Skip Docusaurus build validation")
-@click.option("--fix", is_flag=True, help="Auto-fix issues where possible")
+@click.option("--dry-run", is_flag=True, help="Report issues without applying fixes")
 def validate(
     repo_root: Path,
     verbose: bool,
     skip_build: bool,
-    fix: bool,
+    dry_run: bool,
 ):
-    """Validate documentation files for correctness.
+    """Validate and fix documentation files.
 
-    Validates markdown documents for:
-    - YAML frontmatter format and required fields
+    By default, automatically fixes issues where possible. Use --dry-run to
+    only report issues without making changes.
+
+    Validates and fixes:
+    - YAML frontmatter (status values, dates, missing fields)
+    - Tags (normalize, deduplicate, sort)
+    - Whitespace (trim values, remove empty fields)
+    - Timestamps (created/updated from git history)
+    - Code blocks (languages, blank lines, closing fences)
     - Internal link reachability
     - Markdown formatting issues
     - Consistent ADR/RFC numbering
-    - MDX compilation compatibility
-    - Docusaurus build validation (unless --skip-build)
     """
+    from docuchango.fixes.code_blocks import fix_code_blocks
+    from docuchango.fixes.frontmatter import fix_all_frontmatter
+    from docuchango.fixes.tags import fix_tags
+    from docuchango.fixes.timestamps import update_document_timestamps
+    from docuchango.fixes.whitespace import fix_whitespace_and_fields
+
     try:
         from docuchango.validator import DocValidator
     except ImportError as e:
@@ -57,13 +68,75 @@ def validate(
         sys.exit(2)
 
     console.print("[bold blue]🔍 Validating Documentation[/bold blue]\n")
-    console.print(f"Repository root: {repo_root}")
-    console.print(f"Verbose: {verbose}")
-    console.print(f"Skip build: {skip_build}")
-    console.print(f"Auto-fix: {fix}\n")
+    if dry_run:
+        console.print("[yellow]DRY RUN - No changes will be made[/yellow]\n")
+
+    # Find all markdown files in docs directories
+    doc_patterns = ["adr/**/*.md", "rfcs/**/*.md", "memos/**/*.md", "prd/**/*.md"]
+    all_files = []
+    for pattern in doc_patterns:
+        all_files.extend(repo_root.glob(pattern))
+
+    # Track fixes applied and remaining issues
+    fixes_applied: list[tuple[Path, str]] = []
+    remaining_issues: list[tuple[Path, str]] = []
+
+    # Phase 1: Apply automatic fixes
+    if all_files:
+        console.print(f"Found {len(all_files)} documentation files\n")
+
+        if not dry_run:
+            console.print("[bold]Applying automatic fixes...[/bold]")
+        else:
+            console.print("[bold]Checking for fixable issues...[/bold]")
+
+        # Define fix functions: (name, function, supports_dry_run)
+        fix_types = [
+            ("Frontmatter", fix_all_frontmatter, True),
+            ("Tags", fix_tags, True),
+            ("Whitespace", fix_whitespace_and_fields, True),
+            ("Timestamps", update_document_timestamps, True),
+            ("Code blocks", fix_code_blocks, False),
+        ]
+
+        for fix_name, fix_func, supports_dry_run_flag in fix_types:
+            for file_path in all_files:
+                try:
+                    # Skip code blocks fix in dry_run mode since it doesn't support it
+                    if not supports_dry_run_flag and dry_run:
+                        continue
+
+                    # Call the fix function
+                    if supports_dry_run_flag:
+                        result = fix_func(file_path, dry_run=dry_run)
+                    else:
+                        result = fix_func(file_path)
+
+                    # Handle different return types
+                    if isinstance(result, list):
+                        messages = result
+                        changed = bool(messages)
+                    else:
+                        changed, messages = result
+
+                    if changed and messages:
+                        for msg in messages:
+                            fixes_applied.append((file_path, f"[{fix_name}] {msg}"))
+                            if verbose:
+                                rel_path = file_path.relative_to(repo_root)
+                                console.print(f"  [green]✓[/green] {rel_path}: {msg}")
+
+                except Exception as e:
+                    if verbose:
+                        rel_path = file_path.relative_to(repo_root)
+                        console.print(f"  [red]✗[/red] {rel_path}: Error in {fix_name} - {e}")
+
+    # Phase 2: Run validation to find remaining issues
+    console.print("\n[bold]Validating...[/bold]")
 
     try:
-        validator = DocValidator(repo_root=repo_root, verbose=verbose, fix=fix)
+        # Don't pass fix=True to validator since we already applied fixes above
+        validator = DocValidator(repo_root=repo_root, verbose=verbose, fix=False)
         validator.scan_documents()
         validator.check_code_blocks()
         validator.check_formatting()
@@ -73,26 +146,14 @@ def validate(
             # This would need to be implemented based on the validate_docs.py logic
             pass
 
-        # Check for errors
-        has_errors = False
+        # Collect remaining errors
         for doc in validator.documents:
             if doc.errors:
-                has_errors = True
-                console.print(f"[red]✗[/red] {doc.file_path}")
                 for error in doc.errors:
-                    console.print(f"  [red]{error}[/red]")
+                    remaining_issues.append((doc.file_path, error))
 
-        if validator.errors:
-            has_errors = True
-            for error in validator.errors:
-                console.print(f"[red]{error}[/red]")
-
-        if has_errors:
-            console.print("\n[bold red]❌ Validation failed[/bold red]")
-            sys.exit(1)
-        else:
-            console.print("\n[bold green]✅ All documents valid[/bold green]")
-            sys.exit(0)
+        for error in validator.errors:
+            remaining_issues.append((repo_root, error))
 
     except Exception as e:
         console.print(f"[bold red]Error during validation: {e}[/bold red]")
@@ -101,6 +162,60 @@ def validate(
 
             traceback.print_exc()
         sys.exit(2)
+
+    # Phase 3: Display segmented results
+    console.print("\n" + "=" * 60)
+
+    # Show fixes applied
+    if fixes_applied:
+        action = "would be applied" if dry_run else "applied"
+        console.print(f"\n[bold green]✓ Fixes {action}: {len(fixes_applied)}[/bold green]")
+        if verbose:
+            seen_files: set[Path] = set()
+            for file_path, msg in fixes_applied:
+                rel_path = file_path.relative_to(repo_root)
+                if file_path not in seen_files:
+                    seen_files.add(file_path)
+                    console.print(f"\n  [cyan]{rel_path}[/cyan]")
+                console.print(f"    • {msg}")
+    else:
+        console.print("\n[dim]No automatic fixes needed[/dim]")
+
+    # Show remaining issues
+    if remaining_issues:
+        console.print(f"\n[bold red]✗ Remaining issues: {len(remaining_issues)}[/bold red]")
+        seen_files: set[Path] = set()
+        for file_path, error in remaining_issues:
+            try:
+                rel_path = file_path.relative_to(repo_root)
+            except ValueError:
+                rel_path = file_path
+            if file_path not in seen_files:
+                seen_files.add(file_path)
+                console.print(f"\n  [cyan]{rel_path}[/cyan]")
+            console.print(f"    [red]• {error}[/red]")
+    else:
+        console.print("\n[green]No remaining issues[/green]")
+
+    # Summary
+    console.print("\n" + "=" * 60)
+    files_with_fixes = len(set(f for f, _ in fixes_applied))
+    files_with_issues = len(set(f for f, _ in remaining_issues))
+
+    console.print("[bold]Summary:[/bold]")
+    console.print(f"  Files scanned: {len(all_files)}")
+    console.print(f"  Files with fixes {'(would be)' if dry_run else ''}: {files_with_fixes}")
+    console.print(f"  Files with remaining issues: {files_with_issues}")
+
+    if dry_run and fixes_applied:
+        console.print("\n[yellow]Run without --dry-run to apply fixes[/yellow]")
+
+    if remaining_issues:
+        console.print("\n[bold red]❌ Validation failed[/bold red]")
+        sys.exit(1)
+    else:
+        console.print("\n[bold green]✅ All documents valid[/bold green]")
+        sys.exit(0)
 
 
 @main.group()
