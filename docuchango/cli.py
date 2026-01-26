@@ -83,13 +83,6 @@ def validate(
 
     # Phase 1: Apply automatic fixes
     if all_files:
-        console.print(f"Found {len(all_files)} documentation files\n")
-
-        if not dry_run:
-            console.print("[bold]Applying automatic fixes...[/bold]")
-        else:
-            console.print("[bold]Checking for fixable issues...[/bold]")
-
         # Define fix functions: (name, function, supports_dry_run)
         fix_types = [
             ("Frontmatter", fix_all_frontmatter, True),
@@ -119,9 +112,6 @@ def validate(
                     if changed and messages:
                         for msg in messages:
                             fixes_applied.append((file_path, f"[{fix_name}] {msg}"))
-                            if verbose:
-                                rel_path = file_path.relative_to(repo_root)
-                                console.print(f"  [green]✓[/green] {rel_path}: {msg}")
 
                 except Exception as e:
                     if verbose:
@@ -129,8 +119,6 @@ def validate(
                         console.print(f"  [red]✗[/red] {rel_path}: Error in {fix_name} - {e}")
 
     # Phase 2: Run validation to find remaining issues
-    console.print("\n[bold]Validating...[/bold]")
-
     try:
         # Don't pass fix=True to validator since we already applied fixes above
         validator = DocValidator(repo_root=repo_root, verbose=verbose, fix=False)
@@ -160,27 +148,35 @@ def validate(
             traceback.print_exc()
         sys.exit(2)
 
-    # Phase 3: Display segmented results
-    console.print("\n" + "=" * 60)
+    # Phase 3: Display results (simplified when no issues)
+    if not fixes_applied and not remaining_issues:
+        # Clean output when everything is valid
+        console.print(f"Scanned {len(all_files)} files\n")
+        console.print("[bold green]✅ All documents valid[/bold green]")
+        sys.exit(0)
+
+    # Show detailed output when there are fixes or issues
+    files_with_fixes = len({f for f, _ in fixes_applied})
+    files_with_issues = len({f for f, _ in remaining_issues})
+
+    console.print(f"Scanned {len(all_files)} files\n")
 
     # Show fixes applied
     if fixes_applied:
         action = "would be applied" if dry_run else "applied"
-        console.print(f"\n[bold green]✓ Fixes {action}: {len(fixes_applied)}[/bold green]")
-        if verbose:
-            seen_files: set[Path] = set()
-            for file_path, msg in fixes_applied:
-                rel_path = file_path.relative_to(repo_root)
-                if file_path not in seen_files:
-                    seen_files.add(file_path)
-                    console.print(f"\n  [cyan]{rel_path}[/cyan]")
-                console.print(f"    • {msg}")
-    else:
-        console.print("\n[dim]No automatic fixes needed[/dim]")
+        console.print(f"[bold green]✓ Fixes {action}: {len(fixes_applied)}[/bold green]")
+        seen_files: set[Path] = set()
+        for file_path, msg in fixes_applied:
+            rel_path = file_path.relative_to(repo_root)
+            if file_path not in seen_files:
+                seen_files.add(file_path)
+                console.print(f"  [cyan]{rel_path}[/cyan]")
+            console.print(f"    • {msg}")
+        console.print()
 
     # Show remaining issues
     if remaining_issues:
-        console.print(f"\n[bold red]✗ Remaining issues: {len(remaining_issues)}[/bold red]")
+        console.print(f"[bold red]✗ Remaining issues: {len(remaining_issues)}[/bold red]")
         seen_files: set[Path] = set()
         for file_path, error in remaining_issues:
             try:
@@ -189,50 +185,28 @@ def validate(
                 rel_path = file_path
             if file_path not in seen_files:
                 seen_files.add(file_path)
-                console.print(f"\n  [cyan]{rel_path}[/cyan]")
+                console.print(f"  [cyan]{rel_path}[/cyan]")
             console.print(f"    [red]• {error}[/red]")
-    else:
-        console.print("\n[green]No remaining issues[/green]")
+        console.print()
 
-    # Summary
-    console.print("\n" + "=" * 60)
-    files_with_fixes = len({f for f, _ in fixes_applied})
-    files_with_issues = len({f for f, _ in remaining_issues})
-
-    console.print("[bold]Summary:[/bold]")
-    console.print(f"  Files scanned: {len(all_files)}")
-    console.print(f"  Files with fixes {'(would be)' if dry_run else ''}: {files_with_fixes}")
-    console.print(f"  Files with remaining issues: {files_with_issues}")
+    # Summary line
+    summary_parts = []
+    if files_with_fixes:
+        summary_parts.append(f"{files_with_fixes} fixed")
+    if files_with_issues:
+        summary_parts.append(f"{files_with_issues} with issues")
+    if summary_parts:
+        console.print(f"[dim]{', '.join(summary_parts)}[/dim]\n")
 
     if dry_run and fixes_applied:
-        console.print("\n[yellow]Run without --dry-run to apply fixes[/yellow]")
+        console.print("[yellow]Run without --dry-run to apply fixes[/yellow]\n")
 
     if remaining_issues:
-        console.print("\n[bold red]❌ Validation failed[/bold red]")
+        console.print("[bold red]❌ Validation failed[/bold red]")
         sys.exit(1)
     else:
-        console.print("\n[bold green]✅ All documents valid[/bold green]")
+        console.print("[bold green]✅ All documents valid[/bold green]")
         sys.exit(0)
-
-
-@main.group()
-def test():
-    """Testing utilities and helpers."""
-    pass
-
-
-@test.command("health")
-@click.option("--url", default="http://localhost:8080", help="Service URL to check")
-@click.option("--timeout", default=30, help="Timeout in seconds")
-def test_health(url: str, timeout: int):
-    """Check service health."""
-    console.print(f"[bold blue]🏥 Checking Health: {url}[/bold blue]\n")
-
-    # Placeholder for health check implementation
-    # HealthChecker would be initialized and used here
-    console.print(f"[yellow]ℹ[/yellow] Health check not yet implemented for {url}")
-    console.print(f"[dim]Timeout: {timeout}s[/dim]")
-    console.print("[green]✓[/green] Placeholder completed")
 
 
 @main.command()

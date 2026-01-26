@@ -2,7 +2,7 @@
 
 from click.testing import CliRunner
 
-from docuchango.cli import main, test, validate
+from docuchango.cli import main, validate
 
 
 class TestValidateCommand:
@@ -180,55 +180,6 @@ tags: "API Design"
             "File was modified during --dry-run! "
             "Dry run should not modify any files."
         )
-
-
-class TestTestCommands:
-    """Test the test command group."""
-
-    def test_test_help(self):
-        """Test that test command shows help."""
-        runner = CliRunner()
-        result = runner.invoke(test, ["--help"])
-        assert result.exit_code == 0
-        assert "Testing utilities" in result.output
-
-    def test_test_health_help(self):
-        """Test test health subcommand help."""
-        runner = CliRunner()
-        result = runner.invoke(test, ["health", "--help"])
-        assert result.exit_code == 0
-        assert "Check service health" in result.output
-        assert "--url" in result.output
-        assert "--timeout" in result.output
-
-    def test_test_health_default(self):
-        """Test test health command with defaults."""
-        runner = CliRunner()
-        result = runner.invoke(test, ["health"])
-        assert result.exit_code == 0
-        assert "Checking Health" in result.output
-        assert "http://localhost:8080" in result.output
-        assert "30s" in result.output
-
-    def test_test_health_custom_url(self):
-        """Test test health command with custom URL."""
-        runner = CliRunner()
-        result = runner.invoke(
-            test,
-            ["health", "--url", "http://example.com:9000"],
-        )
-        assert result.exit_code == 0
-        assert "http://example.com:9000" in result.output
-
-    def test_test_health_custom_timeout(self):
-        """Test test health command with custom timeout."""
-        runner = CliRunner()
-        result = runner.invoke(
-            test,
-            ["health", "--timeout", "60"],
-        )
-        assert result.exit_code == 0
-        assert "60s" in result.output
 
 
 class TestMainCommandGroup:
