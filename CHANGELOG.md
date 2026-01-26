@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.9.0 (2026-01-26)
+
+### Features
+
+- Add trailing whitespace removal to code block fixer
+  ([`f1cc256`](https://github.com/jrepp/docuchango/commit/f1cc25671cbcf210cd1abd4f555f6ac7a0586691))
+
+
 ## v1.8.0 (2026-01-26)
 
 ### Bug Fixes
