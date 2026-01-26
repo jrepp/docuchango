@@ -2,6 +2,43 @@
 
 <!-- version list -->
 
+## v1.8.0 (2026-01-26)
+
+### Bug Fixes
+
+- Implement fix all command to actually apply fixes
+  ([`384bca4`](https://github.com/jrepp/docuchango/commit/384bca43d9b1751520a23921b93a6d008b21fdbd))
+
+- Remove duplicate type annotation for seen_files
+  ([`574a3e3`](https://github.com/jrepp/docuchango/commit/574a3e3c56e96868732536e9aa20fd0c232b2cfd))
+
+- Scan docs-cms subdirectory for documentation files
+  ([`a1ffbe4`](https://github.com/jrepp/docuchango/commit/a1ffbe45324855ef6d77ceb8696b017a0bdbadba))
+
+### Code Style
+
+- Format code with ruff
+  ([`28d73ff`](https://github.com/jrepp/docuchango/commit/28d73ff76be21dfc78116ec58ecb0ea315485fa9))
+
+### Features
+
+- Validate command now applies fixes by default
+  ([`da0a37f`](https://github.com/jrepp/docuchango/commit/da0a37f04d7a339e23dfda6eddae1df92d3fbe61))
+
+### Refactoring
+
+- Remove fix command group, integrate fixes into validate
+  ([`2b858be`](https://github.com/jrepp/docuchango/commit/2b858befc30a5ea314843aa94e9141248fc3b508))
+
+- Remove test command, simplify validation output
+  ([`4713409`](https://github.com/jrepp/docuchango/commit/4713409a38f1a4b3ddc7e30dee23f410f8f0edfe))
+
+### Testing
+
+- Add validation test showing fixes and issues with file paths
+  ([`b693572`](https://github.com/jrepp/docuchango/commit/b69357276ce2ca6b39ee08f8689c5a2865e27204))
+
+
 ## v1.6.4 (2025-11-17)
 
 ### Bug Fixes
