@@ -60,7 +60,6 @@ dev = [
 [project.scripts]
 docuchango = "docuchango.cli:main"
 dcc-validate = "docuchango.cli:validate"
-dcc-fix = "docuchango.cli:fix"
 
 [project.urls]
 Homepage = "https://github.com/jrepp/docuchango"

@@ -2,7 +2,7 @@
 
 from click.testing import CliRunner
 
-from docuchango.cli import fix, main, test, validate
+from docuchango.cli import main, test, validate
 
 
 class TestValidateCommand:
@@ -118,7 +118,7 @@ Some content here.
 
         # Run validate (which now applies fixes by default)
         runner = CliRunner()
-        result = runner.invoke(
+        runner.invoke(
             validate,
             [
                 "--repo-root",
@@ -180,134 +180,6 @@ tags: "API Design"
             "File was modified during --dry-run! "
             "Dry run should not modify any files."
         )
-
-
-class TestFixCommands:
-    """Test the fix command group."""
-
-    def test_fix_help(self):
-        """Test that fix command shows help."""
-        runner = CliRunner()
-        result = runner.invoke(fix, ["--help"])
-        assert result.exit_code == 0
-        assert "Fix documentation issues" in result.output
-
-    def test_fix_all_help(self):
-        """Test fix all subcommand help."""
-        runner = CliRunner()
-        result = runner.invoke(fix, ["all", "--help"])
-        assert result.exit_code == 0
-        assert "Run all automatic fixes" in result.output
-
-    def test_fix_all_command(self, docs_repository):
-        """Test fix all command execution."""
-        runner = CliRunner()
-        result = runner.invoke(
-            fix,
-            [
-                "all",
-                "--repo-root",
-                str(docs_repository["root"]),
-                "--dry-run",
-            ],
-        )
-        assert result.exit_code == 0
-        assert "Fixing Documentation Issues" in result.output
-        assert "DRY RUN" in result.output
-        # Command now shows summary (or "No documentation files found" if no matching dirs)
-        assert "Summary" in result.output or "No documentation files found" in result.output
-
-    def test_fix_all_without_dry_run(self, docs_repository):
-        """Test fix all command without dry-run flag."""
-        runner = CliRunner()
-        result = runner.invoke(
-            fix,
-            [
-                "all",
-                "--repo-root",
-                str(docs_repository["root"]),
-            ],
-        )
-        assert result.exit_code == 0
-        assert "Fixing Documentation Issues" in result.output
-        # Should not show DRY RUN message
-        assert "DRY RUN" not in result.output
-
-    def test_fix_links_help(self):
-        """Test fix links subcommand help."""
-        runner = CliRunner()
-        result = runner.invoke(fix, ["links", "--help"])
-        assert result.exit_code == 0
-        assert "Fix broken links" in result.output
-
-    def test_fix_links_command(self, docs_repository):
-        """Test fix links command execution."""
-        runner = CliRunner()
-        result = runner.invoke(
-            fix,
-            [
-                "links",
-                "--repo-root",
-                str(docs_repository["root"]),
-                "--dry-run",
-            ],
-        )
-        assert result.exit_code == 0
-        assert "Fixing Broken Links" in result.output
-        assert "DRY RUN" in result.output
-
-    def test_fix_links_without_dry_run(self, docs_repository):
-        """Test fix links command without dry-run."""
-        runner = CliRunner()
-        result = runner.invoke(
-            fix,
-            [
-                "links",
-                "--repo-root",
-                str(docs_repository["root"]),
-            ],
-        )
-        assert result.exit_code == 0
-        assert "Fixing Broken Links" in result.output
-        assert "DRY RUN" not in result.output
-
-    def test_fix_code_blocks_help(self):
-        """Test fix code-blocks subcommand help."""
-        runner = CliRunner()
-        result = runner.invoke(fix, ["code-blocks", "--help"])
-        assert result.exit_code == 0
-        assert "Fix code block formatting" in result.output
-
-    def test_fix_code_blocks_command(self, docs_repository):
-        """Test fix code-blocks command execution."""
-        runner = CliRunner()
-        result = runner.invoke(
-            fix,
-            [
-                "code-blocks",
-                "--repo-root",
-                str(docs_repository["root"]),
-                "--dry-run",
-            ],
-        )
-        assert result.exit_code == 0
-        assert "Fixing Code Blocks" in result.output
-        assert "DRY RUN" in result.output
-
-    def test_fix_code_blocks_without_dry_run(self, docs_repository):
-        """Test fix code-blocks command without dry-run."""
-        runner = CliRunner()
-        result = runner.invoke(
-            fix,
-            [
-                "code-blocks",
-                "--repo-root",
-                str(docs_repository["root"]),
-            ],
-        )
-        assert result.exit_code == 0
-        assert "Fixing Code Blocks" in result.output
-        assert "DRY RUN" not in result.output
 
 
 class TestTestCommands:
