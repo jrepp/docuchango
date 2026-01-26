@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Auto-fix code block formatting issues
+"""Auto-fix markdown formatting issues
 
 Fixes:
-1. Missing blank lines before opening code fences
-2. Missing blank lines after closing code fences
-3. Closing fences with extra text (```bash -> ```)
-4. Opening fences without language (``` -> ```text)
-5. Unclosed code blocks
+1. Trailing whitespace on lines (outside code blocks)
+2. Missing blank lines before opening code fences
+3. Missing blank lines after closing code fences
+4. Closing fences with extra text (```bash -> ```)
+5. Opening fences without language (``` -> ```text)
+6. Unclosed code blocks
 
 Usage:
     uv run python -m tooling.fix_code_blocks
@@ -44,13 +45,24 @@ def fix_code_blocks(file_path: Path) -> tuple[bool, list[str]]:
                 elif frontmatter_count == 2:
                     in_frontmatter = False
                     frontmatter_end_line = i
-                fixed_lines.append(line)
+                # Strip trailing whitespace from frontmatter delimiters
+                stripped_line = line.rstrip()
+                if stripped_line != line:
+                    changes.append(f"Line {i + 1}: Removed trailing whitespace")
+                    fixed_lines.append(stripped_line)
+                else:
+                    fixed_lines.append(line)
                 i += 1
                 continue
 
-            # Skip frontmatter content
+            # Frontmatter content - strip trailing whitespace
             if in_frontmatter:
-                fixed_lines.append(line)
+                stripped_line = line.rstrip()
+                if stripped_line != line:
+                    changes.append(f"Line {i + 1}: Removed trailing whitespace")
+                    fixed_lines.append(stripped_line)
+                else:
+                    fixed_lines.append(line)
                 i += 1
                 continue
 
@@ -105,7 +117,13 @@ def fix_code_blocks(file_path: Path) -> tuple[bool, list[str]]:
             else:
                 # Regular line (not a code fence)
                 if not in_code_block:
-                    fixed_lines.append(line)
+                    # Strip trailing whitespace from non-code-block lines
+                    stripped_line = line.rstrip()
+                    if stripped_line != line:
+                        changes.append(f"Line {i + 1}: Removed trailing whitespace")
+                        fixed_lines.append(stripped_line)
+                    else:
+                        fixed_lines.append(line)
                 else:
                     # Inside code block - preserve exactly
                     fixed_lines.append(line)

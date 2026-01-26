@@ -381,3 +381,50 @@ line 3
 
         # Should preserve language options
         assert "```python {1,3-5}" in result or "python" in result
+
+    def test_remove_trailing_whitespace(self, tmp_path):
+        """Test removing trailing whitespace from lines."""
+        test_file = tmp_path / "test.md"
+        # Using explicit spaces at end of lines
+        content = "# Title   \n\nSome text with trailing spaces   \n\n```python\ncode\n```\n"
+        test_file.write_text(content, encoding="utf-8")
+
+        modified, changes = fix_code_blocks(test_file)
+        assert modified is True
+        assert any("trailing whitespace" in change.lower() for change in changes)
+
+        result = test_file.read_text(encoding="utf-8")
+        # Lines should not have trailing whitespace
+        for line in result.split("\n"):
+            # Skip empty lines
+            if line:
+                assert line == line.rstrip(), f"Line still has trailing whitespace: {repr(line)}"
+
+    def test_preserve_whitespace_in_code_blocks(self, tmp_path):
+        """Test that trailing whitespace is preserved inside code blocks."""
+        test_file = tmp_path / "test.md"
+        # Code block content with trailing spaces should be preserved
+        content = "# Title\n\n```python\ncode with trailing   \nmore code  \n```\n"
+        test_file.write_text(content, encoding="utf-8")
+
+        modified, changes = fix_code_blocks(test_file)
+        result = test_file.read_text(encoding="utf-8")
+
+        # Trailing whitespace inside code block should be preserved
+        assert "code with trailing   " in result
+        assert "more code  " in result
+
+    def test_trailing_whitespace_in_frontmatter(self, tmp_path):
+        """Test removing trailing whitespace from frontmatter."""
+        test_file = tmp_path / "test.md"
+        content = "---   \ntitle: Test   \nstatus: accepted  \n---\n\n# Content\n"
+        test_file.write_text(content, encoding="utf-8")
+
+        modified, changes = fix_code_blocks(test_file)
+        assert modified is True
+        assert any("trailing whitespace" in change.lower() for change in changes)
+
+        result = test_file.read_text(encoding="utf-8")
+        # Frontmatter should not have trailing whitespace
+        assert "---   " not in result
+        assert "title: Test   " not in result
