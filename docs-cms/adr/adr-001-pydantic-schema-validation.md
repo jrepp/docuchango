@@ -1,12 +1,17 @@
 ---
-id: "adr-001"
-title: "Use Pydantic for Frontmatter Schema Validation"
-status: Accepted
-date: 2025-01-26
+created: '2025-10-26'
 deciders: Engineering Team
-tags: ["pydantic", "validation", "schema", "architecture"]
-project_id: "docuchango"
-doc_uuid: "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d"
+doc_uuid: a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d
+id: adr-001
+project_id: docuchango
+status: Accepted
+tags:
+- architecture
+- pydantic
+- schema
+- validation
+title: Use Pydantic for Frontmatter Schema Validation
+updated: 2025-10-26
 ---
 
 # ADR-001: Use Pydantic for Frontmatter Schema Validation
@@ -26,6 +31,8 @@ Different doc types (ADR, RFC, Memo) need different required fields. Pydantic gi
 ```python
 class ADRFrontmatter(BaseModel):
     status: Literal["Proposed", "Accepted", "Deprecated", "Superseded"]
+created: 2025-10-26
+updated: 2025-10-26
     date: datetime.date
     deciders: str = Field(min_length=1)
 

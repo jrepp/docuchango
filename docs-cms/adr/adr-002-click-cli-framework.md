@@ -1,12 +1,17 @@
 ---
-id: "adr-002"
-title: "Use Click for CLI Framework"
-status: Accepted
-date: 2025-01-26
+created: '2025-10-26'
 deciders: Engineering Team
-tags: ["click", "cli", "command-line", "architecture"]
-project_id: "docuchango"
-doc_uuid: "b2c3d4e5-f6a7-4b6c-9d0e-1f2a3b4c5d6e"
+doc_uuid: b2c3d4e5-f6a7-4b6c-9d0e-1f2a3b4c5d6e
+id: adr-002
+project_id: docuchango
+status: Accepted
+tags:
+- architecture
+- cli
+- click
+- command-line
+title: Use Click for CLI Framework
+updated: 2025-10-26
 ---
 
 # ADR-002: Use Click for CLI Framework

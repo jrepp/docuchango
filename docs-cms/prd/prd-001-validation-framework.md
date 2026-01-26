@@ -1,13 +1,17 @@
 ---
-id: "prd-001"
-title: "Docuchango: Documentation Validation Tool"
-status: Launched
 author: Engineering Team
-created: 2025-01-20
-updated: 2025-01-26
-tags: ["validation", "documentation", "framework", "product"]
-project_id: "docuchango"
-doc_uuid: "e5f6a7b8-c9d0-4e9f-2a3b-4c5d6e7f8a9b"
+created: '2025-10-26'
+doc_uuid: e5f6a7b8-c9d0-4e9f-2a3b-4c5d6e7f8a9b
+id: prd-001
+project_id: docuchango
+status: Launched
+tags:
+- documentation
+- framework
+- product
+- validation
+title: 'Docuchango: Documentation Validation Tool'
+updated: 2025-10-26
 ---
 
 # PRD-001: Docuchango
@@ -58,6 +62,7 @@ docuchango fix code-blocks
 ### Validation
 
 Check required frontmatter fields:
+
 ```yaml
 # ADR must have: title, status, date, deciders, tags, id
 # RFC must have: title, status, author, created, tags, id
@@ -86,6 +91,7 @@ Fix these automatically:
 ### Templates
 
 Starter files for new documents:
+
 ```bash
 cp templates/adr-template.md docs/adr/adr-042-my-decision.md
 # Edit and run: docuchango validate

@@ -1,12 +1,17 @@
 ---
-id: "adr-003"
-title: "Use pytest with tmp_path for Testing"
-status: Accepted
-date: 2025-01-26
+created: '2025-10-26'
 deciders: Engineering Team
-tags: ["pytest", "testing", "tmp-path", "filesystem"]
-project_id: "docuchango"
-doc_uuid: "a04e65be-7296-4051-8a64-98cca8abcdb0"
+doc_uuid: a04e65be-7296-4051-8a64-98cca8abcdb0
+id: adr-003
+project_id: docuchango
+status: Accepted
+tags:
+- filesystem
+- pytest
+- testing
+- tmp-path
+title: Use pytest with tmp_path for Testing
+updated: 2025-10-26
 ---
 
 # ADR-003: Use pytest with tmp_path for Testing
