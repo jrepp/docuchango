@@ -220,20 +220,119 @@ def fix_list():
     help="Repository root directory (default: current directory)",
 )
 @click.option("--dry-run", is_flag=True, help="Show what would be fixed without making changes")
-def fix_all(repo_root: Path, dry_run: bool):
-    """Run all automatic fixes on documentation."""
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed output")
+def fix_all(repo_root: Path, dry_run: bool, verbose: bool):
+    """Run all automatic fixes on documentation.
+
+    Runs all fixes in order:
+    - Frontmatter (status values, dates, missing fields)
+    - Tags (normalize, deduplicate, sort)
+    - Whitespace (trim values, remove empty fields)
+    - Timestamps (created/updated from git history)
+    - Code blocks (languages, blank lines, closing fences)
+    """
+    from docuchango.fixes.code_blocks import fix_code_blocks
+    from docuchango.fixes.frontmatter import fix_all_frontmatter
+    from docuchango.fixes.tags import fix_tags
+    from docuchango.fixes.timestamps import update_document_timestamps
+    from docuchango.fixes.whitespace import fix_whitespace_and_fields
 
     console.print("[bold blue]🔧 Fixing Documentation Issues[/bold blue]\n")
     if dry_run:
         console.print("[yellow]DRY RUN - No changes will be made[/yellow]\n")
 
-    # This would call the fix functions
-    # For now, just show what would happen
-    console.print("Would fix:")
-    console.print("  • Trailing whitespace")
-    console.print("  • Code fence languages")
-    console.print("  • Blank lines before fences")
-    console.print("  • Missing frontmatter fields")
+    # Find all markdown files in docs directories
+    doc_patterns = ["adr/**/*.md", "rfcs/**/*.md", "memos/**/*.md", "prd/**/*.md"]
+    all_files = []
+    for pattern in doc_patterns:
+        all_files.extend(repo_root.glob(pattern))
+
+    if not all_files:
+        console.print("[yellow]No documentation files found[/yellow]")
+        return
+
+    total_files = len(all_files)
+    console.print(f"Found {total_files} documentation files\n")
+
+    # Track totals across all fix types
+    total_fixes = 0
+    files_with_fixes = set()
+
+    # Define fix functions with their display names
+    # Each fix function returns either:
+    #   - list[str] of messages (frontmatter)
+    #   - tuple[bool, list[str]] (tags, whitespace, timestamps)
+    #   - tuple[bool, list[str]] for code_blocks (but no dry_run support)
+    fix_types = [
+        ("Frontmatter", fix_all_frontmatter, True),
+        ("Tags", fix_tags, True),
+        ("Whitespace", fix_whitespace_and_fields, True),
+        ("Timestamps", update_document_timestamps, True),
+        ("Code blocks", fix_code_blocks, False),  # No dry_run support
+    ]
+
+    for fix_name, fix_func, supports_dry_run in fix_types:
+        fix_count = 0
+        files_fixed = 0
+
+        if verbose:
+            console.print(f"[bold]{fix_name}:[/bold]")
+
+        for file_path in all_files:
+            try:
+                # Skip code blocks fix in dry_run mode since it doesn't support it
+                if not supports_dry_run and dry_run:
+                    continue
+
+                # Call the fix function
+                if supports_dry_run:
+                    result = fix_func(file_path, dry_run=dry_run)
+                else:
+                    result = fix_func(file_path)
+
+                # Handle different return types
+                if isinstance(result, list):
+                    # frontmatter returns list[str]
+                    messages = result
+                    changed = bool(messages)
+                else:
+                    # Others return tuple[bool, list[str]]
+                    changed, messages = result
+
+                if changed and messages:
+                    files_fixed += 1
+                    fix_count += len(messages)
+                    files_with_fixes.add(file_path)
+
+                    if verbose:
+                        rel_path = file_path.relative_to(repo_root)
+                        console.print(f"  [cyan]{rel_path}[/cyan]")
+                        for msg in messages:
+                            console.print(f"    ✓ {msg}")
+
+            except Exception as e:
+                if verbose:
+                    rel_path = file_path.relative_to(repo_root)
+                    console.print(f"  [red]{rel_path}: Error - {e}[/red]")
+
+        total_fixes += fix_count
+
+        if verbose and fix_count > 0:
+            console.print(f"  → {fix_count} fixes in {files_fixed} files\n")
+        elif verbose:
+            console.print(f"  → No issues found\n")
+
+    # Summary
+    console.print()
+    console.print("[bold]Summary:[/bold]")
+    console.print(f"  Files scanned: {total_files}")
+    console.print(f"  Files with fixes: {len(files_with_fixes)}")
+    console.print(f"  Total fixes applied: {total_fixes}")
+
+    if dry_run:
+        console.print("\n[yellow]Dry run complete - no files were modified[/yellow]")
+        if total_fixes > 0:
+            console.print("[yellow]💡 Run without --dry-run to apply changes[/yellow]")
 
 
 @fix.command("links")

@@ -120,7 +120,8 @@ class TestFixCommands:
         assert result.exit_code == 0
         assert "Fixing Documentation Issues" in result.output
         assert "DRY RUN" in result.output
-        assert "Trailing whitespace" in result.output or "Would fix" in result.output
+        # Command now shows summary (or "No documentation files found" if no matching dirs)
+        assert "Summary" in result.output or "No documentation files found" in result.output
 
     def test_fix_all_without_dry_run(self, docs_repository):
         """Test fix all command without dry-run flag."""
