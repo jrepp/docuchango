@@ -11,7 +11,7 @@ tags:
 - testing
 - tmp-path
 title: Use pytest with tmp_path for Testing
-updated: 2025-10-26
+updated: 2026-01-26
 ---
 
 # ADR-003: Use pytest with tmp_path for Testing

@@ -104,7 +104,7 @@ class TestValidateCommand:
         # - Tags not normalized (uppercase, spaces)
         # - Whitespace in field values
         test_file = adr_dir / "adr-001-test-fix.md"
-        original_content = '''---
+        original_content = """---
 title: "Test ADR  "
 status: accepted
 tags: "API Design, Database"
@@ -113,7 +113,7 @@ tags: "API Design, Database"
 # Test ADR
 
 Some content here.
-'''
+"""
         test_file.write_text(original_content, encoding="utf-8")
 
         # Run validate (which now applies fixes by default)
@@ -152,14 +152,14 @@ Some content here.
         adr_dir.mkdir()
 
         test_file = adr_dir / "adr-001-test-dry-run.md"
-        original_content = '''---
+        original_content = """---
 title: "Test ADR  "
 status: accepted
 tags: "API Design"
 ---
 
 # Test ADR
-'''
+"""
         test_file.write_text(original_content, encoding="utf-8")
 
         # Run validate with --dry-run
@@ -177,8 +177,7 @@ tags: "API Design"
         # Read the file back - should be unchanged
         after_content = test_file.read_text(encoding="utf-8")
         assert after_content == original_content, (
-            "File was modified during --dry-run! "
-            "Dry run should not modify any files."
+            "File was modified during --dry-run! Dry run should not modify any files."
         )
 
 

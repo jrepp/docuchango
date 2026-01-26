@@ -74,8 +74,14 @@ def validate(
     # Find all markdown files in docs directories
     # Check both repo root and docs-cms subdirectory for compatibility
     doc_patterns = [
-        "adr/**/*.md", "rfcs/**/*.md", "memos/**/*.md", "prd/**/*.md",
-        "docs-cms/adr/**/*.md", "docs-cms/rfcs/**/*.md", "docs-cms/memos/**/*.md", "docs-cms/prd/**/*.md",
+        "adr/**/*.md",
+        "rfcs/**/*.md",
+        "memos/**/*.md",
+        "prd/**/*.md",
+        "docs-cms/adr/**/*.md",
+        "docs-cms/rfcs/**/*.md",
+        "docs-cms/memos/**/*.md",
+        "docs-cms/prd/**/*.md",
     ]
     all_files = []
     for pattern in doc_patterns:

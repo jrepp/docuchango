@@ -11,7 +11,7 @@ tags:
 - click
 - command-line
 title: Use Click for CLI Framework
-updated: 2025-10-26
+updated: 2026-01-26
 ---
 
 # ADR-002: Use Click for CLI Framework
