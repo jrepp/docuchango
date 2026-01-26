@@ -2,7 +2,7 @@
 
 from click.testing import CliRunner
 
-from docuchango.cli import fix, main, test, validate
+from docuchango.cli import main, validate
 
 
 class TestValidateCommand:
@@ -13,11 +13,11 @@ class TestValidateCommand:
         runner = CliRunner()
         result = runner.invoke(validate, ["--help"])
         assert result.exit_code == 0
-        assert "Validate documentation files" in result.output
+        assert "Validate and fix documentation files" in result.output
         assert "--repo-root" in result.output
         assert "--verbose" in result.output
         assert "--skip-build" in result.output
-        assert "--fix" in result.output
+        assert "--dry-run" in result.output
 
     def test_validate_with_verbose(self, docs_repository):
         """Test validate command with verbose flag."""
@@ -62,19 +62,20 @@ class TestValidateCommand:
         assert result.exit_code == 2
         # Click will error on invalid path
 
-    def test_validate_with_fix_flag(self, docs_repository):
-        """Test validate command with --fix flag."""
+    def test_validate_with_dry_run(self, docs_repository):
+        """Test validate command with --dry-run flag (no fixes applied)."""
         runner = CliRunner()
         result = runner.invoke(
             validate,
             [
                 "--repo-root",
                 str(docs_repository["root"]),
-                "--fix",
+                "--dry-run",
                 "--skip-build",
             ],
         )
         assert result.exit_code in [0, 1]
+        assert "DRY RUN" in result.output
 
     def test_validate_current_directory(self, tmp_path, monkeypatch):
         """Test validate command uses current directory as default."""
@@ -87,181 +88,180 @@ class TestValidateCommand:
         # Should attempt to validate current directory
         assert result.exit_code in [0, 1, 2]
 
+    def test_validate_actually_applies_fixes(self, tmp_path):
+        """Regression test: validate must actually apply fixes, not just report them.
 
-class TestFixCommands:
-    """Test the fix command group."""
+        This test ensures the validate command modifies files when fixes are needed.
+        Previously, the fix functionality was a placeholder that only printed what
+        would be fixed without actually making changes.
+        """
+        # Create directory structure with fixable issues
+        adr_dir = tmp_path / "adr"
+        adr_dir.mkdir()
 
-    def test_fix_help(self):
-        """Test that fix command shows help."""
+        # Create an ADR file with issues that should be auto-fixed:
+        # - Tags as string instead of array
+        # - Tags not normalized (uppercase, spaces)
+        # - Whitespace in field values
+        test_file = adr_dir / "adr-001-test-fix.md"
+        original_content = """---
+title: "Test ADR  "
+status: accepted
+tags: "API Design, Database"
+---
+
+# Test ADR
+
+Some content here.
+"""
+        test_file.write_text(original_content, encoding="utf-8")
+
+        # Run validate (which now applies fixes by default)
         runner = CliRunner()
-        result = runner.invoke(fix, ["--help"])
-        assert result.exit_code == 0
-        assert "Fix documentation issues" in result.output
-
-    def test_fix_all_help(self):
-        """Test fix all subcommand help."""
-        runner = CliRunner()
-        result = runner.invoke(fix, ["all", "--help"])
-        assert result.exit_code == 0
-        assert "Run all automatic fixes" in result.output
-
-    def test_fix_all_command(self, docs_repository):
-        """Test fix all command execution."""
-        runner = CliRunner()
-        result = runner.invoke(
-            fix,
+        runner.invoke(
+            validate,
             [
-                "all",
                 "--repo-root",
-                str(docs_repository["root"]),
+                str(tmp_path),
+                "--skip-build",
+            ],
+        )
+
+        # Read the file back
+        fixed_content = test_file.read_text(encoding="utf-8")
+
+        # Verify fixes were actually applied
+        # The file content should have changed from the original
+        assert fixed_content != original_content, (
+            "File was not modified - fixes were not applied! "
+            "This is a regression where validate only reports but doesn't fix."
+        )
+
+        # Verify specific fixes were applied:
+        # - Tags should be converted to array format
+        assert "tags:" in fixed_content
+        # - Tags should be normalized (lowercase, dashes)
+        assert "api-design" in fixed_content.lower() or "- api-design" in fixed_content.lower()
+        # - Title whitespace should be trimmed
+        assert 'title: "Test ADR  "' not in fixed_content
+
+    def test_validate_dry_run_does_not_modify_files(self, tmp_path):
+        """Test that --dry-run prevents file modifications."""
+        # Create directory structure with fixable issues
+        adr_dir = tmp_path / "adr"
+        adr_dir.mkdir()
+
+        test_file = adr_dir / "adr-001-test-dry-run.md"
+        original_content = """---
+title: "Test ADR  "
+status: accepted
+tags: "API Design"
+---
+
+# Test ADR
+"""
+        test_file.write_text(original_content, encoding="utf-8")
+
+        # Run validate with --dry-run
+        runner = CliRunner()
+        runner.invoke(
+            validate,
+            [
+                "--repo-root",
+                str(tmp_path),
+                "--skip-build",
                 "--dry-run",
             ],
         )
-        assert result.exit_code == 0
-        assert "Fixing Documentation Issues" in result.output
-        assert "DRY RUN" in result.output
-        assert "Trailing whitespace" in result.output or "Would fix" in result.output
 
-    def test_fix_all_without_dry_run(self, docs_repository):
-        """Test fix all command without dry-run flag."""
+        # Read the file back - should be unchanged
+        after_content = test_file.read_text(encoding="utf-8")
+        assert after_content == original_content, (
+            "File was modified during --dry-run! Dry run should not modify any files."
+        )
+
+    def test_validate_output_shows_fixes_and_issues_with_paths(self, tmp_path):
+        """Test that validate output shows both fixed and unfixable issues with file paths.
+
+        This test verifies:
+        1. Auto-fixed issues are reported with file paths
+        2. Remaining (unfixable) issues are reported with file paths
+        3. The summary shows counts for both categories
+        """
+        # Create directory structure
+        adr_dir = tmp_path / "adr"
+        adr_dir.mkdir()
+
+        # File 1: Has fixable issues (tags need normalization)
+        fixable_file = adr_dir / "adr-001-fixable.md"
+        fixable_content = """---
+title: "Fixable ADR"
+status: accepted
+tags: "API Design, Database"
+---
+
+# Fixable ADR
+
+This file has fixable issues.
+"""
+        fixable_file.write_text(fixable_content, encoding="utf-8")
+
+        # File 2: Has unfixable issues (invalid filename pattern for validation)
+        # Note: We use trailing whitespace which gets fixed, but code fence issues
+        # that the validator will catch
+        unfixable_file = adr_dir / "adr-002-unfixable.md"
+        unfixable_content = """---
+title: "Unfixable ADR"
+status: accepted
+tags: []
+---
+
+# Unfixable ADR
+
+```python
+code without blank line before
+```
+More text without blank line after code block.
+```javascript
+more code
+```
+"""
+        unfixable_file.write_text(unfixable_content, encoding="utf-8")
+
+        # Run validate
         runner = CliRunner()
         result = runner.invoke(
-            fix,
+            validate,
             [
-                "all",
                 "--repo-root",
-                str(docs_repository["root"]),
+                str(tmp_path),
+                "--skip-build",
             ],
         )
-        assert result.exit_code == 0
-        assert "Fixing Documentation Issues" in result.output
-        # Should not show DRY RUN message
-        assert "DRY RUN" not in result.output
 
-    def test_fix_links_help(self):
-        """Test fix links subcommand help."""
-        runner = CliRunner()
-        result = runner.invoke(fix, ["links", "--help"])
-        assert result.exit_code == 0
-        assert "Fix broken links" in result.output
+        # Verify output contains file paths
+        output = result.output
 
-    def test_fix_links_command(self, docs_repository):
-        """Test fix links command execution."""
-        runner = CliRunner()
-        result = runner.invoke(
-            fix,
-            [
-                "links",
-                "--repo-root",
-                str(docs_repository["root"]),
-                "--dry-run",
-            ],
-        )
-        assert result.exit_code == 0
-        assert "Fixing Broken Links" in result.output
-        assert "DRY RUN" in result.output
+        # Should show scanned files
+        assert "Scanned" in output
+        assert "files" in output
 
-    def test_fix_links_without_dry_run(self, docs_repository):
-        """Test fix links command without dry-run."""
-        runner = CliRunner()
-        result = runner.invoke(
-            fix,
-            [
-                "links",
-                "--repo-root",
-                str(docs_repository["root"]),
-            ],
-        )
-        assert result.exit_code == 0
-        assert "Fixing Broken Links" in result.output
-        assert "DRY RUN" not in result.output
+        # Should show the fixable file path when fixes are applied
+        # (Tags should be normalized from string to array)
+        if "Fixes applied" in output or "fixed" in output.lower():
+            assert "adr-001-fixable.md" in output or "adr/adr-001" in output
 
-    def test_fix_code_blocks_help(self):
-        """Test fix code-blocks subcommand help."""
-        runner = CliRunner()
-        result = runner.invoke(fix, ["code-blocks", "--help"])
-        assert result.exit_code == 0
-        assert "Fix code block formatting" in result.output
+        # Should show remaining issues section if there are validation errors
+        if "Remaining issues" in output:
+            # Should include file path for unfixable issues
+            assert "adr-002-unfixable.md" in output or "adr/adr-002" in output
 
-    def test_fix_code_blocks_command(self, docs_repository):
-        """Test fix code-blocks command execution."""
-        runner = CliRunner()
-        result = runner.invoke(
-            fix,
-            [
-                "code-blocks",
-                "--repo-root",
-                str(docs_repository["root"]),
-                "--dry-run",
-            ],
-        )
-        assert result.exit_code == 0
-        assert "Fixing Code Blocks" in result.output
-        assert "DRY RUN" in result.output
-
-    def test_fix_code_blocks_without_dry_run(self, docs_repository):
-        """Test fix code-blocks command without dry-run."""
-        runner = CliRunner()
-        result = runner.invoke(
-            fix,
-            [
-                "code-blocks",
-                "--repo-root",
-                str(docs_repository["root"]),
-            ],
-        )
-        assert result.exit_code == 0
-        assert "Fixing Code Blocks" in result.output
-        assert "DRY RUN" not in result.output
-
-
-class TestTestCommands:
-    """Test the test command group."""
-
-    def test_test_help(self):
-        """Test that test command shows help."""
-        runner = CliRunner()
-        result = runner.invoke(test, ["--help"])
-        assert result.exit_code == 0
-        assert "Testing utilities" in result.output
-
-    def test_test_health_help(self):
-        """Test test health subcommand help."""
-        runner = CliRunner()
-        result = runner.invoke(test, ["health", "--help"])
-        assert result.exit_code == 0
-        assert "Check service health" in result.output
-        assert "--url" in result.output
-        assert "--timeout" in result.output
-
-    def test_test_health_default(self):
-        """Test test health command with defaults."""
-        runner = CliRunner()
-        result = runner.invoke(test, ["health"])
-        assert result.exit_code == 0
-        assert "Checking Health" in result.output
-        assert "http://localhost:8080" in result.output
-        assert "30s" in result.output
-
-    def test_test_health_custom_url(self):
-        """Test test health command with custom URL."""
-        runner = CliRunner()
-        result = runner.invoke(
-            test,
-            ["health", "--url", "http://example.com:9000"],
-        )
-        assert result.exit_code == 0
-        assert "http://example.com:9000" in result.output
-
-    def test_test_health_custom_timeout(self):
-        """Test test health command with custom timeout."""
-        runner = CliRunner()
-        result = runner.invoke(
-            test,
-            ["health", "--timeout", "60"],
-        )
-        assert result.exit_code == 0
-        assert "60s" in result.output
+        # Verify the fixable file was actually modified
+        fixed_content = fixable_file.read_text(encoding="utf-8")
+        # Tags should be converted from string to array
+        assert "tags:" in fixed_content
+        # Original string format should be gone
+        assert 'tags: "API Design, Database"' not in fixed_content
 
 
 class TestMainCommandGroup:

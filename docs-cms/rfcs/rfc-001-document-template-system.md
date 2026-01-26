@@ -1,13 +1,16 @@
 ---
-id: "rfc-001"
-title: "Document Template System"
-status: Accepted
 author: Engineering Team
-created: 2025-01-26
+created: '2025-01-26'
+doc_uuid: fe162317-3fa5-44b5-a1f3-1b2471d47548
+id: rfc-001
+project_id: docuchango
+status: Accepted
+tags:
+- documentation
+- standards
+- templates
+title: Document Template System
 updated: 2025-01-26
-tags: ["templates", "documentation", "standards"]
-project_id: "docuchango"
-doc_uuid: "fe162317-3fa5-44b5-a1f3-1b2471d47548"
 ---
 
 # RFC-001: Document Template System

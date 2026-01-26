@@ -33,23 +33,34 @@ def main():
 )
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
 @click.option("--skip-build", is_flag=True, help="Skip Docusaurus build validation")
-@click.option("--fix", is_flag=True, help="Auto-fix issues where possible")
+@click.option("--dry-run", is_flag=True, help="Report issues without applying fixes")
 def validate(
     repo_root: Path,
     verbose: bool,
     skip_build: bool,
-    fix: bool,
+    dry_run: bool,
 ):
-    """Validate documentation files for correctness.
+    """Validate and fix documentation files.
 
-    Validates markdown documents for:
-    - YAML frontmatter format and required fields
+    By default, automatically fixes issues where possible. Use --dry-run to
+    only report issues without making changes.
+
+    Validates and fixes:
+    - YAML frontmatter (status values, dates, missing fields)
+    - Tags (normalize, deduplicate, sort)
+    - Whitespace (trim values, remove empty fields)
+    - Timestamps (created/updated from git history)
+    - Code blocks (languages, blank lines, closing fences)
     - Internal link reachability
     - Markdown formatting issues
     - Consistent ADR/RFC numbering
-    - MDX compilation compatibility
-    - Docusaurus build validation (unless --skip-build)
     """
+    from docuchango.fixes.code_blocks import fix_code_blocks
+    from docuchango.fixes.frontmatter import fix_all_frontmatter
+    from docuchango.fixes.tags import fix_tags
+    from docuchango.fixes.timestamps import update_document_timestamps
+    from docuchango.fixes.whitespace import fix_whitespace_and_fields
+
     try:
         from docuchango.validator import DocValidator
     except ImportError as e:
@@ -57,13 +68,70 @@ def validate(
         sys.exit(2)
 
     console.print("[bold blue]🔍 Validating Documentation[/bold blue]\n")
-    console.print(f"Repository root: {repo_root}")
-    console.print(f"Verbose: {verbose}")
-    console.print(f"Skip build: {skip_build}")
-    console.print(f"Auto-fix: {fix}\n")
+    if dry_run:
+        console.print("[yellow]DRY RUN - No changes will be made[/yellow]\n")
 
+    # Find all markdown files in docs directories
+    # Check both repo root and docs-cms subdirectory for compatibility
+    doc_patterns = [
+        "adr/**/*.md",
+        "rfcs/**/*.md",
+        "memos/**/*.md",
+        "prd/**/*.md",
+        "docs-cms/adr/**/*.md",
+        "docs-cms/rfcs/**/*.md",
+        "docs-cms/memos/**/*.md",
+        "docs-cms/prd/**/*.md",
+    ]
+    all_files = []
+    for pattern in doc_patterns:
+        all_files.extend(repo_root.glob(pattern))
+
+    # Track fixes applied and remaining issues
+    fixes_applied: list[tuple[Path, str]] = []
+    remaining_issues: list[tuple[Path, str]] = []
+
+    # Phase 1: Apply automatic fixes
+    if all_files:
+        # Define fix functions: (name, function, supports_dry_run)
+        fix_types = [
+            ("Frontmatter", fix_all_frontmatter, True),
+            ("Tags", fix_tags, True),
+            ("Whitespace", fix_whitespace_and_fields, True),
+            ("Timestamps", update_document_timestamps, True),
+            ("Code blocks", fix_code_blocks, False),
+        ]
+
+        for fix_name, fix_func, supports_dry_run_flag in fix_types:
+            for file_path in all_files:
+                try:
+                    # Skip code blocks fix in dry_run mode since it doesn't support it
+                    if not supports_dry_run_flag and dry_run:
+                        continue
+
+                    # Call the fix function
+                    result = fix_func(file_path, dry_run=dry_run) if supports_dry_run_flag else fix_func(file_path)
+
+                    # Handle different return types
+                    if isinstance(result, list):
+                        messages = result
+                        changed = bool(messages)
+                    else:
+                        changed, messages = result
+
+                    if changed and messages:
+                        for msg in messages:
+                            fixes_applied.append((file_path, f"[{fix_name}] {msg}"))
+
+                except Exception as e:
+                    if verbose:
+                        rel_path = file_path.relative_to(repo_root)
+                        console.print(f"  [red]✗[/red] {rel_path}: Error in {fix_name} - {e}")
+
+    # Phase 2: Run validation to find remaining issues
     try:
-        validator = DocValidator(repo_root=repo_root, verbose=verbose, fix=fix)
+        # Don't pass fix=True to validator since we already applied fixes above
+        validator = DocValidator(repo_root=repo_root, verbose=verbose, fix=False)
         validator.scan_documents()
         validator.check_code_blocks()
         validator.check_formatting()
@@ -73,26 +141,14 @@ def validate(
             # This would need to be implemented based on the validate_docs.py logic
             pass
 
-        # Check for errors
-        has_errors = False
+        # Collect remaining errors
         for doc in validator.documents:
             if doc.errors:
-                has_errors = True
-                console.print(f"[red]✗[/red] {doc.file_path}")
                 for error in doc.errors:
-                    console.print(f"  [red]{error}[/red]")
+                    remaining_issues.append((doc.file_path, error))
 
-        if validator.errors:
-            has_errors = True
-            for error in validator.errors:
-                console.print(f"[red]{error}[/red]")
-
-        if has_errors:
-            console.print("\n[bold red]❌ Validation failed[/bold red]")
-            sys.exit(1)
-        else:
-            console.print("\n[bold green]✅ All documents valid[/bold green]")
-            sys.exit(0)
+        for error in validator.errors:
+            remaining_issues.append((repo_root, error))
 
     except Exception as e:
         console.print(f"[bold red]Error during validation: {e}[/bold red]")
@@ -102,590 +158,65 @@ def validate(
             traceback.print_exc()
         sys.exit(2)
 
+    # Phase 3: Display results (simplified when no issues)
+    if not fixes_applied and not remaining_issues:
+        # Clean output when everything is valid
+        console.print(f"Scanned {len(all_files)} files\n")
+        console.print("[bold green]✅ All documents valid[/bold green]")
+        sys.exit(0)
 
-@main.group()
-def fix():
-    """Fix documentation issues automatically."""
-    pass
+    # Show detailed output when there are fixes or issues
+    files_with_fixes = len({f for f, _ in fixes_applied})
+    files_with_issues = len({f for f, _ in remaining_issues})
 
+    console.print(f"Scanned {len(all_files)} files\n")
 
-@fix.command("list")
-def fix_list():
-    """List all available fixes and their descriptions."""
-    console.print("[bold blue]📋 Available Fixes[/bold blue]\n")
-
-    fixes = [
-        {
-            "command": "all",
-            "description": "Run all automatic fixes on documentation",
-            "scope": "All fixes listed below",
-        },
-        {
-            "command": "frontmatter",
-            "description": "Fix frontmatter issues",
-            "fixes": [
-                "Invalid status values (maps to valid values by doc type)",
-                "Invalid date formats (converts to ISO 8601: YYYY-MM-DD)",
-                "Missing frontmatter blocks (generates with defaults)",
-                "Date objects to strings conversion",
-            ],
-        },
-        {
-            "command": "tags",
-            "description": "Normalize and fix tags fields",
-            "fixes": [
-                "Convert string tags to arrays",
-                "Normalize to lowercase with dashes (e.g., 'API Design' → 'api-design')",
-                "Remove duplicates",
-                "Sort alphabetically",
-                "Add missing tags field (empty array)",
-            ],
-        },
-        {
-            "command": "whitespace",
-            "description": "Clean whitespace and ensure required fields",
-            "fixes": [
-                "Trim leading/trailing whitespace from all string values",
-                "Remove empty strings and null values",
-                "Ensure required fields present (tags, doc_uuid, project_id)",
-                "Normalize empty arrays for list fields",
-            ],
-        },
-        {
-            "command": "timestamps",
-            "description": "Update document timestamps from git history",
-            "fixes": [
-                "Sets 'created' field to first git commit date",
-                "Sets 'updated' field to last git commit date",
-                "Migrates legacy 'date' field to 'created'/'updated'",
-            ],
-        },
-        {
-            "command": "bulk-update",
-            "description": "Bulk update frontmatter fields",
-            "operations": [
-                "--set FIELD=VALUE: Update or create field",
-                "--add FIELD=VALUE: Add field only if it doesn't exist",
-                "--remove FIELD: Delete field from frontmatter",
-                "--rename OLD=NEW: Rename field (preserves value)",
-            ],
-        },
-        {
-            "command": "code-blocks",
-            "description": "Fix code block formatting issues",
-            "fixes": [
-                "Add language to bare opening fences",
-                "Remove language from closing fences",
-                "Add missing closing fences",
-                "Insert blank lines before/after fences",
-            ],
-        },
-        {
-            "command": "links",
-            "description": "Fix broken links in documentation",
-            "fixes": [
-                "Update broken internal links",
-                "Convert problematic cross-plugin links",
-                "Fix document link formats",
-            ],
-        },
-    ]
-
-    for fix in fixes:
-        console.print(f"[cyan]docuchango fix {fix['command']}[/cyan]")
-        console.print(f"  {fix['description']}")
-
-        if "scope" in fix:
-            console.print(f"  [dim]Scope: {fix['scope']}[/dim]")
-        elif "fixes" in fix:
-            console.print("  [bold]Fixes:[/bold]")
-            for item in fix["fixes"]:
-                console.print(f"    • {item}")
-        elif "operations" in fix:
-            console.print("  [bold]Operations:[/bold]")
-            for item in fix["operations"]:
-                console.print(f"    • {item}")
-
+    # Show fixes applied
+    if fixes_applied:
+        action = "would be applied" if dry_run else "applied"
+        console.print(f"[bold green]✓ Fixes {action}: {len(fixes_applied)}[/bold green]")
+        seen_files: set[Path] = set()
+        for file_path, msg in fixes_applied:
+            rel_path = file_path.relative_to(repo_root)
+            if file_path not in seen_files:
+                seen_files.add(file_path)
+                console.print(f"  [cyan]{rel_path}[/cyan]")
+            console.print(f"    • {msg}")
         console.print()
 
-    console.print("[dim]💡 Use --dry-run with any fix command to preview changes[/dim]")
-    console.print("[dim]💡 Use --verbose or -v for detailed output[/dim]")
-
-
-@fix.command("all")
-@click.option(
-    "--repo-root",
-    type=click.Path(exists=True, file_okay=False, path_type=Path),
-    default=Path.cwd(),
-    help="Repository root directory (default: current directory)",
-)
-@click.option("--dry-run", is_flag=True, help="Show what would be fixed without making changes")
-def fix_all(repo_root: Path, dry_run: bool):
-    """Run all automatic fixes on documentation."""
-
-    console.print("[bold blue]🔧 Fixing Documentation Issues[/bold blue]\n")
-    if dry_run:
-        console.print("[yellow]DRY RUN - No changes will be made[/yellow]\n")
-
-    # This would call the fix functions
-    # For now, just show what would happen
-    console.print("Would fix:")
-    console.print("  • Trailing whitespace")
-    console.print("  • Code fence languages")
-    console.print("  • Blank lines before fences")
-    console.print("  • Missing frontmatter fields")
-
-
-@fix.command("links")
-@click.option(
-    "--repo-root",
-    type=click.Path(exists=True, file_okay=False, path_type=Path),
-    default=Path.cwd(),
-    help="Repository root directory (default: current directory)",
-)
-@click.option("--dry-run", is_flag=True, help="Show what would be fixed without making changes")
-def fix_links(repo_root: Path, dry_run: bool):
-    """Fix broken links in documentation."""
-    console.print("[bold blue]🔗 Fixing Broken Links[/bold blue]\n")
-    if dry_run:
-        console.print("[yellow]DRY RUN - No changes will be made[/yellow]\n")
-
-    # Import and run the fix_broken_links module
-    console.print("Fixing broken links...")
-
-
-@fix.command("code-blocks")
-@click.option(
-    "--repo-root",
-    type=click.Path(exists=True, file_okay=False, path_type=Path),
-    default=Path.cwd(),
-    help="Repository root directory (default: current directory)",
-)
-@click.option("--dry-run", is_flag=True, help="Show what would be fixed without making changes")
-def fix_code_blocks(repo_root: Path, dry_run: bool):
-    """Fix code block formatting issues."""
-    console.print("[bold blue]📝 Fixing Code Blocks[/bold blue]\n")
-    if dry_run:
-        console.print("[yellow]DRY RUN - No changes will be made[/yellow]\n")
-
-    console.print("Fixing code blocks...")
-
-
-@fix.command("frontmatter")
-@click.option(
-    "--repo-root",
-    type=click.Path(exists=True, file_okay=False, path_type=Path),
-    default=Path.cwd(),
-    help="Repository root directory (default: current directory)",
-)
-@click.option("--dry-run", is_flag=True, help="Show what would be fixed without making changes")
-@click.option("--verbose", "-v", is_flag=True, help="Show detailed output")
-def fix_frontmatter(repo_root: Path, dry_run: bool, verbose: bool):
-    """Fix frontmatter issues (status values, dates, missing fields)."""
-    from docuchango.fixes.frontmatter import fix_all_frontmatter
-
-    console.print("[bold blue]📋 Fixing Frontmatter Issues[/bold blue]\n")
-    if dry_run:
-        console.print("[yellow]DRY RUN - No changes will be made[/yellow]\n")
-
-    # Find all markdown files in docs directories
-    doc_patterns = ["adr/**/*.md", "rfcs/**/*.md", "memos/**/*.md", "prd/**/*.md"]
-    all_files = []
-    for pattern in doc_patterns:
-        all_files.extend(repo_root.glob(pattern))
-
-    if not all_files:
-        console.print("[yellow]No documentation files found[/yellow]")
-        return
-
-    total_files = len(all_files)
-    fixed_files = 0
-    total_fixes = 0
-
-    console.print(f"Found {total_files} documentation files\n")
-
-    for file_path in all_files:
-        messages = fix_all_frontmatter(file_path, dry_run=dry_run)
-
-        if messages:
-            fixed_files += 1
-            total_fixes += len(messages)
-
-            if verbose:
+    # Show remaining issues
+    if remaining_issues:
+        console.print(f"[bold red]✗ Remaining issues: {len(remaining_issues)}[/bold red]")
+        seen_files = set()
+        for file_path, error in remaining_issues:
+            try:
                 rel_path = file_path.relative_to(repo_root)
-                console.print(f"[cyan]{rel_path}[/cyan]")
-                for msg in messages:
-                    console.print(f"  {msg}")
+            except ValueError:
+                rel_path = file_path
+            if file_path not in seen_files:
+                seen_files.add(file_path)
+                console.print(f"  [cyan]{rel_path}[/cyan]")
+            console.print(f"    [red]• {error}[/red]")
+        console.print()
 
-    console.print()
-    if fixed_files > 0:
-        console.print(f"[green]✓[/green] Fixed {total_fixes} issues in {fixed_files} files")
-    else:
-        console.print("[green]✓[/green] No frontmatter issues found")
+    # Summary line
+    summary_parts = []
+    if files_with_fixes:
+        summary_parts.append(f"{files_with_fixes} fixed")
+    if files_with_issues:
+        summary_parts.append(f"{files_with_issues} with issues")
+    if summary_parts:
+        console.print(f"[dim]{', '.join(summary_parts)}[/dim]\n")
 
-    if dry_run:
-        console.print("\n[yellow]Dry run complete - no files were modified[/yellow]")
+    if dry_run and fixes_applied:
+        console.print("[yellow]Run without --dry-run to apply fixes[/yellow]\n")
 
-
-@fix.command("tags")
-@click.option(
-    "--repo-root",
-    type=click.Path(exists=True, file_okay=False, path_type=Path),
-    default=Path.cwd(),
-    help="Repository root directory (default: current directory)",
-)
-@click.option("--dry-run", is_flag=True, help="Show what would be fixed without making changes")
-@click.option("--verbose", "-v", is_flag=True, help="Show detailed output")
-def fix_tags(repo_root: Path, dry_run: bool, verbose: bool):
-    """Fix tags field issues.
-
-    Normalizes tags across all documents:
-    - Converts string tags to arrays
-    - Normalizes to lowercase with dashes
-    - Removes duplicates
-    - Sorts alphabetically
-    - Adds missing tags field
-    """
-    from docuchango.fixes.tags import fix_tags as fix_tags_func
-
-    console.print("[bold blue]🏷️  Fixing Tags[/bold blue]\n")
-    if dry_run:
-        console.print("[yellow]DRY RUN - No changes will be made[/yellow]\n")
-
-    # Find all markdown files in docs directories
-    doc_patterns = ["adr/**/*.md", "rfcs/**/*.md", "memos/**/*.md", "prd/**/*.md"]
-    all_files = []
-    for pattern in doc_patterns:
-        all_files.extend(repo_root.glob(pattern))
-
-    if not all_files:
-        console.print("[yellow]No documentation files found[/yellow]")
-        return
-
-    total_files = len(all_files)
-    fixed_files = 0
-    total_fixes = 0
-
-    console.print(f"Found {total_files} documentation files\n")
-
-    for file_path in all_files:
-        changed, messages = fix_tags_func(file_path, dry_run=dry_run)
-
-        if changed:
-            fixed_files += 1
-            total_fixes += len(messages)
-
-            if verbose or not dry_run:
-                rel_path = file_path.relative_to(repo_root)
-                console.print(f"[cyan]{rel_path}[/cyan]")
-                for msg in messages:
-                    console.print(f"  ✓ {msg}")
-
-    console.print()
-    if fixed_files > 0:
-        console.print(f"[green]✓[/green] Fixed {total_fixes} issues in {fixed_files} files")
-    else:
-        console.print("[green]✓[/green] No tag issues found")
-
-    if dry_run:
-        console.print("\n[yellow]Dry run complete - no files were modified[/yellow]")
-
-
-@fix.command("whitespace")
-@click.option(
-    "--repo-root",
-    type=click.Path(exists=True, file_okay=False, path_type=Path),
-    default=Path.cwd(),
-    help="Repository root directory (default: current directory)",
-)
-@click.option("--dry-run", is_flag=True, help="Show what would be fixed without making changes")
-@click.option("--verbose", "-v", is_flag=True, help="Show detailed output")
-def fix_whitespace_cmd(repo_root: Path, dry_run: bool, verbose: bool):
-    """Fix whitespace and missing required fields.
-
-    Fixes:
-    - Trims leading/trailing whitespace from string values
-    - Removes empty strings and null values
-    - Ensures required fields are present (tags, doc_uuid, project_id)
-    """
-    from docuchango.fixes.whitespace import fix_whitespace_and_fields
-
-    console.print("[bold blue]🧹 Fixing Whitespace & Fields[/bold blue]\n")
-    if dry_run:
-        console.print("[yellow]DRY RUN - No changes will be made[/yellow]\n")
-
-    # Find all markdown files in docs directories
-    doc_patterns = ["adr/**/*.md", "rfcs/**/*.md", "memos/**/*.md", "prd/**/*.md"]
-    all_files = []
-    for pattern in doc_patterns:
-        all_files.extend(repo_root.glob(pattern))
-
-    if not all_files:
-        console.print("[yellow]No documentation files found[/yellow]")
-        return
-
-    total_files = len(all_files)
-    fixed_files = 0
-    total_fixes = 0
-
-    console.print(f"Found {total_files} documentation files\n")
-
-    for file_path in all_files:
-        changed, messages = fix_whitespace_and_fields(file_path, dry_run=dry_run)
-
-        if changed:
-            fixed_files += 1
-            total_fixes += len(messages)
-
-            if verbose or not dry_run:
-                rel_path = file_path.relative_to(repo_root)
-                console.print(f"[cyan]{rel_path}[/cyan]")
-                for msg in messages:
-                    console.print(f"  ✓ {msg}")
-
-    console.print()
-    if fixed_files > 0:
-        console.print(f"[green]✓[/green] Fixed {total_fixes} issues in {fixed_files} files")
-    else:
-        console.print("[green]✓[/green] No whitespace issues found")
-
-    if dry_run:
-        console.print("\n[yellow]Dry run complete - no files were modified[/yellow]")
-
-
-@fix.command("timestamps")
-@click.option(
-    "--repo-root",
-    type=click.Path(exists=True, file_okay=False, path_type=Path),
-    default=Path.cwd(),
-    help="Repository root directory (default: current directory)",
-)
-@click.option("--dry-run", is_flag=True, help="Show what would be updated without making changes")
-@click.option("--verbose", "-v", is_flag=True, help="Show detailed output")
-@click.option(
-    "--path",
-    type=click.Path(path_type=Path),
-    default=None,
-    help="Specific file or directory to update (default: all docs)",
-)
-def fix_timestamps(repo_root: Path, dry_run: bool, verbose: bool, path: Path | None):
-    """Update document timestamps based on git history.
-
-    Updates 'created' and 'updated' fields based on git commit history:
-    - created: Date of first commit
-    - updated: Date of last commit
-
-    Also migrates legacy 'date' field to 'created'/'updated' fields.
-    """
-    from docuchango.fixes.timestamps import update_document_timestamps
-
-    console.print("[bold blue]📅 Updating Document Timestamps[/bold blue]\n")
-    if dry_run:
-        console.print("[yellow]DRY RUN - No changes will be made[/yellow]\n")
-
-    # Determine paths to process
-    if path:
-        paths = [path] if path.is_file() else list(path.rglob("*.md"))
-    else:
-        # Process all docs in standard directories
-        doc_patterns = ["adr/**/*.md", "rfcs/**/*.md", "memos/**/*.md", "prd/**/*.md"]
-        paths = []
-        for pattern in doc_patterns:
-            paths.extend(repo_root.glob(pattern))
-
-    if not paths:
-        console.print("[yellow]No documentation files found[/yellow]")
-        return
-
-    console.print(f"Found {len(paths)} documentation files\n")
-
-    updated_count = 0
-    for file_path in sorted(paths):
-        changed, messages = update_document_timestamps(file_path, dry_run)
-
-        if changed:
-            updated_count += 1
-            if verbose or not dry_run:
-                rel_path = file_path.relative_to(repo_root)
-                console.print(f"[cyan]{rel_path}[/cyan]")
-                for msg in messages:
-                    console.print(f"  ✓ {msg}")
-
-    console.print()
-    console.print("[bold]Summary:[/bold]")
-    console.print(f"  Documents processed: {len(paths)}")
-    console.print(f"  Documents {'would be ' if dry_run else ''}updated: {updated_count}")
-
-    if dry_run and updated_count > 0:
-        console.print("\n[yellow]💡 Run without --dry-run to apply changes[/yellow]")
-
-
-@fix.command("bulk-update")
-@click.option(
-    "--repo-root",
-    type=click.Path(exists=True, file_okay=False, path_type=Path),
-    default=Path.cwd(),
-    help="Repository root directory (default: current directory)",
-)
-@click.option("--set", "set_field", metavar="FIELD=VALUE", help="Set field value")
-@click.option("--add", "add_field", metavar="FIELD=VALUE", help="Add field only if it doesn't exist")
-@click.option("--remove", "remove_field", metavar="FIELD", help="Remove field from frontmatter")
-@click.option("--rename", "rename_field", metavar="OLD=NEW", help="Rename field")
-@click.option(
-    "--type",
-    "doc_type",
-    type=click.Choice(["adr", "rfc", "memo", "prd"]),
-    help="Filter by document type",
-)
-@click.option(
-    "--path",
-    type=click.Path(path_type=Path),
-    default=None,
-    help="Specific file or directory to update",
-)
-@click.option("--dry-run", is_flag=True, help="Preview changes without modifying files")
-@click.option("--verbose", "-v", is_flag=True, help="Show detailed output")
-def bulk_update(
-    repo_root: Path,
-    set_field: str | None,
-    add_field: str | None,
-    remove_field: str | None,
-    rename_field: str | None,
-    doc_type: str | None,
-    path: Path | None,
-    dry_run: bool,
-    verbose: bool,
-):
-    """Bulk update frontmatter fields across documentation.
-
-    Perform operations on frontmatter fields:
-    - --set: Update or create field
-    - --add: Create field only if it doesn't exist
-    - --remove: Delete field
-    - --rename: Rename field (OLD=NEW)
-
-    Examples:
-        # Set status to Accepted for all ADRs
-        docuchango fix bulk-update --type adr --set status=Accepted
-
-        # Add priority field to all RFCs
-        docuchango fix bulk-update --type rfc --add priority=high
-
-        # Remove deprecated field
-        docuchango fix bulk-update --remove deprecated
-
-        # Rename field
-        docuchango fix bulk-update --rename old_name=new_name
-    """
-    from docuchango.fixes.bulk_update import bulk_update_files
-
-    # Validate that exactly one operation is specified
-    operations = [set_field, add_field, remove_field, rename_field]
-    specified = [op for op in operations if op is not None]
-    if len(specified) != 1:
-        console.print("[red]Error: Specify exactly one operation (--set, --add, --remove, or --rename)[/red]")
+    if remaining_issues:
+        console.print("[bold red]❌ Validation failed[/bold red]")
         sys.exit(1)
-
-    # Determine operation and parse field spec
-    if set_field:
-        operation = "set"
-        if "=" not in set_field:
-            console.print("[red]Error: --set requires FIELD=VALUE format[/red]")
-            sys.exit(1)
-        field_name, value = set_field.split("=", 1)
-    elif add_field:
-        operation = "add"
-        if "=" not in add_field:
-            console.print("[red]Error: --add requires FIELD=VALUE format[/red]")
-            sys.exit(1)
-        field_name, value = add_field.split("=", 1)
-    elif remove_field:
-        operation = "remove"
-        field_name = remove_field
-        value = None
-    else:  # rename_field
-        operation = "rename"
-        if "=" not in rename_field:
-            console.print("[red]Error: --rename requires OLD=NEW format[/red]")
-            sys.exit(1)
-        field_name, value = rename_field.split("=", 1)
-
-    console.print("[bold blue]🔧 Bulk Update Frontmatter[/bold blue]\n")
-    if dry_run:
-        console.print("[yellow]DRY RUN - No changes will be made[/yellow]\n")
-
-    # Determine paths to process
-    if path:
-        paths = [path] if path.is_file() else list(path.rglob("*.md"))
     else:
-        # Process based on doc_type filter or all docs
-        doc_patterns = ["adr/**/*.md", "rfcs/**/*.md", "memos/**/*.md", "prd/**/*.md"]
-        if doc_type:
-            if doc_type == "adr":
-                doc_patterns = ["adr/**/*.md"]
-            elif doc_type == "rfc":
-                doc_patterns = ["rfcs/**/*.md"]
-            elif doc_type == "memo":
-                doc_patterns = ["memos/**/*.md"]
-            elif doc_type == "prd":
-                doc_patterns = ["prd/**/*.md"]
-
-        paths = []
-        for pattern in doc_patterns:
-            paths.extend(repo_root.glob(pattern))
-
-    if not paths:
-        console.print("[yellow]No documentation files found[/yellow]")
-        return
-
-    console.print(f"Operation: {operation.upper()}")
-    console.print(f"Field: {field_name}" + (f" = {value}" if value else ""))
-    if doc_type:
-        console.print(f"Document type filter: {doc_type.upper()}")
-    console.print(f"Files found: {len(paths)}\n")
-
-    # Perform bulk update
-    results = bulk_update_files(paths, field_name, value, operation, dry_run)
-
-    # Display results
-    updated_count = 0
-    for file_path, changed, message in results:
-        if changed:
-            updated_count += 1
-
-        if (verbose or changed) and message:
-            rel_path = file_path.relative_to(repo_root)
-            icon = "✓" if changed else "ℹ"
-            console.print(f"[cyan]{rel_path}[/cyan]")
-            console.print(f"  {icon} {message}")
-
-    console.print()
-    console.print("[bold]Summary:[/bold]")
-    console.print(f"  Files processed: {len(results)}")
-    console.print(f"  Files {'would be ' if dry_run else ''}updated: {updated_count}")
-
-    if dry_run and updated_count > 0:
-        console.print("\n[yellow]💡 Run without --dry-run to apply changes[/yellow]")
-
-
-@main.group()
-def test():
-    """Testing utilities and helpers."""
-    pass
-
-
-@test.command("health")
-@click.option("--url", default="http://localhost:8080", help="Service URL to check")
-@click.option("--timeout", default=30, help="Timeout in seconds")
-def test_health(url: str, timeout: int):
-    """Check service health."""
-    console.print(f"[bold blue]🏥 Checking Health: {url}[/bold blue]\n")
-
-    # Placeholder for health check implementation
-    # HealthChecker would be initialized and used here
-    console.print(f"[yellow]ℹ[/yellow] Health check not yet implemented for {url}")
-    console.print(f"[dim]Timeout: {timeout}s[/dim]")
-    console.print("[green]✓[/green] Placeholder completed")
+        console.print("[bold green]✅ All documents valid[/bold green]")
+        sys.exit(0)
 
 
 @main.command()
@@ -912,12 +443,6 @@ def bootstrap(guide: str, output: Path | None):
 def validate_main():
     """Entry point for dcc-validate command."""
     validate()
-
-
-# Export the fix command as a separate entry point
-def fix_main():
-    """Entry point for dcc-fix command."""
-    fix()
 
 
 if __name__ == "__main__":
