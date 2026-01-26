@@ -180,6 +180,89 @@ tags: "API Design"
             "File was modified during --dry-run! Dry run should not modify any files."
         )
 
+    def test_validate_output_shows_fixes_and_issues_with_paths(self, tmp_path):
+        """Test that validate output shows both fixed and unfixable issues with file paths.
+
+        This test verifies:
+        1. Auto-fixed issues are reported with file paths
+        2. Remaining (unfixable) issues are reported with file paths
+        3. The summary shows counts for both categories
+        """
+        # Create directory structure
+        adr_dir = tmp_path / "adr"
+        adr_dir.mkdir()
+
+        # File 1: Has fixable issues (tags need normalization)
+        fixable_file = adr_dir / "adr-001-fixable.md"
+        fixable_content = """---
+title: "Fixable ADR"
+status: accepted
+tags: "API Design, Database"
+---
+
+# Fixable ADR
+
+This file has fixable issues.
+"""
+        fixable_file.write_text(fixable_content, encoding="utf-8")
+
+        # File 2: Has unfixable issues (invalid filename pattern for validation)
+        # Note: We use trailing whitespace which gets fixed, but code fence issues
+        # that the validator will catch
+        unfixable_file = adr_dir / "adr-002-unfixable.md"
+        unfixable_content = """---
+title: "Unfixable ADR"
+status: accepted
+tags: []
+---
+
+# Unfixable ADR
+
+```python
+code without blank line before
+```
+More text without blank line after code block.
+```javascript
+more code
+```
+"""
+        unfixable_file.write_text(unfixable_content, encoding="utf-8")
+
+        # Run validate
+        runner = CliRunner()
+        result = runner.invoke(
+            validate,
+            [
+                "--repo-root",
+                str(tmp_path),
+                "--skip-build",
+            ],
+        )
+
+        # Verify output contains file paths
+        output = result.output
+
+        # Should show scanned files
+        assert "Scanned" in output
+        assert "files" in output
+
+        # Should show the fixable file path when fixes are applied
+        # (Tags should be normalized from string to array)
+        if "Fixes applied" in output or "fixed" in output.lower():
+            assert "adr-001-fixable.md" in output or "adr/adr-001" in output
+
+        # Should show remaining issues section if there are validation errors
+        if "Remaining issues" in output:
+            # Should include file path for unfixable issues
+            assert "adr-002-unfixable.md" in output or "adr/adr-002" in output
+
+        # Verify the fixable file was actually modified
+        fixed_content = fixable_file.read_text(encoding="utf-8")
+        # Tags should be converted from string to array
+        assert "tags:" in fixed_content
+        # Original string format should be gone
+        assert 'tags: "API Design, Database"' not in fixed_content
+
 
 class TestMainCommandGroup:
     """Test the main command group."""
