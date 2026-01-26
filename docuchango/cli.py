@@ -187,7 +187,7 @@ def validate(
     # Show remaining issues
     if remaining_issues:
         console.print(f"[bold red]✗ Remaining issues: {len(remaining_issues)}[/bold red]")
-        seen_files: set[Path] = set()
+        seen_files = set()
         for file_path, error in remaining_issues:
             try:
                 rel_path = file_path.relative_to(repo_root)
