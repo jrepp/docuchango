@@ -2,6 +2,38 @@
 
 <!-- version list -->
 
+## v1.10.0 (2026-01-27)
+
+### Bug Fixes
+
+- Correct deciders field comment in ADR template
+  ([`df009f2`](https://github.com/jrepp/docuchango/commit/df009f2ef9acb586a225ed1cb1254526109cb655))
+
+- Resolve lint and formatting issues
+  ([`6b89bc2`](https://github.com/jrepp/docuchango/commit/6b89bc2b7a29fedfb54db1b6cec93c49eca3c4aa))
+
+### Features
+
+- Add bulk command group with update, timestamps, and migrate commands
+  ([`9c41b4e`](https://github.com/jrepp/docuchango/commit/9c41b4e03e2d6d8dacc13a539160d20f079646b8))
+
+- Update ADR schema to use created/updated instead of date
+  ([`f7ee03f`](https://github.com/jrepp/docuchango/commit/f7ee03f2217f9125b88719e2635ef6aeb924043e))
+
+- Use ISO 8601 datetime format for created/updated fields
+  ([`b41bd59`](https://github.com/jrepp/docuchango/commit/b41bd591dec523328b46948e1e1e247c94416b23))
+
+### Refactoring
+
+- Remove deprecated project-specific modules
+  ([`9b85b83`](https://github.com/jrepp/docuchango/commit/9b85b838977826d14486402940cad479f88e3bf4))
+
+### Testing
+
+- Add comprehensive tests to improve code coverage
+  ([`27d118b`](https://github.com/jrepp/docuchango/commit/27d118bd01a63fb5af4012bcc9fbc9a3926732f7))
+
+
 ## v1.9.0 (2026-01-26)
 
 ### Features
