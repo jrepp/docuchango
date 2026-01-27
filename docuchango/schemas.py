@@ -184,12 +184,16 @@ class ADRFrontmatter(BaseModel):
     REQUIRED FIELDS (all must be present):
     - title: Title without ADR prefix (e.g., "Use Rust for Proxy"). ID displayed by sidebar.
     - status: Current state (Proposed/Accepted/Implemented/Deprecated/Superseded)
-    - date: Decision date in ISO 8601 format (YYYY-MM-DD)
+    - created: Date ADR was first created in ISO 8601 format (YYYY-MM-DD)
+    - updated: Date ADR was last modified in ISO 8601 format (YYYY-MM-DD)
     - deciders: Person or team who made the decision (e.g., "Core Team", "Platform Team")
     - tags: List of lowercase hyphenated tags for categorization
     - id: Lowercase identifier matching filename (e.g., "adr-001" for ADR-001-rust-proxy.md)
     - project_id: Project identifier from docs-project.yaml (e.g., "my-project")
     - doc_uuid: Unique identifier for backend tracking (UUID v4 format)
+
+    DEPRECATED FIELDS (supported for backwards compatibility):
+    - date: Legacy field, use 'created' instead. Will be auto-migrated.
     """
 
     title: str = Field(
@@ -201,9 +205,13 @@ class ADRFrontmatter(BaseModel):
         ...,
         description="Decision status. Use 'Proposed' for drafts, 'Accepted' for approved, 'Implemented' for completed",
     )
-    date: datetime.date = Field(
+    created: datetime.date = Field(
         ...,
-        description="Date of decision in ISO 8601 format (YYYY-MM-DD). Use date decision was made, not file creation date",
+        description="Date ADR was first created in ISO 8601 format (YYYY-MM-DD). Do not change after initial creation",
+    )
+    updated: datetime.date = Field(
+        ...,
+        description="Date ADR was last modified in ISO 8601 format (YYYY-MM-DD). Update whenever content changes",
     )
     deciders: str = Field(
         ..., description="Who made the decision. Use team name (e.g., 'Core Team') or individual name"
