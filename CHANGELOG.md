@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v1.11.0 (2026-01-27)
+
+### Features
+
+- Migrate command removes updated and date fields
+  ([`36ac902`](https://github.com/jrepp/docuchango/commit/36ac90293ccc4d680c9f1ad4574a491845c56f1d))
+
+- Normalize created field to datetime format from git
+  ([`8502ec3`](https://github.com/jrepp/docuchango/commit/8502ec3780b879fc97029a14d21f9d7b46e2ff33))
+
+### Refactoring
+
+- Remove updated field from frontmatter schemas
+  ([`08ba76b`](https://github.com/jrepp/docuchango/commit/08ba76b9a8790a1ec72e006cbc4a98f4fd3ddd39))
+
+
 ## v1.10.0 (2026-01-27)
 
 ### Bug Fixes
