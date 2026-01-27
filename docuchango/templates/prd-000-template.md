@@ -1,14 +1,14 @@
 ---
 title: Title Goes Here
 status: Draft
-author: Product Team
-created: 2025-01-01
-updated: 2025-01-01
+author: Product Team  # git config user.name
+created: YYYY-MM-DDTHH:MM:SSZ  # python -c "from datetime import datetime, timezone; print(datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))"
+updated: YYYY-MM-DDTHH:MM:SSZ  # python -c "from datetime import datetime, timezone; print(datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))"
 target_release: v1.0.0
 tags: [feature, product]
-id: prd-000
-project_id: my-project
-doc_uuid: 00000000-0000-4000-8000-000000000000
+id: prd-000  # lowercase prd-XXX format matching filename
+project_id: my-project  # from docs-project.yaml
+doc_uuid: 00000000-0000-4000-8000-000000000000  # python -c "import uuid; print(uuid.uuid4())"
 ---
 
 # Executive Summary

@@ -439,6 +439,611 @@ def bootstrap(guide: str, output: Path | None):
         console.print(Markdown(guide_content))
 
 
+# ==============================================================================
+# Bulk command group
+# ==============================================================================
+
+
+@main.group()
+def bulk():
+    """Bulk operations on documentation frontmatter.
+
+    Commands for updating frontmatter fields across multiple documents at once.
+    """
+    pass
+
+
+@bulk.command("update")
+@click.option(
+    "--set",
+    "set_field",
+    metavar="FIELD=VALUE",
+    help="Set field value (creates or updates)",
+)
+@click.option(
+    "--add",
+    "add_field",
+    metavar="FIELD=VALUE",
+    help="Add field only if it doesn't exist",
+)
+@click.option(
+    "--remove",
+    "remove_field",
+    metavar="FIELD",
+    help="Remove field from frontmatter",
+)
+@click.option(
+    "--rename",
+    "rename_field",
+    metavar="OLD=NEW",
+    help="Rename field (preserves value)",
+)
+@click.option(
+    "--type",
+    "doc_type",
+    type=click.Choice(["adr", "rfc", "memo", "prd"]),
+    help="Filter by document type",
+)
+@click.option(
+    "--path",
+    "target_path",
+    type=click.Path(exists=True, path_type=Path),
+    help="Target directory (default: current directory)",
+)
+@click.option("--dry-run", is_flag=True, help="Preview changes without applying")
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed output")
+def bulk_update(
+    set_field: str | None,
+    add_field: str | None,
+    remove_field: str | None,
+    rename_field: str | None,
+    doc_type: str | None,
+    target_path: Path | None,
+    dry_run: bool,
+    verbose: bool,
+):
+    """Bulk update frontmatter fields across documents.
+
+    Perform bulk updates on YAML frontmatter fields. Exactly one operation
+    must be specified per invocation.
+
+    Examples:
+
+        \b
+        # Set status to 'Accepted' on all ADRs
+        docuchango bulk update --set status=Accepted --type adr
+
+        \b
+        # Add project_id field only where missing
+        docuchango bulk update --add project_id=my-project
+
+        \b
+        # Remove deprecated field from all docs
+        docuchango bulk update --remove legacy_field
+
+        \b
+        # Rename field across all documents
+        docuchango bulk update --rename old_name=new_name
+
+        \b
+        # Preview changes without applying
+        docuchango bulk update --set status=Draft --dry-run
+    """
+    from docuchango.fixes.bulk_update import bulk_update_files
+
+    # Validate exactly one operation
+    ops = [set_field, add_field, remove_field, rename_field]
+    ops_provided = [op for op in ops if op is not None]
+
+    if len(ops_provided) == 0:
+        console.print("[red]Error: Must specify one of --set, --add, --remove, or --rename[/red]")
+        sys.exit(1)
+    if len(ops_provided) > 1:
+        console.print("[red]Error: Only one operation allowed per invocation[/red]")
+        sys.exit(1)
+
+    # Parse the operation
+    if set_field:
+        if "=" not in set_field:
+            console.print("[red]Error: --set requires FIELD=VALUE format[/red]")
+            sys.exit(1)
+        field_name, value = set_field.split("=", 1)
+        operation = "set"
+    elif add_field:
+        if "=" not in add_field:
+            console.print("[red]Error: --add requires FIELD=VALUE format[/red]")
+            sys.exit(1)
+        field_name, value = add_field.split("=", 1)
+        operation = "add"
+    elif remove_field:
+        field_name = remove_field
+        value = None
+        operation = "remove"
+    elif rename_field:
+        if "=" not in rename_field:
+            console.print("[red]Error: --rename requires OLD=NEW format[/red]")
+            sys.exit(1)
+        field_name, value = rename_field.split("=", 1)
+        operation = "rename"
+
+    # Find files to process
+    root = target_path or Path.cwd()
+
+    # Build glob patterns based on doc_type filter
+    if doc_type:
+        type_dirs = {
+            "adr": ["adr"],
+            "rfc": ["rfcs"],
+            "memo": ["memos"],
+            "prd": ["prd"],
+        }
+        patterns = [f"{d}/**/*.md" for d in type_dirs[doc_type]]
+        patterns += [f"docs-cms/{d}/**/*.md" for d in type_dirs[doc_type]]
+    else:
+        patterns = [
+            "adr/**/*.md",
+            "rfcs/**/*.md",
+            "memos/**/*.md",
+            "prd/**/*.md",
+            "docs-cms/adr/**/*.md",
+            "docs-cms/rfcs/**/*.md",
+            "docs-cms/memos/**/*.md",
+            "docs-cms/prd/**/*.md",
+        ]
+
+    all_files = []
+    for pattern in patterns:
+        all_files.extend(root.glob(pattern))
+
+    if not all_files:
+        console.print("[yellow]No files found matching criteria[/yellow]")
+        sys.exit(0)
+
+    # Run bulk update
+    console.print(f"[bold blue]📝 Bulk {operation}[/bold blue]")
+    if dry_run:
+        console.print("[yellow]DRY RUN - No changes will be made[/yellow]")
+    console.print(f"Processing {len(all_files)} files...\n")
+
+    results = bulk_update_files(all_files, field_name, value, operation, dry_run)
+
+    # Display results
+    modified_count = 0
+    for file_path, changed, message in results:
+        if changed or verbose:
+            try:
+                rel_path = file_path.relative_to(root)
+            except ValueError:
+                rel_path = file_path
+
+            if changed:
+                modified_count += 1
+                console.print(f"[green]✓[/green] {rel_path}: {message}")
+            elif verbose:
+                console.print(f"[dim]⊘[/dim] {rel_path}: {message}")
+
+    # Summary
+    console.print()
+    if dry_run:
+        console.print(f"[yellow]Would modify {modified_count} of {len(all_files)} files[/yellow]")
+        console.print("[dim]Run without --dry-run to apply changes[/dim]")
+    else:
+        console.print(f"[green]Modified {modified_count} of {len(all_files)} files[/green]")
+
+
+@bulk.command("timestamps")
+@click.option(
+    "--type",
+    "doc_type",
+    type=click.Choice(["adr", "rfc", "memo", "prd"]),
+    help="Filter by document type",
+)
+@click.option(
+    "--path",
+    "target_path",
+    type=click.Path(exists=True, path_type=Path),
+    help="Target directory (default: current directory)",
+)
+@click.option("--dry-run", is_flag=True, help="Preview changes without applying")
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed output")
+def bulk_timestamps(
+    doc_type: str | None,
+    target_path: Path | None,
+    dry_run: bool,
+    verbose: bool,
+):
+    """Derive created/updated timestamps from git history.
+
+    Updates frontmatter 'created' and 'updated' fields based on git commit
+    history. The 'created' date is set to the first commit date, and 'updated'
+    is set to the most recent commit date.
+
+    Also migrates legacy 'date' fields to the new 'created'/'updated' format.
+
+    Examples:
+
+        \b
+        # Update timestamps for all documents
+        docuchango bulk timestamps
+
+        \b
+        # Update only ADR timestamps
+        docuchango bulk timestamps --type adr
+
+        \b
+        # Preview changes without applying
+        docuchango bulk timestamps --dry-run
+
+        \b
+        # Show all files including unchanged
+        docuchango bulk timestamps --verbose
+    """
+    from docuchango.fixes.timestamps import update_document_timestamps
+
+    # Find files to process
+    root = target_path or Path.cwd()
+
+    # Build glob patterns based on doc_type filter
+    if doc_type:
+        type_dirs = {
+            "adr": ["adr"],
+            "rfc": ["rfcs"],
+            "memo": ["memos"],
+            "prd": ["prd"],
+        }
+        patterns = [f"{d}/**/*.md" for d in type_dirs[doc_type]]
+        patterns += [f"docs-cms/{d}/**/*.md" for d in type_dirs[doc_type]]
+    else:
+        patterns = [
+            "adr/**/*.md",
+            "rfcs/**/*.md",
+            "memos/**/*.md",
+            "prd/**/*.md",
+            "docs-cms/adr/**/*.md",
+            "docs-cms/rfcs/**/*.md",
+            "docs-cms/memos/**/*.md",
+            "docs-cms/prd/**/*.md",
+        ]
+
+    all_files = []
+    for pattern in patterns:
+        all_files.extend(root.glob(pattern))
+
+    if not all_files:
+        console.print("[yellow]No files found matching criteria[/yellow]")
+        sys.exit(0)
+
+    # Run timestamp updates
+    console.print("[bold blue]🕐 Updating timestamps from git history[/bold blue]")
+    if dry_run:
+        console.print("[yellow]DRY RUN - No changes will be made[/yellow]")
+    console.print(f"Processing {len(all_files)} files...\n")
+
+    modified_count = 0
+    error_count = 0
+
+    for file_path in all_files:
+        try:
+            changed, messages = update_document_timestamps(file_path, dry_run=dry_run)
+
+            try:
+                rel_path = file_path.relative_to(root)
+            except ValueError:
+                rel_path = file_path
+
+            if changed:
+                modified_count += 1
+                console.print(f"[green]✓[/green] {rel_path}")
+                for msg in messages:
+                    console.print(f"    {msg}")
+            elif verbose:
+                if messages:
+                    console.print(f"[dim]⊘[/dim] {rel_path}: {messages[0]}")
+                else:
+                    console.print(f"[dim]⊘[/dim] {rel_path}: No changes needed")
+
+        except Exception as e:
+            error_count += 1
+            try:
+                rel_path = file_path.relative_to(root)
+            except ValueError:
+                rel_path = file_path
+            console.print(f"[red]✗[/red] {rel_path}: {e}")
+
+    # Summary
+    console.print()
+    if dry_run:
+        console.print(f"[yellow]Would modify {modified_count} of {len(all_files)} files[/yellow]")
+        if error_count:
+            console.print(f"[red]Errors: {error_count}[/red]")
+        console.print("[dim]Run without --dry-run to apply changes[/dim]")
+    else:
+        console.print(f"[green]Modified {modified_count} of {len(all_files)} files[/green]")
+        if error_count:
+            console.print(f"[red]Errors: {error_count}[/red]")
+
+
+@bulk.command("migrate")
+@click.option(
+    "--project-id",
+    required=True,
+    help="Project ID to set for documents missing project_id",
+)
+@click.option(
+    "--type",
+    "doc_type",
+    type=click.Choice(["adr", "rfc", "memo", "prd"]),
+    help="Filter by document type",
+)
+@click.option(
+    "--path",
+    "target_path",
+    type=click.Path(exists=True, path_type=Path),
+    help="Target directory (default: current directory)",
+)
+@click.option("--dry-run", is_flag=True, help="Preview changes without applying")
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed output")
+def bulk_migrate(
+    project_id: str,
+    doc_type: str | None,
+    target_path: Path | None,
+    dry_run: bool,
+    verbose: bool,
+):
+    """Migrate documents to the current frontmatter schema.
+
+    Performs comprehensive migration of frontmatter fields:
+
+    \b
+    - Adds missing 'project_id' field
+    - Generates 'doc_uuid' (UUID v4) if missing
+    - Migrates legacy 'date' field to 'created'/'updated'
+    - Adds 'created'/'updated' from git history if missing
+    - Normalizes 'id' field to lowercase format
+    - Normalizes tags to lowercase with hyphens
+
+    Examples:
+
+        \b
+        # Migrate all documents
+        docuchango bulk migrate --project-id my-project
+
+        \b
+        # Migrate only ADRs
+        docuchango bulk migrate --project-id my-project --type adr
+
+        \b
+        # Preview changes without applying
+        docuchango bulk migrate --project-id my-project --dry-run
+
+    Agent instructions to generate required fields:
+
+        \b
+        # Generate created/updated datetime (ISO 8601 UTC):
+        python -c "from datetime import datetime, timezone; print(datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))"
+        # Or: date -u +%Y-%m-%dT%H:%M:%SZ
+
+        \b
+        # Generate doc_uuid:
+        python -c "import uuid; print(uuid.uuid4())"
+        # Or: uuidgen
+
+        \b
+        # Generate author from git config:
+        git config user.name
+    """
+    import re
+    import uuid
+
+    import frontmatter
+
+    from docuchango.fixes.timestamps import get_git_dates
+
+    # Find files to process
+    root = target_path or Path.cwd()
+
+    # Build glob patterns based on doc_type filter
+    if doc_type:
+        type_dirs = {
+            "adr": ["adr"],
+            "rfc": ["rfcs"],
+            "memo": ["memos"],
+            "prd": ["prd"],
+        }
+        patterns = [f"{d}/**/*.md" for d in type_dirs[doc_type]]
+        patterns += [f"docs-cms/{d}/**/*.md" for d in type_dirs[doc_type]]
+    else:
+        patterns = [
+            "adr/**/*.md",
+            "rfcs/**/*.md",
+            "memos/**/*.md",
+            "prd/**/*.md",
+            "docs-cms/adr/**/*.md",
+            "docs-cms/rfcs/**/*.md",
+            "docs-cms/memos/**/*.md",
+            "docs-cms/prd/**/*.md",
+        ]
+
+    all_files = []
+    for pattern in patterns:
+        all_files.extend(root.glob(pattern))
+
+    if not all_files:
+        console.print("[yellow]No files found matching criteria[/yellow]")
+        sys.exit(0)
+
+    # Run migration
+    console.print("[bold blue]🔄 Migrating frontmatter to current schema[/bold blue]")
+    if dry_run:
+        console.print("[yellow]DRY RUN - No changes will be made[/yellow]")
+    console.print(f"Processing {len(all_files)} files...\n")
+
+    modified_count = 0
+    error_count = 0
+
+    for file_path in all_files:
+        # Skip templates
+        if "template" in file_path.name.lower() or file_path.name.startswith("000-"):
+            if verbose:
+                try:
+                    rel_path = file_path.relative_to(root)
+                except ValueError:
+                    rel_path = file_path
+                console.print(f"[dim]⊘[/dim] {rel_path}: Skipped (template)")
+            continue
+
+        try:
+            content = file_path.read_text(encoding="utf-8")
+            post = frontmatter.loads(content)
+
+            if not post.metadata:
+                if verbose:
+                    try:
+                        rel_path = file_path.relative_to(root)
+                    except ValueError:
+                        rel_path = file_path
+                    console.print(f"[dim]⊘[/dim] {rel_path}: No frontmatter")
+                continue
+
+            changes = []
+            modified = False
+
+            # Determine document type from path
+            path_str = str(file_path).lower()
+            if "/adr/" in path_str:
+                doc_type_detected = "adr"
+            elif "/rfcs/" in path_str:
+                doc_type_detected = "rfc"
+            elif "/memos/" in path_str:
+                doc_type_detected = "memo"
+            elif "/prd/" in path_str:
+                doc_type_detected = "prd"
+            else:
+                doc_type_detected = None
+
+            # 1. Add project_id if missing
+            if "project_id" not in post.metadata:
+                post.metadata["project_id"] = project_id
+                changes.append(f"Added project_id: {project_id}")
+                modified = True
+
+            # 2. Generate doc_uuid if missing
+            if "doc_uuid" not in post.metadata:
+                new_uuid = str(uuid.uuid4())
+                post.metadata["doc_uuid"] = new_uuid
+                changes.append(f"Generated doc_uuid: {new_uuid}")
+                modified = True
+
+            # 3. Migrate legacy 'date' field to 'created'/'updated'
+            if "date" in post.metadata and "created" not in post.metadata:
+                date_val = post.metadata["date"]
+                if hasattr(date_val, "strftime"):
+                    date_str = date_val.strftime("%Y-%m-%d")
+                else:
+                    date_str = str(date_val)
+
+                # Get git dates for updated field
+                created_date, updated_date = get_git_dates(file_path)
+
+                post.metadata["created"] = date_str
+                post.metadata["updated"] = updated_date or date_str
+                del post.metadata["date"]
+                changes.append(f"Migrated date → created: {date_str}, updated: {updated_date or date_str}")
+                modified = True
+
+            # 4. Add created/updated from git if missing
+            if "created" not in post.metadata or "updated" not in post.metadata:
+                created_date, updated_date = get_git_dates(file_path)
+                if created_date:
+                    if "created" not in post.metadata:
+                        post.metadata["created"] = created_date
+                        changes.append(f"Added created: {created_date} (from git)")
+                        modified = True
+                    if "updated" not in post.metadata:
+                        post.metadata["updated"] = updated_date
+                        changes.append(f"Added updated: {updated_date} (from git)")
+                        modified = True
+
+            # 5. Normalize id field to lowercase
+            if "id" in post.metadata:
+                old_id = post.metadata["id"]
+                new_id = old_id.lower()
+                if new_id != old_id:
+                    post.metadata["id"] = new_id
+                    changes.append(f"Normalized id: {old_id} → {new_id}")
+                    modified = True
+            elif doc_type_detected:
+                # Generate id from filename
+                # e.g., ADR-001-decision.md → adr-001
+                filename = file_path.stem.lower()
+                match = re.match(rf"({doc_type_detected})-(\d+)", filename)
+                if match:
+                    new_id = f"{match.group(1)}-{match.group(2).zfill(3)}"
+                    post.metadata["id"] = new_id
+                    changes.append(f"Generated id: {new_id}")
+                    modified = True
+
+            # 6. Normalize tags
+            if "tags" in post.metadata:
+                old_tags = post.metadata["tags"]
+                if isinstance(old_tags, str):
+                    # Convert string to list
+                    old_tags = [t.strip() for t in old_tags.split(",")]
+                if isinstance(old_tags, list):
+                    new_tags = []
+                    for tag in old_tags:
+                        # Normalize: lowercase, replace spaces with hyphens
+                        normalized = tag.lower().strip().replace(" ", "-")
+                        # Remove non-alphanumeric except hyphens
+                        normalized = re.sub(r"[^a-z0-9\-]", "", normalized)
+                        if normalized:
+                            new_tags.append(normalized)
+                    new_tags = sorted(set(new_tags))
+                    if new_tags != old_tags:
+                        post.metadata["tags"] = new_tags
+                        changes.append(f"Normalized tags: {old_tags} → {new_tags}")
+                        modified = True
+
+            # Write changes
+            if modified and not dry_run:
+                new_content = frontmatter.dumps(post)
+                file_path.write_text(new_content, encoding="utf-8")
+
+            # Report
+            try:
+                rel_path = file_path.relative_to(root)
+            except ValueError:
+                rel_path = file_path
+
+            if modified:
+                modified_count += 1
+                console.print(f"[green]✓[/green] {rel_path}")
+                for change in changes:
+                    console.print(f"    {change}")
+            elif verbose:
+                console.print(f"[dim]⊘[/dim] {rel_path}: No changes needed")
+
+        except Exception as e:
+            error_count += 1
+            try:
+                rel_path = file_path.relative_to(root)
+            except ValueError:
+                rel_path = file_path
+            console.print(f"[red]✗[/red] {rel_path}: {e}")
+
+    # Summary
+    console.print()
+    if dry_run:
+        console.print(f"[yellow]Would modify {modified_count} of {len(all_files)} files[/yellow]")
+        if error_count:
+            console.print(f"[red]Errors: {error_count}[/red]")
+        console.print("[dim]Run without --dry-run to apply changes[/dim]")
+    else:
+        console.print(f"[green]Modified {modified_count} of {len(all_files)} files[/green]")
+        if error_count:
+            console.print(f"[red]Errors: {error_count}[/red]")
+
+
 # Export the validate command as a separate entry point
 def validate_main():
     """Entry point for dcc-validate command."""
