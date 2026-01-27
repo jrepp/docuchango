@@ -797,10 +797,14 @@ def migrate(
     \b
     - Adds missing 'project_id' field
     - Generates 'doc_uuid' (UUID v4) if missing
-    - Migrates legacy 'date' field to 'created'/'updated'
-    - Adds 'created'/'updated' from git history if missing
+    - Migrates legacy 'date' field to 'created'
+    - Adds 'created' from git history if missing
+    - Removes deprecated/derived fields ('updated', 'date')
     - Normalizes 'id' field to lowercase format
     - Normalizes tags to lowercase with hyphens
+
+    Note: The 'updated' field is removed because it can be derived from
+    git history. Use 'docuchango bulk timestamps' to compute it on demand.
 
     Examples:
 
@@ -819,7 +823,7 @@ def migrate(
     Agent instructions to generate required fields:
 
         \b
-        # Generate created/updated datetime (ISO 8601 UTC):
+        # Generate created datetime (ISO 8601 UTC):
         python -c "from datetime import datetime, timezone; print(datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))"
         # Or: date -u +%Y-%m-%dT%H:%M:%SZ
 
@@ -934,34 +938,35 @@ def migrate(
                 changes.append(f"Generated doc_uuid: {new_uuid}")
                 modified = True
 
-            # 3. Migrate legacy 'date' field to 'created'/'updated'
+            # 3. Migrate legacy 'date' field to 'created'
             if "date" in post.metadata and "created" not in post.metadata:
                 date_val = post.metadata["date"]
                 date_str = date_val.strftime("%Y-%m-%d") if hasattr(date_val, "strftime") else str(date_val)
-
-                # Get git dates for updated field
-                created_date, updated_date = get_git_dates(file_path)
-
                 post.metadata["created"] = date_str
-                post.metadata["updated"] = updated_date or date_str
-                del post.metadata["date"]
-                changes.append(f"Migrated date → created: {date_str}, updated: {updated_date or date_str}")
+                changes.append(f"Migrated date → created: {date_str}")
                 modified = True
 
-            # 4. Add created/updated from git if missing
-            if "created" not in post.metadata or "updated" not in post.metadata:
-                created_date, updated_date = get_git_dates(file_path)
-                if created_date:
-                    if "created" not in post.metadata:
-                        post.metadata["created"] = created_date
-                        changes.append(f"Added created: {created_date} (from git)")
-                        modified = True
-                    if "updated" not in post.metadata:
-                        post.metadata["updated"] = updated_date
-                        changes.append(f"Added updated: {updated_date} (from git)")
-                        modified = True
+            # 4. Remove legacy 'date' field
+            if "date" in post.metadata:
+                del post.metadata["date"]
+                changes.append("Removed deprecated 'date' field")
+                modified = True
 
-            # 5. Normalize id field to lowercase
+            # 5. Add created from git if missing
+            if "created" not in post.metadata:
+                created_date, _ = get_git_dates(file_path)
+                if created_date:
+                    post.metadata["created"] = created_date
+                    changes.append(f"Added created: {created_date} (from git)")
+                    modified = True
+
+            # 6. Remove 'updated' field (derived from git history)
+            if "updated" in post.metadata:
+                del post.metadata["updated"]
+                changes.append("Removed 'updated' field (derived from git)")
+                modified = True
+
+            # 7. Normalize id field to lowercase
             if "id" in post.metadata:
                 old_id = post.metadata["id"]
                 new_id = old_id.lower()
@@ -980,7 +985,7 @@ def migrate(
                     changes.append(f"Generated id: {new_id}")
                     modified = True
 
-            # 6. Normalize tags
+            # 8. Normalize tags
             if "tags" in post.metadata:
                 old_tags = post.metadata["tags"]
                 if isinstance(old_tags, str):
