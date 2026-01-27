@@ -185,12 +185,14 @@ class ADRFrontmatter(BaseModel):
     - title: Title without ADR prefix (e.g., "Use Rust for Proxy"). ID displayed by sidebar.
     - status: Current state (Proposed/Accepted/Implemented/Deprecated/Superseded)
     - created: Date ADR was first created in ISO 8601 format (YYYY-MM-DD)
-    - updated: Date ADR was last modified in ISO 8601 format (YYYY-MM-DD)
     - deciders: Person or team who made the decision (e.g., "Core Team", "Platform Team")
     - tags: List of lowercase hyphenated tags for categorization
     - id: Lowercase identifier matching filename (e.g., "adr-001" for ADR-001-rust-proxy.md)
     - project_id: Project identifier from docs-project.yaml (e.g., "my-project")
     - doc_uuid: Unique identifier for backend tracking (UUID v4 format)
+
+    DERIVED FIELDS (computed from git history):
+    - updated: Last modification date, derived from git commit history
 
     DEPRECATED FIELDS (supported for backwards compatibility):
     - date: Legacy field, use 'created' instead. Will be auto-migrated.
@@ -208,10 +210,6 @@ class ADRFrontmatter(BaseModel):
     created: datetime.datetime | datetime.date | str = Field(
         ...,
         description="DateTime ADR was first created in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ). Do not change after initial creation",
-    )
-    updated: datetime.datetime | datetime.date | str = Field(
-        ...,
-        description="DateTime ADR was last modified in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ). Update whenever content changes",
     )
     deciders: str = Field(
         ..., description="Who made the decision. Use team name (e.g., 'Core Team') or individual name"
@@ -280,11 +278,13 @@ class RFCFrontmatter(BaseModel):
     - status: Current state (Draft/Proposed/Accepted/Implemented/Rejected)
     - author: Document author (person or team who wrote the RFC)
     - created: Date RFC was first created in ISO 8601 format (YYYY-MM-DD)
-    - updated: Date RFC was last modified in ISO 8601 format (YYYY-MM-DD)
     - tags: List of lowercase hyphenated tags for categorization
     - id: Lowercase identifier matching filename (e.g., "rfc-015" for RFC-015-plugin-architecture.md)
     - project_id: Project identifier from docs-project.yaml (e.g., "my-project")
     - doc_uuid: Unique identifier for backend tracking (UUID v4 format)
+
+    DERIVED FIELDS (computed from git history):
+    - updated: Last modification date, derived from git commit history
     """
 
     title: str = Field(
@@ -301,10 +301,6 @@ class RFCFrontmatter(BaseModel):
     created: datetime.datetime | datetime.date | str = Field(
         ...,
         description="DateTime RFC was first created in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ). Do not change after initial creation",
-    )
-    updated: datetime.datetime | datetime.date | str | None = Field(
-        None,
-        description="DateTime RFC was last modified in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ). Update whenever content changes",
     )
     tags: list[str] = Field(
         default_factory=list, description="List of lowercase, hyphenated tags (e.g., ['design', 'api', 'backend'])"
@@ -368,11 +364,13 @@ class MemoFrontmatter(BaseModel):
     - title: Title without MEMO prefix (e.g., "Load Test Results"). ID displayed by sidebar.
     - author: Document author (person or team who wrote the memo)
     - created: Date memo was first created in ISO 8601 format (YYYY-MM-DD)
-    - updated: Date memo was last modified in ISO 8601 format (YYYY-MM-DD)
     - tags: List of lowercase hyphenated tags for categorization
     - id: Lowercase identifier matching filename (e.g., "memo-010" for MEMO-010-loadtest-results.md)
     - project_id: Project identifier from docs-project.yaml (e.g., "my-project")
     - doc_uuid: Unique identifier for backend tracking (UUID v4 format)
+
+    DERIVED FIELDS (computed from git history):
+    - updated: Last modification date, derived from git commit history
     """
 
     title: str = Field(
@@ -384,10 +382,6 @@ class MemoFrontmatter(BaseModel):
     created: datetime.datetime | datetime.date | str = Field(
         ...,
         description="DateTime memo was first created in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ). Do not change after initial creation",
-    )
-    updated: datetime.datetime | datetime.date | str = Field(
-        ...,
-        description="DateTime memo was last modified in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ). Update whenever content changes",
     )
     tags: list[str] = Field(
         default_factory=list,
@@ -453,12 +447,14 @@ class PRDFrontmatter(BaseModel):
     - status: Current state (Draft/In Review/Approved/In Progress/Completed/Cancelled)
     - author: Document author (person or team who wrote the PRD)
     - created: Date PRD was first created in ISO 8601 format (YYYY-MM-DD)
-    - updated: Date PRD was last modified in ISO 8601 format (YYYY-MM-DD)
     - target_release: Target release version or date (e.g., "v2.0.0" or "Q2 2025")
     - tags: List of lowercase hyphenated tags for categorization
     - id: Lowercase identifier matching filename (e.g., "prd-005" for prd-005-user-auth.md)
     - project_id: Project identifier from docs-project.yaml (e.g., "my-project")
     - doc_uuid: Unique identifier for backend tracking (UUID v4 format)
+
+    DERIVED FIELDS (computed from git history):
+    - updated: Last modification date, derived from git commit history
     """
 
     title: str = Field(
@@ -476,10 +472,6 @@ class PRDFrontmatter(BaseModel):
     created: datetime.datetime | datetime.date | str = Field(
         ...,
         description="DateTime PRD was first created in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ). Do not change after initial creation",
-    )
-    updated: datetime.datetime | datetime.date | str = Field(
-        ...,
-        description="DateTime PRD was last modified in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ). Update whenever content changes",
     )
     target_release: str = Field(
         ...,
