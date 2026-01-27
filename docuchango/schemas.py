@@ -303,7 +303,8 @@ class RFCFrontmatter(BaseModel):
         description="DateTime RFC was first created in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ). Do not change after initial creation",
     )
     updated: datetime.datetime | datetime.date | str | None = Field(
-        None, description="DateTime RFC was last modified in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ). Update whenever content changes"
+        None,
+        description="DateTime RFC was last modified in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ). Update whenever content changes",
     )
     tags: list[str] = Field(
         default_factory=list, description="List of lowercase, hyphenated tags (e.g., ['design', 'api', 'backend'])"
@@ -385,7 +386,8 @@ class MemoFrontmatter(BaseModel):
         description="DateTime memo was first created in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ). Do not change after initial creation",
     )
     updated: datetime.datetime | datetime.date | str = Field(
-        ..., description="DateTime memo was last modified in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ). Update whenever content changes"
+        ...,
+        description="DateTime memo was last modified in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ). Update whenever content changes",
     )
     tags: list[str] = Field(
         default_factory=list,
@@ -476,7 +478,8 @@ class PRDFrontmatter(BaseModel):
         description="DateTime PRD was first created in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ). Do not change after initial creation",
     )
     updated: datetime.datetime | datetime.date | str = Field(
-        ..., description="DateTime PRD was last modified in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ). Update whenever content changes"
+        ...,
+        description="DateTime PRD was last modified in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ). Update whenever content changes",
     )
     target_release: str = Field(
         ...,

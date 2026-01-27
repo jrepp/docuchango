@@ -937,10 +937,7 @@ def migrate(
             # 3. Migrate legacy 'date' field to 'created'/'updated'
             if "date" in post.metadata and "created" not in post.metadata:
                 date_val = post.metadata["date"]
-                if hasattr(date_val, "strftime"):
-                    date_str = date_val.strftime("%Y-%m-%d")
-                else:
-                    date_str = str(date_val)
+                date_str = date_val.strftime("%Y-%m-%d") if hasattr(date_val, "strftime") else str(date_val)
 
                 # Get git dates for updated field
                 created_date, updated_date = get_git_dates(file_path)
