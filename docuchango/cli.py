@@ -938,35 +938,36 @@ def migrate(
                 changes.append(f"Generated doc_uuid: {new_uuid}")
                 modified = True
 
-            # 3. Migrate legacy 'date' field to 'created'
-            if "date" in post.metadata and "created" not in post.metadata:
-                date_val = post.metadata["date"]
-                date_str = date_val.strftime("%Y-%m-%d") if hasattr(date_val, "strftime") else str(date_val)
-                post.metadata["created"] = date_str
-                changes.append(f"Migrated date → created: {date_str}")
-                modified = True
-
-            # 4. Remove legacy 'date' field
+            # 3. Remove legacy 'date' field (will get created from git)
             if "date" in post.metadata:
                 del post.metadata["date"]
                 changes.append("Removed deprecated 'date' field")
                 modified = True
+                # Also remove created if it exists so it gets refreshed from git
+                if "created" in post.metadata:
+                    del post.metadata["created"]
 
-            # 5. Add created from git if missing
-            if "created" not in post.metadata:
-                created_date, _ = get_git_dates(file_path)
-                if created_date:
-                    post.metadata["created"] = created_date
-                    changes.append(f"Added created: {created_date} (from git)")
+            # 4. Add or update created from git (ensures datetime format)
+            created_datetime, _ = get_git_dates(file_path)
+            if created_datetime:
+                old_created = post.metadata.get("created")
+                # Normalize to datetime format from git
+                if old_created != created_datetime:
+                    old_val = str(old_created) if old_created else "None"
+                    post.metadata["created"] = created_datetime
+                    if old_created:
+                        changes.append(f"Normalized created: {old_val} → {created_datetime}")
+                    else:
+                        changes.append(f"Added created: {created_datetime} (from git)")
                     modified = True
 
-            # 6. Remove 'updated' field (derived from git history)
+            # 5. Remove 'updated' field (derived from git history)
             if "updated" in post.metadata:
                 del post.metadata["updated"]
                 changes.append("Removed 'updated' field (derived from git)")
                 modified = True
 
-            # 7. Normalize id field to lowercase
+            # 6. Normalize id field to lowercase
             if "id" in post.metadata:
                 old_id = post.metadata["id"]
                 new_id = old_id.lower()
@@ -985,7 +986,7 @@ def migrate(
                     changes.append(f"Generated id: {new_id}")
                     modified = True
 
-            # 8. Normalize tags
+            # 7. Normalize tags
             if "tags" in post.metadata:
                 old_tags = post.metadata["tags"]
                 if isinstance(old_tags, str):
