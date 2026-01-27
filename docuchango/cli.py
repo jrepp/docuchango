@@ -763,7 +763,7 @@ def bulk_timestamps(
             console.print(f"[red]Errors: {error_count}[/red]")
 
 
-@bulk.command("migrate")
+@main.command("migrate")
 @click.option(
     "--project-id",
     required=True,
@@ -783,7 +783,7 @@ def bulk_timestamps(
 )
 @click.option("--dry-run", is_flag=True, help="Preview changes without applying")
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed output")
-def bulk_migrate(
+def migrate(
     project_id: str,
     doc_type: str | None,
     target_path: Path | None,
@@ -806,15 +806,15 @@ def bulk_migrate(
 
         \b
         # Migrate all documents
-        docuchango bulk migrate --project-id my-project
+        docuchango migrate --project-id my-project
 
         \b
         # Migrate only ADRs
-        docuchango bulk migrate --project-id my-project --type adr
+        docuchango migrate --project-id my-project --type adr
 
         \b
         # Preview changes without applying
-        docuchango bulk migrate --project-id my-project --dry-run
+        docuchango migrate --project-id my-project --dry-run
 
     Agent instructions to generate required fields:
 

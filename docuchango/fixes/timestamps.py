@@ -16,13 +16,13 @@ import frontmatter
 
 
 def get_git_dates(file_path: Path) -> tuple[str | None, str | None]:
-    """Get creation and last update dates from git history.
+    """Get creation and last update datetimes from git history.
 
     Args:
         file_path: Path to the file
 
     Returns:
-        Tuple of (created_date, updated_date) in YYYY-MM-DD format
+        Tuple of (created_datetime, updated_datetime) in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ)
         Returns (None, None) if file is not in git history
     """
     try:
@@ -45,7 +45,9 @@ def get_git_dates(file_path: Path) -> tuple[str | None, str | None]:
         first_commit = commits[0]
         # Replace 'Z' with '+00:00' for Python 3.9/3.10 compatibility (Python 3.11+ handles 'Z' natively)
         first_commit = first_commit.replace("Z", "+00:00")
-        created_date = datetime.fromisoformat(first_commit).strftime("%Y-%m-%d")
+        # Convert to UTC and format as ISO 8601 datetime
+        created_dt = datetime.fromisoformat(first_commit).astimezone(tz=None)
+        created_datetime = created_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
         # Get last commit date (update)
         result = subprocess.run(
@@ -57,13 +59,15 @@ def get_git_dates(file_path: Path) -> tuple[str | None, str | None]:
         )
         last_commit = result.stdout.strip()
         if not last_commit:
-            return created_date, created_date
+            return created_datetime, created_datetime
 
         # Replace 'Z' with '+00:00' for Python 3.9/3.10 compatibility (Python 3.11+ handles 'Z' natively)
         last_commit = last_commit.replace("Z", "+00:00")
-        updated_date = datetime.fromisoformat(last_commit).strftime("%Y-%m-%d")
+        # Convert to UTC and format as ISO 8601 datetime
+        updated_dt = datetime.fromisoformat(last_commit).astimezone(tz=None)
+        updated_datetime = updated_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-        return created_date, updated_date
+        return created_datetime, updated_datetime
 
     except subprocess.CalledProcessError:
         return None, None
@@ -182,7 +186,12 @@ def update_document_timestamps(file_path: Path, dry_run: bool = False) -> tuple[
         # Update or add created field
         if "created" in post.metadata:
             old_created = post.metadata["created"]
-            old_created_str = old_created if isinstance(old_created, str) else old_created.strftime("%Y-%m-%d")
+            if isinstance(old_created, str):
+                old_created_str = old_created
+            elif hasattr(old_created, "strftime"):
+                old_created_str = old_created.strftime("%Y-%m-%dT%H:%M:%SZ")
+            else:
+                old_created_str = str(old_created)
 
             if old_created_str != created_date:
                 new_content = update_frontmatter_field(new_content, "created", created_date)
@@ -201,7 +210,12 @@ def update_document_timestamps(file_path: Path, dry_run: bool = False) -> tuple[
         # Update or add updated field
         if "updated" in post.metadata:
             old_updated = post.metadata["updated"]
-            old_updated_str = old_updated if isinstance(old_updated, str) else old_updated.strftime("%Y-%m-%d")
+            if isinstance(old_updated, str):
+                old_updated_str = old_updated
+            elif hasattr(old_updated, "strftime"):
+                old_updated_str = old_updated.strftime("%Y-%m-%dT%H:%M:%SZ")
+            else:
+                old_updated_str = str(old_updated)
 
             if old_updated_str != updated_date:
                 new_content = update_frontmatter_field(new_content, "updated", updated_date)

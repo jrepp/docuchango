@@ -44,8 +44,8 @@ class TestGetGitDates:
         assert created is not None
         assert updated is not None
         assert created == updated  # Only one commit
-        # Check format is YYYY-MM-DD
-        datetime.strptime(created, "%Y-%m-%d")
+        # Check format is ISO 8601 datetime (YYYY-MM-DDTHH:MM:SSZ)
+        datetime.strptime(created, "%Y-%m-%dT%H:%M:%SZ")
 
     def test_get_git_dates_for_untracked_file(self, tmp_path):
         """Test getting git dates for a file not in git."""

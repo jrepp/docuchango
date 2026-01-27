@@ -69,9 +69,9 @@ class TestGetGitDatesEdgeCases:
 
         assert created is not None
         assert updated is not None
-        # Both should be valid dates
-        datetime.strptime(created, "%Y-%m-%d")
-        datetime.strptime(updated, "%Y-%m-%d")
+        # Both should be valid ISO 8601 datetimes
+        datetime.strptime(created, "%Y-%m-%dT%H:%M:%SZ")
+        datetime.strptime(updated, "%Y-%m-%dT%H:%M:%SZ")
         # For same-day commits, might be same or different
         assert created <= updated
 

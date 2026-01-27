@@ -205,13 +205,13 @@ class ADRFrontmatter(BaseModel):
         ...,
         description="Decision status. Use 'Proposed' for drafts, 'Accepted' for approved, 'Implemented' for completed",
     )
-    created: datetime.date = Field(
+    created: datetime.datetime | datetime.date | str = Field(
         ...,
-        description="Date ADR was first created in ISO 8601 format (YYYY-MM-DD). Do not change after initial creation",
+        description="DateTime ADR was first created in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ). Do not change after initial creation",
     )
-    updated: datetime.date = Field(
+    updated: datetime.datetime | datetime.date | str = Field(
         ...,
-        description="Date ADR was last modified in ISO 8601 format (YYYY-MM-DD). Update whenever content changes",
+        description="DateTime ADR was last modified in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ). Update whenever content changes",
     )
     deciders: str = Field(
         ..., description="Who made the decision. Use team name (e.g., 'Core Team') or individual name"
@@ -298,12 +298,12 @@ class RFCFrontmatter(BaseModel):
     author: str = Field(
         ..., description="RFC author. Use person name or team name (e.g., 'Platform Team', 'John Smith')"
     )
-    created: datetime.date = Field(
+    created: datetime.datetime | datetime.date | str = Field(
         ...,
-        description="Date RFC was first created in ISO 8601 format (YYYY-MM-DD). Do not change after initial creation",
+        description="DateTime RFC was first created in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ). Do not change after initial creation",
     )
-    updated: datetime.date | None = Field(
-        None, description="Date RFC was last modified in ISO 8601 format (YYYY-MM-DD). Update whenever content changes"
+    updated: datetime.datetime | datetime.date | str | None = Field(
+        None, description="DateTime RFC was last modified in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ). Update whenever content changes"
     )
     tags: list[str] = Field(
         default_factory=list, description="List of lowercase, hyphenated tags (e.g., ['design', 'api', 'backend'])"
@@ -380,12 +380,12 @@ class MemoFrontmatter(BaseModel):
         description="Memo title without prefix (e.g., 'Load Test Results'). The ID prefix is in the 'id' field and displayed by sidebar.",
     )
     author: str = Field(..., description="Memo author. Use person name or team name (e.g., 'Platform Team', 'Claude')")
-    created: datetime.date = Field(
+    created: datetime.datetime | datetime.date | str = Field(
         ...,
-        description="Date memo was first created in ISO 8601 format (YYYY-MM-DD). Do not change after initial creation",
+        description="DateTime memo was first created in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ). Do not change after initial creation",
     )
-    updated: datetime.date = Field(
-        ..., description="Date memo was last modified in ISO 8601 format (YYYY-MM-DD). Update whenever content changes"
+    updated: datetime.datetime | datetime.date | str = Field(
+        ..., description="DateTime memo was last modified in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ). Update whenever content changes"
     )
     tags: list[str] = Field(
         default_factory=list,
@@ -471,12 +471,12 @@ class PRDFrontmatter(BaseModel):
     author: str = Field(
         ..., description="PRD author. Use person name or team name (e.g., 'Product Team', 'Jane Smith')"
     )
-    created: datetime.date = Field(
+    created: datetime.datetime | datetime.date | str = Field(
         ...,
-        description="Date PRD was first created in ISO 8601 format (YYYY-MM-DD). Do not change after initial creation",
+        description="DateTime PRD was first created in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ). Do not change after initial creation",
     )
-    updated: datetime.date = Field(
-        ..., description="Date PRD was last modified in ISO 8601 format (YYYY-MM-DD). Update whenever content changes"
+    updated: datetime.datetime | datetime.date | str = Field(
+        ..., description="DateTime PRD was last modified in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ). Update whenever content changes"
     )
     target_release: str = Field(
         ...,
