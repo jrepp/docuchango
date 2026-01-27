@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.12.0 (2026-01-27)
+
+### Features
+
+- Remove updated field from timestamps bulk operation
+  ([`fa1a23e`](https://github.com/jrepp/docuchango/commit/fa1a23e2f2a8edfbfe76713159ef3aa62573b994))
+
+
 ## v1.11.0 (2026-01-27)
 
 ### Features
