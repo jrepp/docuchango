@@ -5,9 +5,7 @@ slug: prd-XXX-product-name  # URL-friendly slug (lowercase-with-dashes)
 title: "PRD-XXX: Product Name"  # Must start with "PRD-XXX:" where XXX is 3-digit number
 status: Draft  # Valid values: Draft, In Review, Approved, In Progress, Completed, Cancelled
 created: YYYY-MM-DD  # ISO 8601 format (YYYY-MM-DD) - date PRD was first created, DO NOT CHANGE after initial creation
-                     # Generate: date +%Y-%m-%d  OR  python -c "from datetime import date; print(date.today())"  OR  auto-set with: docuchango fix timestamps
-updated: YYYY-MM-DD  # ISO 8601 format (YYYY-MM-DD) - date of last modification, UPDATE whenever content changes
-                     # Auto-updated with: docuchango fix timestamps
+                     # Generate: date +%Y-%m-%d  OR  python -c "from datetime import date; print(date.today())"  OR  auto-set with: docuchango bulk timestamps
 author: Product Manager Name  # Person or team who wrote this PRD (e.g., "Jane Smith", "Product Team")
                               # Generate: git config user.name
 tags: ["product", "requirements", "feature"]  # List of lowercase-with-dashes tags (e.g., ["user-experience", "mobile"])

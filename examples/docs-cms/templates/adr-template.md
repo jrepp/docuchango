@@ -3,7 +3,6 @@ id: adr-NNN
 title: Brief decision title
 status: Proposed
 created: YYYY-MM-DD
-updated: YYYY-MM-DD
 deciders: Engineering Team
 tags: [architecture, decision]
 project_id: your-project-id

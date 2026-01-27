@@ -5,9 +5,7 @@ slug: rfc-XXX-brief-description  # URL-friendly slug (lowercase-with-dashes)
 title: "RFC-XXX: Technical Proposal Title"  # Must start with "RFC-XXX:" where XXX is 3-digit number
 status: Draft  # Valid values: Draft, In Review, Accepted, Rejected, Implemented
 created: YYYY-MM-DD  # ISO 8601 format (YYYY-MM-DD) - date RFC was first created, DO NOT CHANGE after initial creation
-                     # Generate: date +%Y-%m-%d  OR  python -c "from datetime import date; print(date.today())"  OR  auto-set with: docuchango fix timestamps
-updated: YYYY-MM-DD  # ISO 8601 format (YYYY-MM-DD) - date of last modification, UPDATE whenever content changes
-                     # Auto-updated with: docuchango fix timestamps
+                     # Generate: date +%Y-%m-%d  OR  python -c "from datetime import date; print(date.today())"  OR  auto-set with: docuchango bulk timestamps
 author: Your Name  # Person or team who wrote this RFC (e.g., "Jacob Repp", "Platform Team")
                    # Generate: git config user.name
 tags: ["architecture", "api", "backend"]  # List of lowercase-with-dashes tags (e.g., ["performance", "security"])

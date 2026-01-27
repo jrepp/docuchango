@@ -42,7 +42,6 @@ title: Automated Documentation Generation from Code
 status: Draft
 author: Claude Code Agent
 created: 2025-10-27
-updated: 2025-10-27
 tags: [rfc, automation, documentation, tooling]
 project_id: example-project
 doc_uuid: 4a5b6c7d-8e9f-4012-8345-6789abcdef01
@@ -56,7 +55,6 @@ id: memo-001
 title: docs-cms System Launch Status
 author: Project Team
 created: 2025-10-27
-updated: 2025-10-27
 tags: [memo, status-update, launch]
 project_id: example-project
 doc_uuid: 4b5c6d7e-8f90-4123-8456-789abcdef012

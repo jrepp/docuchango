@@ -2,7 +2,6 @@
 id: memo-NNN
 title: Memo title
 created: YYYY-MM-DD
-updated: YYYY-MM-DD
 author: Your Name
 tags: [memo]
 project_id: your-project-id

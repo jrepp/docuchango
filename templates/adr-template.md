@@ -5,9 +5,7 @@ slug: adr-XXX-brief-description  # URL-friendly slug (lowercase-with-dashes)
 title: "ADR-XXX: Decision Title"  # Must start with "ADR-XXX:" where XXX is 3-digit number
 status: Proposed  # Valid values: Proposed, Accepted, Deprecated, Superseded, Implemented
 created: YYYY-MM-DD  # ISO 8601 format (YYYY-MM-DD) - date ADR was first created, DO NOT CHANGE after initial creation
-                     # Generate: date +%Y-%m-%d  OR  python -c "from datetime import date; print(date.today())"  OR  auto-set with: docuchango fix timestamps
-updated: YYYY-MM-DD  # ISO 8601 format (YYYY-MM-DD) - date of last modification, UPDATE whenever content changes
-                     # Auto-updated with: docuchango fix timestamps
+                     # Generate: date +%Y-%m-%d  OR  python -c "from datetime import date; print(date.today())"  OR  auto-set with: docuchango bulk timestamps
 author: Your Name  # Person or team who wrote this ADR (e.g., "Jacob Repp", "Platform Team")
                    # Generate: git config user.name
 deciders: Your Name  # Team or person who made the decision (e.g., "Core Team", "Platform Team", "John Smith")

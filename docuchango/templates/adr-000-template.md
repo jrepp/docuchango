@@ -2,7 +2,6 @@
 title: Title Goes Here
 status: Proposed
 created: YYYY-MM-DDTHH:MM:SSZ  # python -c "from datetime import datetime, timezone; print(datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))"
-updated: YYYY-MM-DDTHH:MM:SSZ  # python -c "from datetime import datetime, timezone; print(datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))"
 deciders: Engineering Team  # team or person who made the decision
 tags: [architecture, design]
 id: adr-000  # lowercase adr-XXX format matching filename

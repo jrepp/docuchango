@@ -1,5 +1,5 @@
 ---
-created: '2025-10-26'
+created: 2025-10-26T02:35:12Z
 deciders: Engineering Team
 doc_uuid: a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d
 id: adr-001
@@ -11,7 +11,6 @@ tags:
 - schema
 - validation
 title: Use Pydantic for Frontmatter Schema Validation
-updated: 2026-01-26
 ---
 
 # ADR-001: Use Pydantic for Frontmatter Schema Validation
@@ -31,9 +30,7 @@ Different doc types (ADR, RFC, Memo) need different required fields. Pydantic gi
 ```python
 class ADRFrontmatter(BaseModel):
     status: Literal["Proposed", "Accepted", "Deprecated", "Superseded"]
-created: 2025-10-26
-updated: 2026-01-26
-    date: datetime.date
+    created: datetime.datetime  # ISO 8601 format
     deciders: str = Field(min_length=1)
 
     @field_validator("id")

@@ -3,7 +3,6 @@ title: Title Goes Here
 status: Draft
 author: Product Team  # git config user.name
 created: YYYY-MM-DDTHH:MM:SSZ  # python -c "from datetime import datetime, timezone; print(datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))"
-updated: YYYY-MM-DDTHH:MM:SSZ  # python -c "from datetime import datetime, timezone; print(datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))"
 target_release: v1.0.0
 tags: [feature, product]
 id: prd-000  # lowercase prd-XXX format matching filename

@@ -3,7 +3,6 @@ title: Title Goes Here
 status: Draft
 author: Engineering Team  # git config user.name
 created: YYYY-MM-DDTHH:MM:SSZ  # python -c "from datetime import datetime, timezone; print(datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))"
-updated: YYYY-MM-DDTHH:MM:SSZ  # python -c "from datetime import datetime, timezone; print(datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))"
 tags: [rfc, design]
 id: rfc-000  # lowercase rfc-XXX format matching filename
 project_id: my-project  # from docs-project.yaml
