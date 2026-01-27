@@ -191,11 +191,9 @@ class ADRFrontmatter(BaseModel):
     - project_id: Project identifier from docs-project.yaml (e.g., "my-project")
     - doc_uuid: Unique identifier for backend tracking (UUID v4 format)
 
-    DERIVED FIELDS (computed from git history):
-    - updated: Last modification date, derived from git commit history
-
     DEPRECATED FIELDS (supported for backwards compatibility):
     - date: Legacy field, use 'created' instead. Will be auto-migrated.
+    - updated: No longer stored. Derive from git history with: git log -1 --format=%aI <file>
     """
 
     title: str = Field(
@@ -283,8 +281,7 @@ class RFCFrontmatter(BaseModel):
     - project_id: Project identifier from docs-project.yaml (e.g., "my-project")
     - doc_uuid: Unique identifier for backend tracking (UUID v4 format)
 
-    DERIVED FIELDS (computed from git history):
-    - updated: Last modification date, derived from git commit history
+    NOTE: The 'updated' field is no longer stored. Derive from git: git log -1 --format=%aI <file>
     """
 
     title: str = Field(
@@ -369,8 +366,7 @@ class MemoFrontmatter(BaseModel):
     - project_id: Project identifier from docs-project.yaml (e.g., "my-project")
     - doc_uuid: Unique identifier for backend tracking (UUID v4 format)
 
-    DERIVED FIELDS (computed from git history):
-    - updated: Last modification date, derived from git commit history
+    NOTE: The 'updated' field is no longer stored. Derive from git: git log -1 --format=%aI <file>
     """
 
     title: str = Field(
@@ -453,8 +449,7 @@ class PRDFrontmatter(BaseModel):
     - project_id: Project identifier from docs-project.yaml (e.g., "my-project")
     - doc_uuid: Unique identifier for backend tracking (UUID v4 format)
 
-    DERIVED FIELDS (computed from git history):
-    - updated: Last modification date, derived from git commit history
+    NOTE: The 'updated' field is no longer stored. Derive from git: git log -1 --format=%aI <file>
     """
 
     title: str = Field(

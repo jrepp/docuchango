@@ -5,9 +5,7 @@ slug: memo-XXX-brief-description  # URL-friendly slug (lowercase-with-dashes)
 title: "Memo: Subject Title"  # Clear, descriptive subject line
 status: Draft  # Valid values: Draft, Published, Archived
 created: YYYY-MM-DD  # ISO 8601 format (YYYY-MM-DD) - date memo was first created, DO NOT CHANGE after initial creation
-                     # Generate: date +%Y-%m-%d  OR  python -c "from datetime import date; print(date.today())"  OR  auto-set with: docuchango fix timestamps
-updated: YYYY-MM-DD  # ISO 8601 format (YYYY-MM-DD) - date of last modification, UPDATE whenever content changes
-                     # Auto-updated with: docuchango fix timestamps
+                     # Generate: date +%Y-%m-%d  OR  python -c "from datetime import date; print(date.today())"  OR  auto-set with: docuchango bulk timestamps
 author: Your Name  # Person who wrote this memo (e.g., "Jacob Repp", "Product Team")
                    # Generate: git config user.name
 tags: ["memo", "communication"]  # List of lowercase-with-dashes tags (e.g., ["quarterly-review", "announcement"])

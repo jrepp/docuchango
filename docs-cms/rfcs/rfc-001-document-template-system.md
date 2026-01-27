@@ -10,7 +10,6 @@ tags:
 - standards
 - templates
 title: Document Template System
-updated: 2025-01-26
 ---
 
 # RFC-001: Document Template System

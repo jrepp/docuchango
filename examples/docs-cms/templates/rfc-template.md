@@ -3,7 +3,6 @@ id: rfc-NNN
 title: Proposal title
 status: Draft
 created: YYYY-MM-DD
-updated: YYYY-MM-DD
 author: Your Name
 tags: [rfc, proposal]
 project_id: your-project-id
