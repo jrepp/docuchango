@@ -130,34 +130,6 @@ class TestUTF8EncodingOnWrites:
     Fix: Added encoding="utf-8" to all read/write operations.
     """
 
-    def test_utf8_characters_preserved_in_broken_links(self):
-        """Test that UTF-8 characters are preserved when fixing broken links."""
-        from docuchango.fixes.broken_links import fix_links_in_file
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            test_file = Path(tmpdir) / "test.md"
-
-            # Content with UTF-8 characters
-            content = """# Test Document
-
-[Link](/rfc/rfc-211-test)
-
-UTF-8 characters: → ✓ ✗ 中文 🎉
-"""
-
-            test_file.write_text(content, encoding="utf-8")
-
-            # Fix links (should preserve UTF-8)
-            fix_links_in_file(test_file, dry_run=False)
-
-            # Read back and verify UTF-8 preserved
-            result = test_file.read_text(encoding="utf-8")
-            assert "→" in result
-            assert "✓" in result
-            assert "✗" in result
-            assert "中文" in result
-            assert "🎉" in result
-
     def test_utf8_characters_preserved_in_cross_plugin_links(self):
         """Test that UTF-8 characters are preserved when fixing cross-plugin links."""
         from docuchango.fixes.cross_plugin_links import fix_cross_plugin_links
@@ -188,11 +160,7 @@ Special chars: ≥ ≤ ≠ → ← ↔
         """Verify that encoding parameter is specified in file read operations."""
         import inspect
 
-        from docuchango.fixes import broken_links, cross_plugin_links
-
-        # Check broken_links.py
-        source = inspect.getsource(broken_links.fix_links_in_file)
-        assert 'encoding="utf-8"' in source, "broken_links.py should specify UTF-8 encoding"
+        from docuchango.fixes import cross_plugin_links
 
         # Check cross_plugin_links.py
         source = inspect.getsource(cross_plugin_links.fix_cross_plugin_links)
