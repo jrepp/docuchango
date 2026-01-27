@@ -23,7 +23,8 @@ class TestADRFrontmatter:
         adr = ADRFrontmatter(
             title="Use gRPC for API Design",
             status="Accepted",
-            date=date(2025, 10, 13),
+            created=date(2025, 10, 13),
+            updated=date(2025, 10, 14),
             deciders="Engineering Team",
             tags=["grpc", "api", "design"],
             id="adr-001",
@@ -40,7 +41,8 @@ class TestADRFrontmatter:
             ADRFrontmatter(
                 title="Test ADR",
                 status="Proposed",
-                date=date(2025, 10, 13),
+                created=date(2025, 10, 13),
+                updated=date(2025, 10, 13),
                 # Missing deciders
                 tags=["test"],
                 id="adr-001",
@@ -55,7 +57,8 @@ class TestADRFrontmatter:
             ADRFrontmatter(
                 title="Test ADR",
                 status="Invalid",  # Not in allowed values
-                date=date(2025, 10, 13),
+                created=date(2025, 10, 13),
+                updated=date(2025, 10, 13),
                 deciders="Team",
                 tags=["test"],
                 id="adr-001",
@@ -70,7 +73,8 @@ class TestADRFrontmatter:
             ADRFrontmatter(
                 title="Test ADR",
                 status="Proposed",
-                date=date(2025, 10, 13),
+                created=date(2025, 10, 13),
+                updated=date(2025, 10, 13),
                 deciders="Team",
                 tags=["test"],
                 id="ADR-001",  # Should be lowercase
@@ -85,7 +89,8 @@ class TestADRFrontmatter:
             ADRFrontmatter(
                 title="Test ADR",
                 status="Proposed",
-                date=date(2025, 10, 13),
+                created=date(2025, 10, 13),
+                updated=date(2025, 10, 13),
                 deciders="Team",
                 tags=["test"],
                 id="adr-001",
@@ -100,7 +105,8 @@ class TestADRFrontmatter:
             ADRFrontmatter(
                 title="Test ADR",
                 status="Proposed",
-                date=date(2025, 10, 13),
+                created=date(2025, 10, 13),
+                updated=date(2025, 10, 13),
                 deciders="Team",
                 tags=["Invalid Tag"],  # Should be lowercase with hyphens
                 id="adr-001",
@@ -115,7 +121,8 @@ class TestADRFrontmatter:
             ADRFrontmatter(
                 title="Short",  # Less than 10 characters
                 status="Proposed",
-                date=date(2025, 10, 13),
+                created=date(2025, 10, 13),
+                updated=date(2025, 10, 13),
                 deciders="Team",
                 tags=["test"],
                 id="adr-001",

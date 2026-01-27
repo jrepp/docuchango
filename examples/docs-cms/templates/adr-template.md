@@ -2,10 +2,12 @@
 id: adr-NNN
 title: Brief decision title
 status: Proposed
-date: YYYY-MM-DD
+created: YYYY-MM-DD
+updated: YYYY-MM-DD
+deciders: Engineering Team
 tags: [architecture, decision]
 project_id: your-project-id
-doc_uuid: generate-uuid-v4-here
+doc_uuid: 00000000-0000-4000-8000-000000000000
 ---
 
 # ADR-NNN: Brief Decision Title

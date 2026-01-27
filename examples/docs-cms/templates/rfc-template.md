@@ -2,11 +2,12 @@
 id: rfc-NNN
 title: Proposal title
 status: Draft
-date: YYYY-MM-DD
+created: YYYY-MM-DD
+updated: YYYY-MM-DD
 author: Your Name
 tags: [rfc, proposal]
 project_id: your-project-id
-doc_uuid: generate-uuid-v4-here
+doc_uuid: 00000000-0000-4000-8000-000000000000
 ---
 
 # RFC-NNN: Proposal Title
