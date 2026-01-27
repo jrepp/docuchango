@@ -7,7 +7,7 @@ import frontmatter
 
 from docuchango.fixes.timestamps import (
     get_git_dates,
-    migrate_date_to_created_updated,
+    migrate_date_to_created,
     update_document_timestamps,
     update_frontmatter_field,
 )
@@ -209,12 +209,13 @@ date: 2020-01-01
 ---
 # Test
 """
-        updated = migrate_date_to_created_updated(content, "2021-01-01", "2022-01-01")
+        result = migrate_date_to_created(content, "2021-01-01")
 
         # Should still work, inserts after id field
-        assert "date:" not in updated
-        assert "created: 2021-01-01" in updated
-        assert "updated: 2022-01-01" in updated
+        assert "date:" not in result
+        assert "created: 2021-01-01" in result
+        # updated field is no longer added (derived from git)
+        assert "updated:" not in result
 
     def test_migrate_with_existing_created_field(self):
         """Test migration when created already exists."""
@@ -226,11 +227,11 @@ created: 2019-01-01
 ---
 # Test
 """
-        updated = migrate_date_to_created_updated(content, "2021-01-01", "2022-01-01")
+        result = migrate_date_to_created(content, "2021-01-01")
 
-        # Should remove date, add created and updated
+        # Should remove date, add created
         # Existing created might be overwritten
-        assert "date: 2020-01-01" not in updated
+        assert "date: 2020-01-01" not in result
 
     def test_migrate_multiline_date(self):
         """Test date field in multiline format."""
@@ -242,11 +243,11 @@ date:
 ---
 # Test
 """
-        updated = migrate_date_to_created_updated(content, "2021-01-01", "2022-01-01")
+        result = migrate_date_to_created(content, "2021-01-01")
 
         # Pattern might not match multiline
         # Documents current behavior
-        assert isinstance(updated, str)
+        assert isinstance(result, str)
 
 
 class TestUpdateDocumentTimestampsEdgeCases:
@@ -275,7 +276,7 @@ class TestUpdateDocumentTimestampsEdgeCases:
             assert not changed
 
     def test_document_with_only_created(self, tmp_path):
-        """Test document with created but no updated."""
+        """Test document with created field - should update it from git."""
         repo = tmp_path / "repo"
         repo.mkdir()
 
@@ -290,14 +291,15 @@ class TestUpdateDocumentTimestampsEdgeCases:
 
         changed, messages = update_document_timestamps(doc)
 
-        # Should add updated field and update created field
+        # Should update created field from git
         assert changed
         post = frontmatter.loads(doc.read_text())
         assert "created" in post.metadata
-        assert "updated" in post.metadata
+        # updated field is no longer stored (derived from git)
+        assert "updated" not in post.metadata
 
-    def test_document_with_only_updated(self, tmp_path):
-        """Test document with updated but no created."""
+    def test_document_with_status_but_no_created(self, tmp_path):
+        """Test document with status but no created field."""
         repo = tmp_path / "repo"
         repo.mkdir()
 
@@ -306,17 +308,18 @@ class TestUpdateDocumentTimestampsEdgeCases:
         subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True, capture_output=True)
 
         doc = repo / "test.md"
-        doc.write_text("---\nid: test\nstatus: Draft\nupdated: 2020-01-01\n---\n# Test")
+        doc.write_text("---\nid: test\nstatus: Draft\n---\n# Test")
         subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
         subprocess.run(["git", "commit", "-m", "add"], cwd=repo, check=True, capture_output=True)
 
         changed, messages = update_document_timestamps(doc)
 
-        # Should add created field and update updated field
+        # Should add created field
         assert changed
         post = frontmatter.loads(doc.read_text())
         assert "created" in post.metadata
-        assert "updated" in post.metadata
+        # updated field is no longer stored (derived from git)
+        assert "updated" not in post.metadata
 
     def test_corrupt_frontmatter(self, tmp_path):
         """Test file with corrupt frontmatter."""

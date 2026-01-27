@@ -652,13 +652,14 @@ def bulk_timestamps(
     dry_run: bool,
     verbose: bool,
 ):
-    """Derive created/updated timestamps from git history.
+    """Derive created timestamp from git history.
 
-    Updates frontmatter 'created' and 'updated' fields based on git commit
-    history. The 'created' date is set to the first commit date, and 'updated'
-    is set to the most recent commit date.
+    Updates frontmatter 'created' field based on git commit history.
+    The 'created' date is set to the first commit datetime.
 
-    Also migrates legacy 'date' fields to the new 'created'/'updated' format.
+    Also migrates legacy 'date' fields to the new 'created' format.
+
+    Note: The 'updated' field is not stored as it can be derived from git history.
 
     Examples:
 

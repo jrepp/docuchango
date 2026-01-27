@@ -7,7 +7,7 @@ import frontmatter
 
 from docuchango.fixes.timestamps import (
     get_git_dates,
-    migrate_date_to_created_updated,
+    migrate_date_to_created,
     update_document_timestamps,
     update_frontmatter_field,
 )
@@ -108,8 +108,8 @@ id: "test-001"
 class TestMigrateDateField:
     """Test migrating legacy 'date' field."""
 
-    def test_migrate_date_to_created_updated(self):
-        """Test migrating date field to created/updated."""
+    def test_migrate_date_to_created(self):
+        """Test migrating date field to created."""
         content = """---
 id: "adr-001"
 title: "Test ADR"
@@ -120,21 +120,20 @@ deciders: "Team"
 
 # Test
 """
-        updated = migrate_date_to_created_updated(content, "2025-01-20", "2025-01-30")
+        result = migrate_date_to_created(content, "2025-01-20")
 
         # Check date is removed
-        assert "date: 2025-01-26" not in updated
+        assert "date: 2025-01-26" not in result
 
-        # Check created and updated are added after status
-        lines = updated.split("\n")
+        # Check created is added after status
+        lines = result.split("\n")
         status_idx = next(i for i, line in enumerate(lines) if line.startswith("status:"))
         created_idx = next(i for i, line in enumerate(lines) if line.startswith("created:"))
-        updated_idx = next(i for i, line in enumerate(lines) if line.startswith("updated:"))
 
         assert created_idx == status_idx + 1
-        assert updated_idx == status_idx + 2
-        assert "created: 2025-01-20" in updated
-        assert "updated: 2025-01-30" in updated
+        assert "created: 2025-01-20" in result
+        # updated field is no longer stored (derived from git)
+        assert "updated:" not in result
 
 
 class TestUpdateDocumentTimestamps:
@@ -222,10 +221,11 @@ date: 2025-01-26
         post = frontmatter.loads(doc.read_text())
         assert "date" not in post.metadata
         assert "created" in post.metadata
-        assert "updated" in post.metadata
+        # updated field is no longer stored (derived from git)
+        assert "updated" not in post.metadata
 
-    def test_update_existing_created_updated_fields(self, tmp_path):
-        """Test updating existing created/updated fields."""
+    def test_update_existing_created_field(self, tmp_path):
+        """Test updating existing created field."""
         # Create a git repo
         repo = tmp_path / "repo"
         repo.mkdir()
@@ -234,14 +234,13 @@ date: 2025-01-26
         subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=repo, check=True, capture_output=True)
         subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo, check=True, capture_output=True)
 
-        # Create file with old dates
+        # Create file with old date
         doc = repo / "adr-001-test.md"
         content = """---
 id: "adr-001"
 title: "Test"
 status: Accepted
 created: 2020-01-01
-updated: 2020-01-02
 ---
 
 # Test
@@ -261,14 +260,14 @@ updated: 2020-01-02
         changed, messages = update_document_timestamps(doc)
 
         assert changed
-        assert len(messages) == 2  # Both created and updated should change
+        assert len(messages) == 1  # Only created should change
         assert any("created" in msg for msg in messages)
-        assert any("updated" in msg for msg in messages)
 
-        # Verify dates were updated to today's date
+        # Verify created date was updated from git
         post = frontmatter.loads(doc.read_text())
         assert post.metadata["created"] != "2020-01-01"
-        assert post.metadata["updated"] != "2020-01-02"
+        # updated field is not stored anymore
+        assert "updated" not in post.metadata
 
     def test_dry_run_no_changes(self, tmp_path):
         """Test that dry run doesn't write changes."""
