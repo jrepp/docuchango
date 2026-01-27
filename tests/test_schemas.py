@@ -24,7 +24,6 @@ class TestADRFrontmatter:
             title="Use gRPC for API Design",
             status="Accepted",
             created=date(2025, 10, 13),
-            updated=date(2025, 10, 14),
             deciders="Engineering Team",
             tags=["grpc", "api", "design"],
             id="adr-001",
@@ -42,7 +41,6 @@ class TestADRFrontmatter:
                 title="Test ADR",
                 status="Proposed",
                 created=date(2025, 10, 13),
-                updated=date(2025, 10, 13),
                 # Missing deciders
                 tags=["test"],
                 id="adr-001",
@@ -58,7 +56,6 @@ class TestADRFrontmatter:
                 title="Test ADR",
                 status="Invalid",  # Not in allowed values
                 created=date(2025, 10, 13),
-                updated=date(2025, 10, 13),
                 deciders="Team",
                 tags=["test"],
                 id="adr-001",
@@ -74,7 +71,6 @@ class TestADRFrontmatter:
                 title="Test ADR",
                 status="Proposed",
                 created=date(2025, 10, 13),
-                updated=date(2025, 10, 13),
                 deciders="Team",
                 tags=["test"],
                 id="ADR-001",  # Should be lowercase
@@ -90,7 +86,6 @@ class TestADRFrontmatter:
                 title="Test ADR",
                 status="Proposed",
                 created=date(2025, 10, 13),
-                updated=date(2025, 10, 13),
                 deciders="Team",
                 tags=["test"],
                 id="adr-001",
@@ -106,7 +101,6 @@ class TestADRFrontmatter:
                 title="Test ADR",
                 status="Proposed",
                 created=date(2025, 10, 13),
-                updated=date(2025, 10, 13),
                 deciders="Team",
                 tags=["Invalid Tag"],  # Should be lowercase with hyphens
                 id="adr-001",
@@ -122,7 +116,6 @@ class TestADRFrontmatter:
                 title="Short",  # Less than 10 characters
                 status="Proposed",
                 created=date(2025, 10, 13),
-                updated=date(2025, 10, 13),
                 deciders="Team",
                 tags=["test"],
                 id="adr-001",
@@ -142,7 +135,6 @@ class TestRFCFrontmatter:
             status="Proposed",
             author="Engineering Team",
             created=date(2025, 10, 13),
-            updated=date(2025, 10, 14),
             tags=["vpc", "management"],
             id="rfc-001",
             project_id="test-project",
@@ -166,21 +158,6 @@ class TestRFCFrontmatter:
                 doc_uuid="046aa65f-f236-4221-9c19-6bf3e1e9f0f0",
             )
         assert "author" in str(exc_info.value).lower()
-
-    def test_rfc_optional_updated(self):
-        """Test that updated field is optional."""
-        rfc = RFCFrontmatter(
-            title="Test RFC Title",
-            status="Draft",
-            author="Team",
-            created=date(2025, 10, 13),
-            # updated is optional
-            tags=["test"],
-            id="rfc-001",
-            project_id="test-project",
-            doc_uuid="046aa65f-f236-4221-9c19-6bf3e1e9f0f0",
-        )
-        assert rfc.updated is None
 
     def test_rfc_invalid_status(self):
         """Test that invalid status values are rejected."""
@@ -206,7 +183,6 @@ class TestMemoFrontmatter:
             title="Atlas TFC Agent Request Pattern",
             author="Engineering Team",
             created=date(2025, 10, 14),
-            updated=date(2025, 10, 14),
             tags=["atlas", "tfc", "agent"],
             id="memo-001",
             project_id="test-project",
@@ -215,21 +191,6 @@ class TestMemoFrontmatter:
         assert memo.title == "Atlas TFC Agent Request Pattern"
         assert memo.id == "memo-001"
 
-    def test_memo_missing_updated(self):
-        """Test that missing updated field raises ValidationError."""
-        with pytest.raises(ValidationError) as exc_info:
-            MemoFrontmatter(
-                title="Test Memo Title",
-                author="Team",
-                created=date(2025, 10, 14),
-                # Missing updated - it's required for memos
-                tags=["test"],
-                id="memo-001",
-                project_id="test-project",
-                doc_uuid="5c345ed0-a7e3-4104-832b-c0c5d7f2848d",
-            )
-        assert "updated" in str(exc_info.value).lower()
-
     def test_memo_invalid_id_format(self):
         """Test that invalid memo ID format is rejected."""
         with pytest.raises(ValidationError):
@@ -237,7 +198,6 @@ class TestMemoFrontmatter:
                 title="Test Memo Title",
                 author="Team",
                 created=date(2025, 10, 14),
-                updated=date(2025, 10, 14),
                 tags=["test"],
                 id="MEMO-001",  # Should be lowercase
                 project_id="test-project",
@@ -302,7 +262,6 @@ class TestPRDFrontmatter:
             status="Draft",
             author="Product Team",
             created=date(2025, 10, 15),
-            updated=date(2025, 10, 20),
             target_release="v2.0.0",
             tags=["feature", "authentication", "security"],
             id="prd-001",
@@ -361,23 +320,6 @@ class TestPRDFrontmatter:
                 doc_uuid="9a234567-1234-4abc-8def-123456789abc",
             )
         assert "prd-xxx" in str(exc_info.value).lower() or "lowercase" in str(exc_info.value).lower()
-
-    def test_prd_updated_required(self):
-        """Test that PRD updated field is required (consistent with Memo)."""
-        with pytest.raises(ValidationError) as exc_info:
-            PRDFrontmatter(
-                title="Test PRD with no update",
-                status="Draft",
-                author="Team",
-                created=date(2025, 10, 15),
-                # updated is now required - missing it should fail
-                target_release="Q1 2026",
-                tags=["test"],
-                id="prd-002",
-                project_id="test-project",
-                doc_uuid="9a234567-1234-4abc-8def-123456789abc",
-            )
-        assert "updated" in str(exc_info.value).lower()
 
 
 class TestDocsProjectConfig:

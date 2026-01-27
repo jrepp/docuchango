@@ -387,7 +387,6 @@ class TestSchemaValidation:
             status="Accepted",
             tags=["api", "database"],
             created="2024-01-01",
-            updated="2024-01-02",
             deciders="Core Team",
             project_id="test-project",
             doc_uuid="12345678-1234-4123-8123-123456789abc",
@@ -406,7 +405,6 @@ class TestSchemaValidation:
             tags=["api"],
             author="Test Author",
             created="2024-01-01",
-            updated="2024-01-02",
             project_id="test-project",
             doc_uuid="12345678-1234-4123-8123-123456789abc",
         )
@@ -419,12 +417,9 @@ class TestSchemaValidation:
         frontmatter = MemoFrontmatter(
             id="memo-001",
             title="Test Memo Title That Is Long Enough",
-            status="Final",
             tags=["note"],
             author="Test Author",
-            date="2024-01-01",
             created="2024-01-01",
-            updated="2024-01-02",
             project_id="test-project",
             doc_uuid="12345678-1234-4123-8123-123456789abc",
         )
@@ -441,7 +436,6 @@ class TestSchemaValidation:
             tags=["feature"],
             author="Test Author",
             created="2024-01-01",
-            updated="2024-01-02",
             target_release="Q1 2024",
             project_id="test-project",
             doc_uuid="12345678-1234-4123-8123-123456789abc",

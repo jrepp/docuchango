@@ -1,8 +1,11 @@
 """Tests for CLI commands in cli.py to improve coverage."""
 
+import subprocess
+
+import frontmatter
 from click.testing import CliRunner
 
-from docuchango.cli import main, validate
+from docuchango.cli import main, migrate, validate
 
 
 class TestValidateCommand:
@@ -290,6 +293,205 @@ class TestMainCommandGroup:
         # Check for main command groups
         output_lower = result.output.lower()
         assert "validate" in output_lower or "init" in output_lower
+
+
+class TestMigrateCommand:
+    """Test the migrate command."""
+
+    def test_migrate_help(self):
+        """Test migrate command shows help."""
+        runner = CliRunner()
+        result = runner.invoke(migrate, ["--help"])
+        assert result.exit_code == 0
+        assert "Migrate documents" in result.output
+        assert "--project-id" in result.output
+        assert "--dry-run" in result.output
+
+    def test_migrate_removes_updated_field(self, tmp_path):
+        """Test that migrate removes the 'updated' field."""
+        # Create a git repo
+        repo = tmp_path / "repo"
+        adr_dir = repo / "adr"
+        adr_dir.mkdir(parents=True)
+
+        subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=repo, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo, check=True, capture_output=True)
+
+        # Create file with 'updated' field that should be removed
+        test_file = adr_dir / "adr-001-test.md"
+        content = """---
+id: adr-001
+title: "Test ADR Title"
+status: Accepted
+created: "2025-01-01"
+updated: "2025-01-15"
+deciders: "Core Team"
+tags:
+  - test
+project_id: test-project
+doc_uuid: 12345678-1234-4123-8123-123456789abc
+---
+
+# Test ADR
+"""
+        test_file.write_text(content, encoding="utf-8")
+
+        # Commit it
+        subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "Add doc"], cwd=repo, check=True, capture_output=True)
+
+        # Run migrate
+        runner = CliRunner()
+        result = runner.invoke(migrate, ["--project-id", "test-project", "--path", str(repo)])
+
+        assert result.exit_code == 0
+        assert "Removed 'updated' field" in result.output
+
+        # Verify updated field was removed
+        post = frontmatter.loads(test_file.read_text(encoding="utf-8"))
+        assert "updated" not in post.metadata
+        assert "created" in post.metadata
+
+    def test_migrate_removes_date_field(self, tmp_path):
+        """Test that migrate removes the legacy 'date' field."""
+        # Create a git repo
+        repo = tmp_path / "repo"
+        adr_dir = repo / "adr"
+        adr_dir.mkdir(parents=True)
+
+        subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=repo, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo, check=True, capture_output=True)
+
+        # Create file with legacy 'date' field
+        test_file = adr_dir / "adr-001-test.md"
+        content = """---
+id: adr-001
+title: "Test ADR Title"
+status: Accepted
+date: "2025-01-01"
+deciders: "Core Team"
+tags:
+  - test
+project_id: test-project
+doc_uuid: 12345678-1234-4123-8123-123456789abc
+---
+
+# Test ADR
+"""
+        test_file.write_text(content, encoding="utf-8")
+
+        # Commit it
+        subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "Add doc"], cwd=repo, check=True, capture_output=True)
+
+        # Run migrate
+        runner = CliRunner()
+        result = runner.invoke(migrate, ["--project-id", "test-project", "--path", str(repo)])
+
+        assert result.exit_code == 0
+        assert "Removed deprecated 'date' field" in result.output
+
+        # Verify date field was removed and created was added
+        post = frontmatter.loads(test_file.read_text(encoding="utf-8"))
+        assert "date" not in post.metadata
+        assert "created" in post.metadata
+        # created should be datetime format from git
+        assert "T" in post.metadata["created"]  # ISO 8601 datetime has T separator
+
+    def test_migrate_normalizes_created_to_datetime(self, tmp_path):
+        """Test that migrate normalizes date-only 'created' to datetime format."""
+        # Create a git repo
+        repo = tmp_path / "repo"
+        adr_dir = repo / "adr"
+        adr_dir.mkdir(parents=True)
+
+        subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=repo, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo, check=True, capture_output=True)
+
+        # Create file with date-only 'created' field
+        test_file = adr_dir / "adr-001-test.md"
+        content = """---
+id: adr-001
+title: "Test ADR Title"
+status: Accepted
+created: "2025-01-01"
+deciders: "Core Team"
+tags:
+  - test
+project_id: test-project
+doc_uuid: 12345678-1234-4123-8123-123456789abc
+---
+
+# Test ADR
+"""
+        test_file.write_text(content, encoding="utf-8")
+
+        # Commit it
+        subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "Add doc"], cwd=repo, check=True, capture_output=True)
+
+        # Run migrate
+        runner = CliRunner()
+        result = runner.invoke(migrate, ["--project-id", "test-project", "--path", str(repo)])
+
+        assert result.exit_code == 0
+        assert "Normalized created" in result.output
+
+        # Verify created is now datetime format
+        post = frontmatter.loads(test_file.read_text(encoding="utf-8"))
+        assert "created" in post.metadata
+        # Should be ISO 8601 datetime format (YYYY-MM-DDTHH:MM:SSZ)
+        assert "T" in post.metadata["created"]
+        assert post.metadata["created"].endswith("Z")
+
+    def test_migrate_dry_run_no_changes(self, tmp_path):
+        """Test that --dry-run doesn't modify files."""
+        # Create a git repo
+        repo = tmp_path / "repo"
+        adr_dir = repo / "adr"
+        adr_dir.mkdir(parents=True)
+
+        subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=repo, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo, check=True, capture_output=True)
+
+        # Create file with fields to be removed
+        test_file = adr_dir / "adr-001-test.md"
+        original_content = """---
+id: adr-001
+title: "Test ADR Title"
+status: Accepted
+created: "2025-01-01"
+updated: "2025-01-15"
+deciders: "Core Team"
+tags:
+  - test
+project_id: test-project
+doc_uuid: 12345678-1234-4123-8123-123456789abc
+---
+
+# Test ADR
+"""
+        test_file.write_text(original_content, encoding="utf-8")
+
+        # Commit it
+        subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "Add doc"], cwd=repo, check=True, capture_output=True)
+
+        # Run migrate with --dry-run
+        runner = CliRunner()
+        result = runner.invoke(migrate, ["--project-id", "test-project", "--path", str(repo), "--dry-run"])
+
+        assert result.exit_code == 0
+        assert "DRY RUN" in result.output
+        assert "Would modify" in result.output
+
+        # Verify file was NOT modified
+        after_content = test_file.read_text(encoding="utf-8")
+        assert after_content == original_content
 
 
 class TestCLIErrorHandling:
