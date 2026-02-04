@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.12.1 (2026-02-04)
+
+### Bug Fixes
+
+- Use UTC timezone instead of local for timestamp conversion
+  ([`c94f0e7`](https://github.com/jrepp/docuchango/commit/c94f0e7d35792926a106a275668b6ab7d42d1223))
+
+### Chores
+
+- Remove updated field from templates and documents
+  ([`79cd6b7`](https://github.com/jrepp/docuchango/commit/79cd6b75117d8d9ec6aa4e2373aeff75c6143b62))
+
+
 ## v1.12.0 (2026-01-27)
 
 ### Features
