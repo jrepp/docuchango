@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 import subprocess
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import frontmatter
@@ -48,7 +48,7 @@ def get_git_dates(file_path: Path) -> tuple[str | None, str | None]:
         # Replace 'Z' with '+00:00' for Python 3.9/3.10 compatibility (Python 3.11+ handles 'Z' natively)
         first_commit = first_commit.replace("Z", "+00:00")
         # Convert to UTC and format as ISO 8601 datetime
-        created_dt = datetime.fromisoformat(first_commit).astimezone(tz=None)
+        created_dt = datetime.fromisoformat(first_commit).astimezone(timezone.utc)
         created_datetime = created_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
         # Get last commit date (update)
@@ -66,7 +66,7 @@ def get_git_dates(file_path: Path) -> tuple[str | None, str | None]:
         # Replace 'Z' with '+00:00' for Python 3.9/3.10 compatibility (Python 3.11+ handles 'Z' natively)
         last_commit = last_commit.replace("Z", "+00:00")
         # Convert to UTC and format as ISO 8601 datetime
-        updated_dt = datetime.fromisoformat(last_commit).astimezone(tz=None)
+        updated_dt = datetime.fromisoformat(last_commit).astimezone(timezone.utc)
         updated_datetime = updated_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
         return created_datetime, updated_datetime
