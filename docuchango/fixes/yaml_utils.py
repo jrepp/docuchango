@@ -1,13 +1,16 @@
 """YAML serialization utilities for consistent frontmatter output.
 
-Provides a custom YAML dumper that ensures date-like strings are serialized
-without quotes, matching the behavior of native YAML date types. This prevents
-inconsistent quoting when dates are stored as strings vs datetime objects.
+Provides a custom YAML dumper that minimizes formatting changes when
+round-tripping frontmatter through python-frontmatter/PyYAML:
+- Preserves field order (no alphabetical sorting)
+- Outputs dates/datetimes in ISO 8601 format (unquoted, with T separator)
+- Keeps short lists in flow style: [tag1, tag2]
 """
 
 from __future__ import annotations
 
 import re
+from datetime import date, datetime, timezone
 
 import frontmatter
 import yaml
@@ -25,7 +28,7 @@ _DATE_RE = re.compile(
 
 
 class _ConsistentDumper(yaml.SafeDumper):
-    """YAML dumper that outputs date-like strings without quotes."""
+    """YAML dumper that preserves formatting conventions."""
 
     pass
 
@@ -42,14 +45,54 @@ def _represent_str(dumper: yaml.Dumper, data: str) -> yaml.ScalarNode:
     return yaml.SafeDumper.represent_str(dumper, data)
 
 
+def _represent_datetime(dumper: yaml.Dumper, data: datetime) -> yaml.ScalarNode:
+    """Represent datetime objects in ISO 8601 format with T separator.
+
+    PyYAML's default uses space separator (2026-03-05 17:56:59+00:00).
+    We use the T separator and Z suffix to match the template format.
+    """
+    if data.tzinfo is not None:
+        utc = data.astimezone(timezone.utc)
+        value = utc.strftime("%Y-%m-%dT%H:%M:%SZ")
+    else:
+        value = data.strftime("%Y-%m-%dT%H:%M:%S")
+    return dumper.represent_scalar("tag:yaml.org,2002:timestamp", value)
+
+
+def _represent_date(dumper: yaml.Dumper, data: date) -> yaml.ScalarNode:
+    """Represent date objects in ISO 8601 format (YYYY-MM-DD), unquoted."""
+    return dumper.represent_scalar(
+        "tag:yaml.org,2002:timestamp", data.strftime("%Y-%m-%d")
+    )
+
+
+def _represent_list(dumper: yaml.Dumper, data: list) -> yaml.SequenceNode:  # type: ignore[type-arg]
+    """Represent lists, using flow style for short scalar lists.
+
+    Keeps tags: [architecture, design] instead of expanding to block style.
+    Falls back to block style for long lists or lists containing complex values.
+    """
+    use_flow = len(data) <= 10 and all(
+        isinstance(item, (str, int, float, bool)) for item in data
+    )
+    return dumper.represent_sequence(
+        "tag:yaml.org,2002:seq", data, flow_style=use_flow
+    )
+
+
 _ConsistentDumper.add_representer(str, _represent_str)
+_ConsistentDumper.add_representer(datetime, _represent_datetime)
+_ConsistentDumper.add_representer(date, _represent_date)
+_ConsistentDumper.add_representer(list, _represent_list)
 
 
 def dumps(post: frontmatter.Post) -> str:
-    """Serialize a frontmatter Post with consistent date formatting.
+    """Serialize a frontmatter Post with consistent formatting.
 
-    Drop-in replacement for frontmatter.dumps() that ensures date-like
-    strings are never single-quoted in the output.
+    Drop-in replacement for frontmatter.dumps() that:
+    - Preserves field order
+    - Outputs dates unquoted in ISO 8601 format
+    - Keeps short lists in flow style
 
     Args:
         post: A python-frontmatter Post object
@@ -57,4 +100,4 @@ def dumps(post: frontmatter.Post) -> str:
     Returns:
         Serialized markdown string with frontmatter
     """
-    return frontmatter.dumps(post, Dumper=_ConsistentDumper)
+    return frontmatter.dumps(post, Dumper=_ConsistentDumper, sort_keys=False)
