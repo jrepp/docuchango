@@ -2,6 +2,20 @@
 
 <!-- version list -->
 
+## v1.12.2 (2026-03-09)
+
+### Bug Fixes
+
+- Address code review feedback on PR #49
+  ([`ba8dd5d`](https://github.com/jrepp/docuchango/commit/ba8dd5dff847211f59940fca253da73437392d86))
+
+- Consistent unquoted date formatting in YAML frontmatter
+  ([`78a4b34`](https://github.com/jrepp/docuchango/commit/78a4b34e352be5d8c8db6467f8c691ad1d5371f0))
+
+- Preserve frontmatter field order and formatting during round-trip
+  ([`7529f2b`](https://github.com/jrepp/docuchango/commit/7529f2b4bcf38b7e9e9bdc149eda924b35e2a527))
+
+
 ## v1.12.1 (2026-02-04)
 
 ### Bug Fixes
