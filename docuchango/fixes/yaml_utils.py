@@ -49,21 +49,27 @@ def _represent_datetime(dumper: yaml.Dumper, data: datetime) -> yaml.ScalarNode:
     """Represent datetime objects in ISO 8601 format with T separator.
 
     PyYAML's default uses space separator (2026-03-05 17:56:59+00:00).
-    We use the T separator and Z suffix to match the template format.
+    We use the T separator to match the template format.  Aware datetimes
+    are converted to UTC and suffixed with Z; naive datetimes are emitted
+    without any timezone indicator.  Microseconds are preserved when present.
     """
     if data.tzinfo is not None:
         utc = data.astimezone(timezone.utc)
-        value = utc.strftime("%Y-%m-%dT%H:%M:%SZ")
+        if utc.microsecond:
+            value = utc.strftime("%Y-%m-%dT%H:%M:%S.") + f"{utc.microsecond:06d}Z"
+        else:
+            value = utc.strftime("%Y-%m-%dT%H:%M:%SZ")
     else:
-        value = data.strftime("%Y-%m-%dT%H:%M:%S")
+        if data.microsecond:
+            value = data.strftime("%Y-%m-%dT%H:%M:%S.") + f"{data.microsecond:06d}"
+        else:
+            value = data.strftime("%Y-%m-%dT%H:%M:%S")
     return dumper.represent_scalar("tag:yaml.org,2002:timestamp", value)
 
 
 def _represent_date(dumper: yaml.Dumper, data: date) -> yaml.ScalarNode:
     """Represent date objects in ISO 8601 format (YYYY-MM-DD), unquoted."""
-    return dumper.represent_scalar(
-        "tag:yaml.org,2002:timestamp", data.strftime("%Y-%m-%d")
-    )
+    return dumper.represent_scalar("tag:yaml.org,2002:timestamp", data.strftime("%Y-%m-%d"))
 
 
 def _represent_list(dumper: yaml.Dumper, data: list) -> yaml.SequenceNode:  # type: ignore[type-arg]
@@ -72,12 +78,8 @@ def _represent_list(dumper: yaml.Dumper, data: list) -> yaml.SequenceNode:  # ty
     Keeps tags: [architecture, design] instead of expanding to block style.
     Falls back to block style for long lists or lists containing complex values.
     """
-    use_flow = len(data) <= 10 and all(
-        isinstance(item, (str, int, float, bool)) for item in data
-    )
-    return dumper.represent_sequence(
-        "tag:yaml.org,2002:seq", data, flow_style=use_flow
-    )
+    use_flow = len(data) <= 10 and all(isinstance(item, (str, int, float, bool)) for item in data)
+    return dumper.represent_sequence("tag:yaml.org,2002:seq", data, flow_style=use_flow)
 
 
 _ConsistentDumper.add_representer(str, _represent_str)

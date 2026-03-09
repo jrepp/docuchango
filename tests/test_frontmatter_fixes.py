@@ -14,6 +14,7 @@ from docuchango.fixes.frontmatter import (
     fix_status_value,
     get_doc_type,
 )
+from docuchango.fixes.yaml_utils import dumps as frontmatter_dumps
 
 
 class TestGetDocType:
@@ -258,7 +259,8 @@ date: 2025-01-26
         }
         post.content = "# Test"
 
-        doc.write_text(frontmatter.dumps(post))
+        # Use frontmatter_dumps to exercise the same formatting path as production
+        doc.write_text(frontmatter_dumps(post))
 
         # datetime objects from PyYAML are already canonical — no fix needed
         changed, msg = fix_date_format(doc)

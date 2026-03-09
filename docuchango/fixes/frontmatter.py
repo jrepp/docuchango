@@ -167,19 +167,46 @@ def fix_date_format(file_path: Path, dry_run: bool = False) -> tuple[bool, str]:
 
         date_value = post.metadata[date_field]
 
-        # Native date/datetime objects from PyYAML mean the field was already
-        # an unquoted ISO 8601 value — the canonical format. No fix needed.
-        if isinstance(date_value, datetime):
-            return False, "Date already in ISO 8601 format"
+        # Native date/datetime objects from PyYAML indicate the YAML value was
+        # unquoted, but it may not be in canonical format (e.g. PyYAML also
+        # parses space-separated or +00:00 offset timestamps into datetime).
+        # Read the raw frontmatter line to check if it's already canonical.
+        if isinstance(date_value, datetime) or (hasattr(date_value, "strftime") and hasattr(date_value, "year")):
+            # Check the raw YAML to see if the value is already canonical
+            raw_lines = content.split("---")[1].strip().splitlines() if "---" in content else []
+            raw_value = None
+            for line in raw_lines:
+                if line.startswith(f"{date_field}:"):
+                    raw_value = line.split(":", 1)[1].strip()
+                    break
 
-        if hasattr(date_value, "strftime") and hasattr(date_value, "year"):
-            return False, "Date already in ISO 8601 format"
+            # Canonical formats: YYYY-MM-DD, YYYY-MM-DDTHH:MM:SS, or YYYY-MM-DDTHH:MM:SSZ
+            canonical_re = re.compile(r"^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}Z?)?$")
+            if raw_value and canonical_re.match(raw_value):
+                return False, "Date already in ISO 8601 format"
+
+            # Non-canonical: re-serialize to normalize the format
+            if not dry_run:
+                file_path.write_text(frontmatter_dumps(post), encoding="utf-8")
+
+            if isinstance(date_value, datetime):
+                normalized = (
+                    date_value.strftime("%Y-%m-%dT%H:%M:%SZ") if date_value.tzinfo else date_value.strftime("%Y-%m-%d")
+                )
+            else:
+                normalized = str(date_value)  # date objects have ISO format __str__
+            return True, f"Normalized date object to canonical format: {normalized}"
 
         if not isinstance(date_value, str):
             return False, f"Date is not a string or date object: {type(date_value)}"
 
         # Check if already ISO 8601 string (e.g. from a quoted value)
-        if re.match(r"^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}Z?)?$", date_value):
+        # Accepts: YYYY-MM-DD, YYYY-MM-DDTHH:MM:SS, YYYY-MM-DDTHH:MM:SSZ,
+        # and YYYY-MM-DDTHH:MM:SS+HH:MM / -HH:MM offsets
+        if re.match(
+            r"^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})?)?$",
+            date_value,
+        ):
             return False, "Date already in ISO 8601 format"
 
         # Try various date formats
