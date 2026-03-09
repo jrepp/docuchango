@@ -843,6 +843,7 @@ def migrate(
     import frontmatter
 
     from docuchango.fixes.timestamps import get_git_dates
+    from docuchango.fixes.yaml_utils import dumps as frontmatter_dumps
 
     # Find files to process
     root = target_path or Path.cwd()
@@ -1010,7 +1011,7 @@ def migrate(
 
             # Write changes
             if modified and not dry_run:
-                new_content = frontmatter.dumps(post)
+                new_content = frontmatter_dumps(post)
                 file_path.write_text(new_content, encoding="utf-8")
 
             # Report

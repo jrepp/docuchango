@@ -1,7 +1,7 @@
 """Tests for frontmatter auto-fixes."""
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 import frontmatter
@@ -180,7 +180,7 @@ date: 2025/01/26
         assert "2025-01-26" in msg
 
         post = frontmatter.loads(doc.read_text())
-        assert post.metadata["date"] == "2025-01-26"
+        assert post.metadata["date"] == date(2025, 1, 26)
 
     def test_fix_dot_format(self, tmp_path):
         """Test fixing date with dots."""
@@ -223,7 +223,7 @@ date: January 26, 2025
         assert "2025-01-26" in msg
 
     def test_already_iso_format(self, tmp_path):
-        """Test that ISO 8601 format date object is converted to string."""
+        """Test that unquoted ISO 8601 date (parsed as date object) needs no fix."""
         doc = tmp_path / "adr" / "adr-001-test.md"
         doc.parent.mkdir(parents=True)
 
@@ -238,23 +238,17 @@ date: 2025-01-26
 """
         doc.write_text(content)
 
-        # YAML parser will convert the date string to a date object
-        # so our fix should convert it back to a string
+        # Unquoted ISO 8601 date is already canonical — no fix needed
         changed, msg = fix_date_format(doc)
-        assert changed
-        assert "2025-01-26" in msg
+        assert not changed
+        assert "already in ISO 8601" in msg
 
-        # Verify it's now a string in the file
-        post = frontmatter.loads(doc.read_text())
-        assert post.metadata["date"] == "2025-01-26"
-        assert isinstance(post.metadata["date"], str)
-
-    def test_convert_datetime_object(self, tmp_path):
-        """Test converting datetime object to string."""
+    def test_datetime_object_already_valid(self, tmp_path):
+        """Test that a datetime object (from unquoted YAML) needs no fix."""
         doc = tmp_path / "adr" / "adr-001-test.md"
         doc.parent.mkdir(parents=True)
 
-        # Create frontmatter with datetime object
+        # Create frontmatter with datetime object (simulates unquoted datetime in YAML)
         post = frontmatter.Post("")
         post.metadata = {
             "id": "adr-001",
@@ -266,14 +260,10 @@ date: 2025-01-26
 
         doc.write_text(frontmatter.dumps(post))
 
+        # datetime objects from PyYAML are already canonical — no fix needed
         changed, msg = fix_date_format(doc)
-        assert changed
-        assert "2025-01-26" in msg
-
-        # Verify it's now a string
-        post = frontmatter.loads(doc.read_text())
-        assert post.metadata["date"] == "2025-01-26"
-        assert isinstance(post.metadata["date"], str)
+        assert not changed
+        assert "already in ISO 8601" in msg
 
 
 class TestAddMissingFrontmatter:
@@ -389,7 +379,7 @@ date: 2025/01/26
         # Verify fixes
         post = frontmatter.loads(doc.read_text())
         assert post.metadata["status"] == "Proposed"
-        assert post.metadata["date"] == "2025-01-26"
+        assert post.metadata["date"] == date(2025, 1, 26)
 
     def test_fix_all_dry_run(self, tmp_path):
         """Test that dry run doesn't persist changes."""

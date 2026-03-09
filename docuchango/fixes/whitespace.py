@@ -12,6 +12,8 @@ from pathlib import Path
 
 import frontmatter
 
+from docuchango.fixes.yaml_utils import dumps as frontmatter_dumps
+
 
 def trim_string_values(metadata: dict) -> tuple[dict, list[str]]:
     """Trim whitespace from all string values in metadata.
@@ -169,7 +171,7 @@ def fix_whitespace_and_fields(file_path: Path, dry_run: bool = False) -> tuple[b
 
         if not dry_run:
             try:
-                new_content = frontmatter.dumps(post)
+                new_content = frontmatter_dumps(post)
                 file_path.write_text(new_content, encoding="utf-8")
             except Exception as e:
                 return False, [f"Error writing file: {e}"]

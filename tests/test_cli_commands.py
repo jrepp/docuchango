@@ -397,8 +397,10 @@ doc_uuid: 12345678-1234-4123-8123-123456789abc
         post = frontmatter.loads(test_file.read_text(encoding="utf-8"))
         assert "date" not in post.metadata
         assert "created" in post.metadata
-        # created should be datetime format from git
-        assert "T" in post.metadata["created"]  # ISO 8601 datetime has T separator
+        # created should be a datetime (unquoted ISO 8601 parsed by PyYAML)
+        from datetime import datetime
+
+        assert isinstance(post.metadata["created"], datetime)
 
     def test_migrate_normalizes_created_to_datetime(self, tmp_path):
         """Test that migrate normalizes date-only 'created' to datetime format."""
@@ -443,9 +445,10 @@ doc_uuid: 12345678-1234-4123-8123-123456789abc
         # Verify created is now datetime format
         post = frontmatter.loads(test_file.read_text(encoding="utf-8"))
         assert "created" in post.metadata
-        # Should be ISO 8601 datetime format (YYYY-MM-DDTHH:MM:SSZ)
-        assert "T" in post.metadata["created"]
-        assert post.metadata["created"].endswith("Z")
+        # Unquoted ISO 8601 datetime is parsed by PyYAML as a datetime object
+        from datetime import datetime
+
+        assert isinstance(post.metadata["created"], datetime)
 
     def test_migrate_dry_run_no_changes(self, tmp_path):
         """Test that --dry-run doesn't modify files."""

@@ -14,6 +14,8 @@ from typing import Optional
 
 import frontmatter
 
+from docuchango.fixes.yaml_utils import dumps as frontmatter_dumps
+
 # Valid status values by document type
 VALID_STATUSES = {
     "adr": ["Proposed", "Accepted", "Deprecated", "Superseded"],
@@ -120,7 +122,7 @@ def fix_status_value(file_path: Path, dry_run: bool = False) -> tuple[bool, str]
             post.metadata["status"] = new_status
 
             if not dry_run:
-                file_path.write_text(frontmatter.dumps(post), encoding="utf-8")
+                file_path.write_text(frontmatter_dumps(post), encoding="utf-8")
 
             return True, f"Changed status from '{status}' to '{new_status}'"
 
@@ -130,7 +132,7 @@ def fix_status_value(file_path: Path, dry_run: bool = False) -> tuple[bool, str]
                 post.metadata["status"] = value
 
                 if not dry_run:
-                    file_path.write_text(frontmatter.dumps(post), encoding="utf-8")
+                    file_path.write_text(frontmatter_dumps(post), encoding="utf-8")
 
                 return True, f"Changed status from '{status}' to '{value}'"
 
@@ -165,31 +167,19 @@ def fix_date_format(file_path: Path, dry_run: bool = False) -> tuple[bool, str]:
 
         date_value = post.metadata[date_field]
 
-        # If already a date or datetime object, convert to string
+        # Native date/datetime objects from PyYAML mean the field was already
+        # an unquoted ISO 8601 value — the canonical format. No fix needed.
         if isinstance(date_value, datetime):
-            date_str = date_value.strftime("%Y-%m-%d")
-            post.metadata[date_field] = date_str
+            return False, "Date already in ISO 8601 format"
 
-            if not dry_run:
-                file_path.write_text(frontmatter.dumps(post), encoding="utf-8")
-
-            return True, f"Converted datetime object to ISO 8601: {date_str}"
-
-        # Handle datetime.date objects
         if hasattr(date_value, "strftime") and hasattr(date_value, "year"):
-            date_str = date_value.strftime("%Y-%m-%d")
-            post.metadata[date_field] = date_str
-
-            if not dry_run:
-                file_path.write_text(frontmatter.dumps(post), encoding="utf-8")
-
-            return True, f"Converted date object to ISO 8601: {date_str}"
+            return False, "Date already in ISO 8601 format"
 
         if not isinstance(date_value, str):
             return False, f"Date is not a string or date object: {type(date_value)}"
 
-        # Check if already ISO 8601
-        if re.match(r"^\d{4}-\d{2}-\d{2}$", date_value):
+        # Check if already ISO 8601 string (e.g. from a quoted value)
+        if re.match(r"^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}Z?)?$", date_value):
             return False, "Date already in ISO 8601 format"
 
         # Try various date formats
@@ -212,7 +202,7 @@ def fix_date_format(file_path: Path, dry_run: bool = False) -> tuple[bool, str]:
                 post.metadata[date_field] = iso_date
 
                 if not dry_run:
-                    file_path.write_text(frontmatter.dumps(post), encoding="utf-8")
+                    file_path.write_text(frontmatter_dumps(post), encoding="utf-8")
 
                 return True, f"Converted date from '{date_value}' to '{iso_date}'"
             except ValueError:

@@ -14,6 +14,8 @@ from pathlib import Path
 
 import frontmatter
 
+from docuchango.fixes.yaml_utils import dumps as frontmatter_dumps
+
 
 def normalize_tag(tag: str) -> str:
     """Normalize a single tag to lowercase with dashes.
@@ -122,7 +124,7 @@ def fix_tags(file_path: Path, dry_run: bool = False) -> tuple[bool, list[str]]:
     if changed:
         if not dry_run:
             try:
-                new_content = frontmatter.dumps(post)
+                new_content = frontmatter_dumps(post)
                 file_path.write_text(new_content, encoding="utf-8")
             except Exception as e:
                 return False, [f"Error writing file: {e}"]

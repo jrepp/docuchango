@@ -14,6 +14,8 @@ from pathlib import Path
 import frontmatter
 import yaml
 
+from docuchango.fixes.yaml_utils import dumps as frontmatter_dumps
+
 # Valid bulk update operations
 VALID_OPERATIONS = {"set", "add", "remove", "rename"}
 
@@ -137,7 +139,7 @@ def update_frontmatter_bulk(
 
     # Reconstruct content with updated frontmatter
     try:
-        new_content = frontmatter.dumps(post)
+        new_content = frontmatter_dumps(post)
         return new_content, True, message
     except Exception as e:
         return content, False, f"Error serializing frontmatter: {e}"

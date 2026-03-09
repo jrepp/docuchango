@@ -233,7 +233,10 @@ date: "01/02/2025"
         if changed:
             post = frontmatter.loads(doc.read_text())
             # Should be Feb 1, 2025 (US format)
-            assert post.metadata["date"] == "2025-02-01"
+            # Unquoted date is parsed by PyYAML as a date object
+            from datetime import date
+
+            assert post.metadata["date"] == date(2025, 2, 1)
 
     def test_partial_dates(self, tmp_path):
         """Test partial date formats."""
