@@ -654,8 +654,9 @@ def bulk_timestamps(
 ):
     """Derive created timestamp from git history.
 
-    Updates frontmatter 'created' field based on git commit history.
-    The 'created' date is set to the first commit datetime.
+    Adds missing frontmatter 'created' field based on git commit history.
+    Existing 'created' values are preserved as immutable metadata.
+    The added 'created' date is set to the first commit datetime.
 
     Also migrates legacy 'date' fields to the new 'created' format.
 
@@ -940,28 +941,18 @@ def migrate(
                 changes.append(f"Generated doc_uuid: {new_uuid}")
                 modified = True
 
-            # 3. Remove legacy 'date' field (will get created from git)
+            # 3. Remove legacy 'date' field
             if "date" in post.metadata:
                 del post.metadata["date"]
                 changes.append("Removed deprecated 'date' field")
                 modified = True
-                # Also remove created if it exists so it gets refreshed from git
-                if "created" in post.metadata:
-                    del post.metadata["created"]
 
-            # 4. Add or update created from git (ensures datetime format)
+            # 4. Add created from git only when missing (preserve immutability)
             created_datetime, _ = get_git_dates(file_path)
-            if created_datetime:
-                old_created = post.metadata.get("created")
-                # Normalize to datetime format from git
-                if old_created != created_datetime:
-                    old_val = str(old_created) if old_created else "None"
-                    post.metadata["created"] = created_datetime
-                    if old_created:
-                        changes.append(f"Normalized created: {old_val} → {created_datetime}")
-                    else:
-                        changes.append(f"Added created: {created_datetime} (from git)")
-                    modified = True
+            if created_datetime and "created" not in post.metadata:
+                post.metadata["created"] = created_datetime
+                changes.append(f"Added created: {created_datetime} (from git)")
+                modified = True
 
             # 5. Remove 'updated' field (derived from git history)
             if "updated" in post.metadata:
