@@ -225,7 +225,7 @@ date: 2025-01-26
         assert "updated" not in post.metadata
 
     def test_update_existing_created_field(self, tmp_path):
-        """Test updating existing created field."""
+        """Test preserving existing created field."""
         # Create a git repo
         repo = tmp_path / "repo"
         repo.mkdir()
@@ -259,13 +259,12 @@ created: 2020-01-01
         # Update timestamps
         changed, messages = update_document_timestamps(doc)
 
-        assert changed
-        assert len(messages) == 1  # Only created should change
-        assert any("created" in msg for msg in messages)
+        assert not changed
+        assert messages == []
 
-        # Verify created date was updated from git
+        # Verify created date was preserved
         post = frontmatter.loads(doc.read_text())
-        assert post.metadata["created"] != "2020-01-01"
+        assert str(post.metadata["created"]) == "2020-01-01"
         # updated field is not stored anymore
         assert "updated" not in post.metadata
 

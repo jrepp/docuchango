@@ -276,7 +276,7 @@ class TestUpdateDocumentTimestampsEdgeCases:
             assert not changed
 
     def test_document_with_only_created(self, tmp_path):
-        """Test document with created field - should update it from git."""
+        """Test document with created field - should preserve existing value."""
         repo = tmp_path / "repo"
         repo.mkdir()
 
@@ -291,10 +291,12 @@ class TestUpdateDocumentTimestampsEdgeCases:
 
         changed, messages = update_document_timestamps(doc)
 
-        # Should update created field from git
-        assert changed
+        # Should preserve existing created field
+        assert not changed
+        assert messages == []
         post = frontmatter.loads(doc.read_text())
         assert "created" in post.metadata
+        assert str(post.metadata["created"]) == "2020-01-01"
         # updated field is no longer stored (derived from git)
         assert "updated" not in post.metadata
 
