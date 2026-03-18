@@ -15,7 +15,6 @@ from datetime import date, datetime, timezone
 import frontmatter
 import yaml
 
-
 # Pattern matching ISO 8601 dates and datetimes
 _DATE_RE = re.compile(
     r"^\d{4}-\d{2}-\d{2}"  # YYYY-MM-DD
@@ -61,9 +60,7 @@ def _represent_datetime(dumper: yaml.Dumper, data: datetime) -> yaml.ScalarNode:
 
 def _represent_date(dumper: yaml.Dumper, data: date) -> yaml.ScalarNode:
     """Represent date objects in ISO 8601 format (YYYY-MM-DD), unquoted."""
-    return dumper.represent_scalar(
-        "tag:yaml.org,2002:timestamp", data.strftime("%Y-%m-%d")
-    )
+    return dumper.represent_scalar("tag:yaml.org,2002:timestamp", data.strftime("%Y-%m-%d"))
 
 
 def _represent_list(dumper: yaml.Dumper, data: list) -> yaml.SequenceNode:  # type: ignore[type-arg]
@@ -72,12 +69,8 @@ def _represent_list(dumper: yaml.Dumper, data: list) -> yaml.SequenceNode:  # ty
     Keeps tags: [architecture, design] instead of expanding to block style.
     Falls back to block style for long lists or lists containing complex values.
     """
-    use_flow = len(data) <= 10 and all(
-        isinstance(item, (str, int, float, bool)) for item in data
-    )
-    return dumper.represent_sequence(
-        "tag:yaml.org,2002:seq", data, flow_style=use_flow
-    )
+    use_flow = len(data) <= 10 and all(isinstance(item, (str, int, float, bool)) for item in data)
+    return dumper.represent_sequence("tag:yaml.org,2002:seq", data, flow_style=use_flow)
 
 
 _ConsistentDumper.add_representer(str, _represent_str)
