@@ -15,7 +15,6 @@ from datetime import date, datetime, timezone
 import frontmatter
 import yaml
 
-
 # Pattern matching ISO 8601 dates and datetimes
 _DATE_RE = re.compile(
     r"^\d{4}-\d{2}-\d{2}"  # YYYY-MM-DD
