@@ -1,7 +1,7 @@
 """Update document timestamps based on git history.
 
 This module provides functionality to update document timestamps using git history:
-- For all docs: Update 'created' to first commit datetime
+- For all docs: Add missing 'created' from first commit datetime
 - Migrates legacy 'date' field in ADRs to 'created' field
 
 Note: The 'updated' field is not stored in frontmatter as it can be derived from git history.
@@ -180,22 +180,9 @@ def update_document_timestamps(file_path: Path, dry_run: bool = False) -> tuple[
         modified = True
         messages.append("Migrated 'date' → 'created'")
     else:
-        # Standard handling for created field
-        # Update or add created field
-        if "created" in post.metadata:
-            old_created = post.metadata["created"]
-            if isinstance(old_created, str):
-                old_created_str = old_created
-            elif hasattr(old_created, "strftime"):
-                old_created_str = old_created.strftime("%Y-%m-%dT%H:%M:%SZ")
-            else:
-                old_created_str = str(old_created)
-
-            if old_created_str != created_date:
-                new_content = update_frontmatter_field(new_content, "created", created_date)
-                modified = True
-                messages.append(f"Updated 'created': {old_created_str} → {created_date}")
-        else:
+        # Preserve immutable created field if already present.
+        # Only add missing created values from git history.
+        if "created" not in post.metadata:
             # Add missing created field
             # Try to insert after status field
             insert_pattern = r"(status:.*\n)"
