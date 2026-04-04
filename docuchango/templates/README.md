@@ -52,14 +52,14 @@ Product requirements and feature specifications.
 Run validation to check your documents:
 
 ```bash
-# Validate all documents
+# Validate all documents and auto-fix what can be fixed
 docuchango validate
+
+# Preview issues without changing files
+docuchango validate --dry-run
 
 # Validate with verbose output
 docuchango validate --verbose
-
-# Auto-fix common issues
-docuchango validate --fix
 ```
 
 ## Configuration
@@ -75,7 +75,7 @@ Edit `docs-project.yaml` to customize:
 - Use meaningful, descriptive slugs in filenames
 - Keep frontmatter fields up to date
 - Use lowercase with dashes for IDs and filenames
-- Update the `updated` field when making changes
+- Preserve the `created` field once set; derive later updates from git history
 - Use appropriate tags for categorization
 - Link to related documents using relative paths
 

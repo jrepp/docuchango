@@ -69,14 +69,11 @@ status: Accepted  # ← Agent shouldn't accept without human
 **Never commit without validation:**
 
 ```bash
-# Before every commit
+# Preview issues without changing files
+docuchango validate --dry-run
+
+# Apply automatic fixes and report anything remaining
 docuchango validate --verbose
-
-# If errors, fix them
-docuchango fix
-
-# Verify clean
-docuchango validate
 ```
 
 **Why**: Invalid documents break tooling, confuse other agents, and reduce trust in the CMS.
@@ -218,11 +215,11 @@ doc_uuid: 7c9e6679...         # ✓ Generated UUID v4
 #### Step 7: Validate and Commit
 
 ```bash
-# Validate
-docuchango validate
+# Preview issues
+docuchango validate --dry-run
 
-# Fix any issues
-docuchango fix
+# Apply automatic fixes
+docuchango validate
 
 # Commit
 git add docs-cms/adr/adr-042-redis-caching.md
@@ -567,9 +564,8 @@ grep -r "adr-015" docs-cms/
 ✅ **Solution**: Always validate:
 ```bash
 # Before committing
-docuchango validate
-docuchango fix  # if needed
-docuchango validate  # verify
+docuchango validate --dry-run
+docuchango validate --verbose
 
 git commit -m "..."
 ```
