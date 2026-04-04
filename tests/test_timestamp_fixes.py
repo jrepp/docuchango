@@ -225,7 +225,7 @@ date: 2025-01-26
         assert "updated" not in post.metadata
 
     def test_update_existing_created_field(self, tmp_path):
-        """Test updating existing created field."""
+        """Test preserving existing created field."""
         # Create a git repo
         repo = tmp_path / "repo"
         repo.mkdir()
@@ -259,15 +259,77 @@ created: 2020-01-01
         # Update timestamps
         changed, messages = update_document_timestamps(doc)
 
-        assert changed
-        assert len(messages) == 1  # Only created should change
-        assert any("created" in msg for msg in messages)
+        assert not changed
+        assert messages == []
 
-        # Verify created date was updated from git
+        # Verify created date was preserved
         post = frontmatter.loads(doc.read_text())
-        assert post.metadata["created"] != "2020-01-01"
+        assert str(post.metadata["created"]) == "2020-01-01"
         # updated field is not stored anymore
         assert "updated" not in post.metadata
+
+    def test_remove_legacy_date_when_created_exists(self, tmp_path):
+        """Test removing deprecated date while preserving existing created."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+
+        subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=repo, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo, check=True, capture_output=True)
+
+        doc = repo / "adr-001-test.md"
+        content = """---
+id: "adr-001"
+title: "Test"
+status: Accepted
+date: 2025-01-26
+created: 2020-01-01
+---
+
+# Test
+"""
+        doc.write_text(content)
+
+        subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Add doc"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+        )
+
+        changed, messages = update_document_timestamps(doc)
+
+        assert changed
+        assert messages == ["Removed deprecated 'date' field"]
+
+        post = frontmatter.loads(doc.read_text())
+        assert "date" not in post.metadata
+        assert str(post.metadata["created"]) == "2020-01-01"
+
+    def test_preserve_existing_created_without_git_history(self, tmp_path):
+        """Test existing created does not require git history."""
+        doc = tmp_path / "test.md"
+        doc.write_text("---\nid: test\ncreated: 2020-01-01\n---\n# Test")
+
+        changed, messages = update_document_timestamps(doc)
+
+        assert not changed
+        assert messages == []
+
+    def test_migrate_legacy_date_without_git_history(self, tmp_path):
+        """Test legacy date can be migrated without git history."""
+        doc = tmp_path / "test.md"
+        doc.write_text("---\nid: test\ndate: 2020-01-01\n---\n# Test")
+
+        changed, messages = update_document_timestamps(doc)
+
+        assert changed
+        assert messages == ["Migrated 'date' → 'created'"]
+
+        post = frontmatter.loads(doc.read_text())
+        assert "date" not in post.metadata
+        assert str(post.metadata["created"]) == "2020-01-01"
 
     def test_dry_run_no_changes(self, tmp_path):
         """Test that dry run doesn't write changes."""

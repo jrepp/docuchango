@@ -402,8 +402,39 @@ doc_uuid: 12345678-1234-4123-8123-123456789abc
 
         assert isinstance(post.metadata["created"], datetime)
 
-    def test_migrate_normalizes_created_to_datetime(self, tmp_path):
-        """Test that migrate normalizes date-only 'created' to datetime format."""
+    def test_migrate_uses_legacy_date_when_git_history_missing(self, tmp_path):
+        """Test that migrate preserves timestamp metadata without git history."""
+        adr_dir = tmp_path / "adr"
+        adr_dir.mkdir(parents=True)
+
+        test_file = adr_dir / "adr-001-test.md"
+        content = """---
+id: adr-001
+title: "Test ADR Title"
+status: Accepted
+date: "2025-01-01"
+deciders: "Core Team"
+tags:
+  - test
+project_id: test-project
+doc_uuid: 12345678-1234-4123-8123-123456789abc
+---
+
+# Test ADR
+"""
+        test_file.write_text(content, encoding="utf-8")
+
+        runner = CliRunner()
+        result = runner.invoke(migrate, ["--project-id", "test-project", "--path", str(tmp_path)])
+
+        assert result.exit_code == 0
+
+        post = frontmatter.loads(test_file.read_text(encoding="utf-8"))
+        assert "date" not in post.metadata
+        assert str(post.metadata["created"]) == "2025-01-01"
+
+    def test_migrate_preserves_existing_created(self, tmp_path):
+        """Test that migrate preserves existing 'created' values."""
         # Create a git repo
         repo = tmp_path / "repo"
         adr_dir = repo / "adr"
@@ -419,6 +450,7 @@ doc_uuid: 12345678-1234-4123-8123-123456789abc
 id: adr-001
 title: "Test ADR Title"
 status: Accepted
+date: "2024-12-31"
 created: "2025-01-01"
 deciders: "Core Team"
 tags:
@@ -440,15 +472,13 @@ doc_uuid: 12345678-1234-4123-8123-123456789abc
         result = runner.invoke(migrate, ["--project-id", "test-project", "--path", str(repo)])
 
         assert result.exit_code == 0
-        assert "Normalized created" in result.output
+        assert "Normalized created" not in result.output
 
-        # Verify created is now datetime format
+        # Verify created is preserved
         post = frontmatter.loads(test_file.read_text(encoding="utf-8"))
+        assert "date" not in post.metadata
         assert "created" in post.metadata
-        # Unquoted ISO 8601 datetime is parsed by PyYAML as a datetime object
-        from datetime import datetime
-
-        assert isinstance(post.metadata["created"], datetime)
+        assert str(post.metadata["created"]) == "2025-01-01"
 
     def test_migrate_dry_run_no_changes(self, tmp_path):
         """Test that --dry-run doesn't modify files."""
