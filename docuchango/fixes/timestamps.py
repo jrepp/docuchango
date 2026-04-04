@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 import subprocess
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import frontmatter
@@ -100,6 +100,37 @@ def update_frontmatter_field(content: str, field_name: str, new_value: str) -> s
     return re.sub(pattern, replacer, content, flags=re.MULTILINE)
 
 
+def remove_frontmatter_field(content: str, field_name: str) -> str:
+    """Remove a simple single-line field from YAML frontmatter."""
+    pattern = rf"^{field_name}:.*\n"
+    return re.sub(pattern, "", content, flags=re.MULTILINE)
+
+
+def insert_created_field(content: str, created_date: str) -> str:
+    """Insert a created field into frontmatter near other identity metadata."""
+    created_line = f"created: {created_date}\n"
+
+    for pattern in (r"(status:.*\n)", r"(id:.*\n)", r"(^---\n)"):
+        if re.search(pattern, content, flags=re.MULTILINE):
+            return re.sub(pattern, rf"\1{created_line}", content, count=1, flags=re.MULTILINE)
+
+    return content
+
+
+def frontmatter_value_to_string(value: object) -> str:
+    """Convert a parsed frontmatter value back to a YAML-friendly timestamp string."""
+    if isinstance(value, datetime):
+        if value.tzinfo is not None:
+            value = value.astimezone(timezone.utc)
+            return value.strftime("%Y-%m-%dT%H:%M:%SZ")
+        return value.strftime("%Y-%m-%dT%H:%M:%S")
+
+    if isinstance(value, date):
+        return value.strftime("%Y-%m-%d")
+
+    return str(value)
+
+
 def migrate_date_to_created(content: str, created_date: str) -> str:
     """Migrate legacy 'date' field to 'created' field.
 
@@ -108,30 +139,13 @@ def migrate_date_to_created(content: str, created_date: str) -> str:
         created_date: Creation date to use
 
     Returns:
-        Updated content with 'date' removed and 'created' added
+        Updated content with 'date' removed and 'created' added if needed
     """
-    # Remove the old 'date' field line
-    date_pattern = r"^date:.*\n"
-    new_content = re.sub(date_pattern, "", content, flags=re.MULTILINE)
+    new_content = remove_frontmatter_field(content, "date")
+    if re.search(r"^created:.*$", new_content, flags=re.MULTILINE):
+        return new_content
 
-    # Try to insert created after the status line
-    insert_pattern = r"(status:.*\n)"
-    created_line = f"created: {created_date}\n"
-
-    if re.search(insert_pattern, new_content, flags=re.MULTILINE):
-        # Status field exists, insert after it
-        new_content = re.sub(insert_pattern, rf"\1{created_line}", new_content, flags=re.MULTILINE)
-    else:
-        # No status field, insert after the id field or at the beginning of frontmatter
-        id_pattern = r"(id:.*\n)"
-        if re.search(id_pattern, new_content, flags=re.MULTILINE):
-            new_content = re.sub(id_pattern, rf"\1{created_line}", new_content, flags=re.MULTILINE)
-        else:
-            # Insert right after the opening ---
-            frontmatter_pattern = r"(---\n)"
-            new_content = re.sub(frontmatter_pattern, rf"\1{created_line}", new_content, flags=re.MULTILINE)
-
-    return new_content
+    return insert_created_field(new_content, created_date)
 
 
 def update_document_timestamps(file_path: Path, dry_run: bool = False) -> tuple[bool, list[str]]:
@@ -165,32 +179,36 @@ def update_document_timestamps(file_path: Path, dry_run: bool = False) -> tuple[
     if not post.metadata:
         return False, ["No frontmatter found"]
 
-    # Get git dates
-    created_date, updated_date = get_git_dates(file_path)
-    if not created_date:
-        return False, ["No git history found"]
-
     modified = False
     new_content = content
+    has_legacy_date = "date" in post.metadata
+    has_created = "created" in post.metadata
 
-    # Check if we need to migrate from legacy 'date' field
-    if "date" in post.metadata and "created" not in post.metadata:
-        # Legacy document with only 'date' field - migrate to 'created'
+    if has_legacy_date and has_created:
+        new_content = remove_frontmatter_field(new_content, "date")
+        if new_content != content:
+            modified = True
+            messages.append("Removed deprecated 'date' field")
+    elif has_legacy_date:
+        created_date, _ = get_git_dates(file_path)
+        if not created_date:
+            created_date = frontmatter_value_to_string(post.metadata["date"])
+
         new_content = migrate_date_to_created(new_content, created_date)
-        modified = True
-        messages.append("Migrated 'date' → 'created'")
+        if new_content != content:
+            modified = True
+            messages.append("Migrated 'date' → 'created'")
+    elif has_created:
+        return False, []
     else:
-        # Preserve immutable created field if already present.
-        # Only add missing created values from git history.
-        if "created" not in post.metadata:
-            # Add missing created field
-            # Try to insert after status field
-            insert_pattern = r"(status:.*\n)"
-            created_line = f"created: {created_date}\n"
-            if re.search(insert_pattern, new_content, flags=re.MULTILINE):
-                new_content = re.sub(insert_pattern, rf"\1{created_line}", new_content, flags=re.MULTILINE)
-                modified = True
-                messages.append(f"Added 'created': {created_date}")
+        created_date, _ = get_git_dates(file_path)
+        if not created_date:
+            return False, ["No git history found"]
+
+        new_content = insert_created_field(new_content, created_date)
+        if new_content != content:
+            modified = True
+            messages.append(f"Added 'created': {created_date}")
 
     # Write updated content
     if modified and not dry_run:

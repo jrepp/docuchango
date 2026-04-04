@@ -229,9 +229,10 @@ created: 2019-01-01
 """
         result = migrate_date_to_created(content, "2021-01-01")
 
-        # Should remove date, add created
-        # Existing created might be overwritten
+        # Should remove date and preserve the existing created field
         assert "date: 2020-01-01" not in result
+        assert result.count("created:") == 1
+        assert "created: 2019-01-01" in result
 
     def test_migrate_multiline_date(self):
         """Test date field in multiline format."""
@@ -322,6 +323,28 @@ class TestUpdateDocumentTimestampsEdgeCases:
         assert "created" in post.metadata
         # updated field is no longer stored (derived from git)
         assert "updated" not in post.metadata
+
+    def test_document_with_id_but_no_status_adds_created(self, tmp_path):
+        """Test document without status still gets a created field."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+
+        subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=repo, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True, capture_output=True)
+
+        doc = repo / "test.md"
+        doc.write_text("---\nid: test\n---\n# Test")
+        subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "add"], cwd=repo, check=True, capture_output=True)
+
+        changed, _ = update_document_timestamps(doc)
+
+        assert changed
+        lines = doc.read_text().splitlines()
+        id_idx = next(i for i, line in enumerate(lines) if line.startswith("id:"))
+        created_idx = next(i for i, line in enumerate(lines) if line.startswith("created:"))
+        assert created_idx == id_idx + 1
 
     def test_corrupt_frontmatter(self, tmp_path):
         """Test file with corrupt frontmatter."""
