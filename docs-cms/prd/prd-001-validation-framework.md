@@ -1,15 +1,16 @@
 ---
 author: Engineering Team
-created: 2025-10-26T02:35:12Z
-doc_uuid: e5f6a7b8-c9d0-4e9f-2a3b-4c5d6e7f8a9b
+created: 2025-10-26T09:35:12Z
+doc_uuid: e5f6a7b8-c9d0-4e9f-8a3b-4c5d6e7f8a9b
 id: prd-001
 project_id: docuchango
-status: Launched
+status: Completed
 tags:
 - documentation
 - framework
 - product
 - validation
+target_release: v1.0.0
 title: 'Docuchango: Documentation Validation Tool'
 ---
 
