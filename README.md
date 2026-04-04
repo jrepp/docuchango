@@ -39,21 +39,21 @@ curl -sSL https://raw.githubusercontent.com/jrepp/docuchango/main/install.sh | b
 ## Quick Start
 
 ```bash
-# Bootstrap a new docs-cms project with templates and structure
-docuchango bootstrap
+# Initialize a new docs-cms project with templates and structure
+docuchango init
 
-# Validate your documentation against frontmatter schemas, links, and formatting rules
+# Validate your documentation and auto-fix issues where possible
 docuchango validate
 
-# Automatically fix detected issues (code blocks, whitespace, frontmatter)
-docuchango fix all
+# Preview issues without changing files
+docuchango validate --dry-run
 ```
 
 ```mermaid
 flowchart LR
     A[docs-cms/] --> B{docuchango}
-    B -->|validate| C[✓ Report errors]
-    B -->|fix| D[✓ Fixed docs]
+    B -->|validate --dry-run| C[✓ Report issues]
+    B -->|validate| D[✓ Fix what it can]
     D --> E[Docusaurus]
     E -->|build| F[📚 Static site]
 
@@ -91,110 +91,23 @@ docuchango validate
 docuchango validate --skip-build
 ```
 
-### Fix Commands
+### Repair & Bulk Commands
 
 ```bash
-# List all available fixes and their descriptions
-$ docuchango fix list
-📋 Available Fixes
+# Validate and auto-fix common issues
+docuchango validate
 
-docuchango fix frontmatter
-  Fix frontmatter issues
-  Fixes:
-    • Invalid status values (maps to valid values by doc type)
-    • Invalid date formats (converts to ISO 8601: YYYY-MM-DD)
-    • Missing frontmatter blocks (generates with defaults)
-    ...
+# Preview fixes without changing files
+docuchango validate --dry-run --verbose
 
-# Automatically fix all detected issues
-$ docuchango fix all
-   ✓ Fixed 12 code blocks
-   ✓ Removed trailing whitespace
-   ✓ Added missing frontmatter
-
-# Fix specific issues
-docuchango fix code-blocks
-docuchango fix links
-
-# Fix frontmatter issues (status values, dates, missing fields)
-$ docuchango fix frontmatter --dry-run --verbose
-📋 Fixing Frontmatter Issues
-
-DRY RUN - No changes will be made
-
-Found 23 documentation files
-
-adr/adr-001.md
-  ✓ Changed status from 'Draft' to 'Proposed'
-  ✓ Converted date from '2025/01/26' to '2025-01-26'
-
-✓ Fixed 12 issues in 8 files
-
-# Apply the fixes
-docuchango fix frontmatter
-
-# Update timestamps based on git history
-$ docuchango fix timestamps --dry-run
-📅 Updating Document Timestamps
-
-Found 5 documentation files
-
-adr/adr-001.md
-  ✓ Migrated 'date' → 'created' and 'updated'
-
-✓ Fixed 5 issues in 5 files
+# Derive immutable created timestamps from git history
+docuchango bulk timestamps --dry-run
 
 # Bulk update frontmatter fields
-$ docuchango fix bulk-update --type adr --set status=Accepted --dry-run
-🔧 Bulk Update Frontmatter
+docuchango bulk update --type adr --set status=Accepted --dry-run
 
-Operation: SET
-Field: status = Accepted
-Document type filter: ADR
-Files found: 15
-
-adr/adr-001.md
-  ✓ Updated status: Proposed → Accepted
-
-adr/adr-005.md
-  ℹ Field status already has value 'Accepted'
-
-✓ 10 files would be updated
-
-# Bulk update operations support:
-# • SET - Update or add field (smart value detection)
-# • ADD - Add field only if it doesn't exist
-# • REMOVE - Delete field from frontmatter
-# • RENAME - Rename field (preserves value)
-# • Handles empty frontmatter gracefully
-# • Detects duplicate file references
-# • Provides clear feedback for each operation
-
-# Fix tags normalization
-$ docuchango fix tags --dry-run
-🏷️  Fixing Tags
-
-Found 23 documentation files
-
-adr/adr-001.md
-  ✓ Normalized tags: 3 tags
-  ✓ Removed 1 duplicate/invalid tags
-  ✓ Sorted tags alphabetically
-
-✓ Fixed 8 issues in 5 files
-
-# Fix whitespace and required fields
-$ docuchango fix whitespace --dry-run
-🧹 Fixing Whitespace & Fields
-
-Found 23 documentation files
-
-adr/adr-002.md
-  ✓ Trimmed whitespace from 'title' field
-  ✓ Generated missing 'doc_uuid'
-  ✓ Added missing 'tags' field (empty array)
-
-✓ Fixed 15 issues in 7 files
+# Migrate legacy frontmatter to the current schema
+docuchango migrate --project-id my-project --dry-run
 ```
 
 ### Bootstrap & Guides
@@ -209,7 +122,6 @@ docuchango bootstrap --guide best-practices
 
 ```bash
 dcc-validate        # Same as docuchango validate
-dcc-fix            # Same as docuchango fix
 ```
 
 ## CMS Folder Structure

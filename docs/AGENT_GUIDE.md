@@ -14,11 +14,11 @@ This guide is for AI agents working with projects that use `docs-cms` for docume
 ## Quick Reference Commands
 
 ```bash
-# Scan and validate all documentation
+# Validate all documentation and auto-fix what can be fixed
 docuchango validate
 
-# Auto-fix common issues
-docuchango fix
+# Preview issues without changing files
+docuchango validate --dry-run
 
 # Validate with detailed output
 docuchango validate --verbose
@@ -113,11 +113,11 @@ uuidgen | tr '[:upper:]' '[:lower:]'
 
 **Step 5**: Validate before committing
 ```bash
-# Validate the new document
-docuchango validate
+# Preview issues without changing files
+docuchango validate --dry-run
 
-# Fix any issues
-docuchango fix
+# Apply automatic fixes and validate the result
+docuchango validate
 
 # Verify it passes
 docuchango validate --verbose
@@ -335,11 +335,11 @@ Why this memo exists
 ### 1. Always Validate Before Committing
 
 ```bash
-# Run validation
-docuchango validate
+# Preview issues without changing files
+docuchango validate --dry-run
 
-# If errors found, fix them
-docuchango fix
+# Apply automatic fixes and report anything remaining
+docuchango validate
 
 # Verify fixes
 docuchango validate --verbose
@@ -727,7 +727,7 @@ docuchango validate --verbose
 # - Invalid status value
 
 # Auto-fix where possible
-docuchango fix
+docuchango validate
 
 # Check schema requirements
 cat docuchango/schemas.py | grep -A 20 "class ADRSchema"

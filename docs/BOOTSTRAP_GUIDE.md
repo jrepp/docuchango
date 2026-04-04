@@ -210,11 +210,11 @@ EOF
 ### 6. Validate Your Documentation
 
 ```bash
-# Validate all documents
-docuchango validate
+# Preview issues without changing files
+docuchango validate --dry-run
 
-# Fix common issues
-docuchango fix
+# Validate all documents and auto-fix what can be fixed
+docuchango validate
 
 # Generate a report
 docuchango validate --verbose
@@ -335,8 +335,8 @@ node -e "console.log(require('crypto').randomUUID())"
 ### Running Validation
 
 ```bash
-# Quick validation
-docuchango validate
+# Preview issues without modifying files
+docuchango validate --dry-run
 
 # Verbose output
 docuchango validate --verbose
@@ -344,8 +344,8 @@ docuchango validate --verbose
 # Check specific directory
 docuchango validate --repo-root /path/to/project
 
-# Auto-fix issues
-docuchango fix
+# Apply automatic fixes
+docuchango validate
 ```
 
 ## Best Practices
@@ -367,8 +367,8 @@ docuchango fix
 1. **Create from template**: Copy and modify template
 2. **Add frontmatter**: Fill in all required fields
 3. **Write content**: Use clear, concise language
-4. **Validate**: Run `docuchango validate`
-5. **Fix issues**: Run `docuchango fix` or manually fix
+4. **Preview issues**: Run `docuchango validate --dry-run`
+5. **Apply fixes**: Run `docuchango validate` or manually fix any remaining issues
 6. **Commit**: Add to git with descriptive message
 7. **Review**: Have team review in PR
 
