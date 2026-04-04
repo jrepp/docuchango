@@ -2,6 +2,20 @@
 
 <!-- version list -->
 
+## v1.12.3 (2026-04-04)
+
+### Bug Fixes
+
+- Apply ruff formatting to yaml utils
+  ([`5351f3a`](https://github.com/jrepp/docuchango/commit/5351f3af0772872672c0fc04568481206bfd5dda))
+
+- Preserve immutable created frontmatter timestamps
+  ([`d909749`](https://github.com/jrepp/docuchango/commit/d9097491c8e9b2c084578ebbd01c719dbda3dbc9))
+
+- Preserve legacy timestamps during created migration
+  ([`c03dbcf`](https://github.com/jrepp/docuchango/commit/c03dbcf5be24fed57843b9d6ec56ae6a96ff1d84))
+
+
 ## v1.12.2 (2026-03-09)
 
 ### Bug Fixes
