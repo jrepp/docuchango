@@ -110,6 +110,30 @@ docuchango bulk update --type adr --set status=Accepted --dry-run
 docuchango migrate --project-id my-project --dry-run
 ```
 
+### Mixed-Schema Monorepos
+
+`docs-project.yaml` can map multiple document lanes in one repository with
+different schemas, naming rules, and roots. Generic lanes stay strict by
+default, but you can opt specific folders into plain Markdown when frontmatter
+is not a project goal.
+
+```yaml
+structure:
+  docs_roots: [docs]
+  doc_types:
+    adr:
+      schema: adr
+      folders: [adr]
+      filename_pattern: "^(adr)-(\\d{3})-(.+)\\.md$"
+      enforce_filename_pattern: true
+    design-notes:
+      schema: generic
+      folders: [design]
+      filename_pattern: ".+\\.md$"
+      enforce_filename_pattern: false
+      require_frontmatter: false
+```
+
 ### Bootstrap & Guides
 
 ```bash

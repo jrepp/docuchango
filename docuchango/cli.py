@@ -69,7 +69,7 @@ def _discover_doc_files(root: Path) -> list[Path]:
         "docs-cms/memos/**/*.md",
         "docs-cms/prd/**/*.md",
     ]
-    files: list[Path] = []
+    files = []
     for pattern in doc_patterns:
         files.extend(root.glob(pattern))
     return sorted(set(files))

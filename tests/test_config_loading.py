@@ -482,3 +482,98 @@ doc_uuid: 11111111-1111-4111-8111-111111111111
             names = [d.file_path.name for d in validator.documents]
             assert "draft-about-capacity.md" in names
             assert not any("Invalid" in err for err in validator.errors)
+
+    def test_generic_doc_types_can_allow_plain_markdown_without_frontmatter(self):
+        """Generic lanes can opt into plain markdown without YAML frontmatter."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            docs_root = repo_root / "docs"
+            docs_root.mkdir(parents=True)
+            (docs_root / "design").mkdir()
+
+            doc_path = docs_root / "design" / "plain-design-note.md"
+            doc_path.write_text(
+                """# Plain Design Note
+
+This lane intentionally uses plain markdown without frontmatter.
+
+```text
+Example block
+```
+"""
+            )
+
+            config_data = {
+                "project": {
+                    "id": "mixed-project",
+                    "name": "Mixed Project",
+                },
+                "structure": {
+                    "docs_roots": ["docs"],
+                    "doc_types": {
+                        "design-notes": {
+                            "schema": "generic",
+                            "folders": ["design"],
+                            "filename_pattern": r".+\.md$",
+                            "enforce_filename_pattern": False,
+                            "require_frontmatter": False,
+                        }
+                    },
+                },
+            }
+
+            config_path = repo_root / "docs-project.yaml"
+            with config_path.open("w") as f:
+                yaml.dump(config_data, f)
+
+            validator = DocValidator(repo_root, verbose=False)
+            validator.scan_documents()
+
+            assert len(validator.documents) == 1
+            doc = validator.documents[0]
+            assert doc.file_path.name == "plain-design-note.md"
+            assert doc.title == "Plain Design Note"
+            assert doc.errors == []
+
+    def test_generic_doc_types_still_require_frontmatter_by_default(self):
+        """Generic lanes stay strict unless require_frontmatter is disabled."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            docs_root = repo_root / "docs"
+            docs_root.mkdir(parents=True)
+            (docs_root / "design").mkdir()
+
+            (docs_root / "design" / "strict-design-note.md").write_text(
+                """# Strict Design Note
+
+This document omits frontmatter and should still fail by default.
+"""
+            )
+
+            config_data = {
+                "project": {
+                    "id": "mixed-project",
+                    "name": "Mixed Project",
+                },
+                "structure": {
+                    "docs_roots": ["docs"],
+                    "doc_types": {
+                        "design-notes": {
+                            "schema": "generic",
+                            "folders": ["design"],
+                            "filename_pattern": r".+\.md$",
+                            "enforce_filename_pattern": False,
+                        }
+                    },
+                },
+            }
+
+            config_path = repo_root / "docs-project.yaml"
+            with config_path.open("w") as f:
+                yaml.dump(config_data, f)
+
+            validator = DocValidator(repo_root, verbose=False)
+            validator.scan_documents()
+
+            assert len(validator.documents) == 1
+            assert validator.documents[0].errors == ["Missing YAML frontmatter"]

@@ -35,6 +35,13 @@ class DocTypeConfig(BaseModel):
         default=True,
         description="Whether filename_pattern should be enforced when provided",
     )
+    require_frontmatter: bool = Field(
+        default=True,
+        description=(
+            "Whether documents in this lane must include YAML frontmatter. "
+            "Set false for plain-Markdown generic lanes in mixed-schema repos."
+        ),
+    )
     model_config = ConfigDict(populate_by_name=True)
 
     frontmatter_schema: Literal["adr", "rfc", "memo", "prd", "generic"] = Field(

@@ -40,7 +40,6 @@ try:
     # Import schemas from the docuchango package
     from docuchango.schemas import (
         ADRFrontmatter,
-        DocTypeConfig,
         DocsProjectConfig,
         GenericDocFrontmatter,
         MemoFrontmatter,
@@ -137,7 +136,7 @@ class DocValidator:
         self.errors: list[str] = []
 
         # Load project configuration
-        self.project_config_path: Path | None = None
+        self.project_config_path: Optional[Path] = None
         self.project_config = self._load_project_config()
 
     def _load_project_config(self) -> Optional[DocsProjectConfig]:
@@ -204,10 +203,10 @@ class DocValidator:
         # Default folders to scan (includes prd now!)
         return ["adr", "rfcs", "memos", "prd"]
 
-    def _build_scan_entries(self) -> list[tuple[str, str, str, bool, Path]]:
+    def _build_scan_entries(self) -> list[tuple[str, str, str, bool, bool, Path]]:
         """Build scan entries as tuples:
 
-        (doc_type, folder_relative, filename_pattern, enforce_filename_pattern, root_path)
+        (doc_type, folder_relative, filename_pattern, enforce_filename_pattern, require_frontmatter, root_path)
         """
         default_patterns = {
             "adr": r"^(adr)-(\d{3})-(.+)\.md$",
@@ -220,17 +219,24 @@ class DocValidator:
 
         if self.project_config and self.project_config.structure and self.project_config.structure.doc_types:
             roots = self.project_config.structure.docs_roots or ["."]
-            entries: list[tuple[str, str, str, bool, Path]] = []
+            entries: list[tuple[str, str, str, bool, bool, Path]] = []
 
             for doc_type_name, cfg in self.project_config.structure.doc_types.items():
-                if not isinstance(cfg, DocTypeConfig):
-                    continue
                 pattern = cfg.filename_pattern or default_patterns.get(doc_type_name, r"^(.+)\.md$")
                 folders = cfg.folders or []
                 for root_rel in roots:
                     root_path = (config_base / root_rel).resolve()
                     for folder in folders:
-                        entries.append((cfg.frontmatter_schema, folder, pattern, cfg.enforce_filename_pattern, root_path))
+                        entries.append(
+                            (
+                                cfg.frontmatter_schema,
+                                folder,
+                                pattern,
+                                cfg.enforce_filename_pattern,
+                                cfg.require_frontmatter,
+                                root_path,
+                            )
+                        )
             return entries
 
         # Legacy behavior
@@ -241,11 +247,17 @@ class DocValidator:
         for key, schema_name in [("adr", "adr"), ("rfc", "rfc"), ("memo", "memo"), ("prd", "prd")]:
             folder_name = folder_config[key]
             if folder_name in document_folders:
-                entries.append((schema_name, folder_name, default_patterns[schema_name], True, config_base))
+                entries.append((schema_name, folder_name, default_patterns[schema_name], True, True, config_base))
         return entries
 
     def _scan_document_folder(
-        self, folder_path: Path, folder_name: str, doc_type: str, pattern: re.Pattern[str], enforce_filename_pattern: bool
+        self,
+        folder_path: Path,
+        _folder_name: str,
+        doc_type: str,
+        pattern: re.Pattern[str],
+        enforce_filename_pattern: bool,
+        require_frontmatter: bool,
     ):
         """Scan a specific document folder for markdown files"""
         if not folder_path.exists():
@@ -259,9 +271,7 @@ class DocValidator:
 
             match = pattern.match(md_file.name)
             if enforce_filename_pattern and not match:
-                self.errors.append(
-                    f"Invalid {doc_type.upper()} filename: {md_file.name} (pattern: {pattern.pattern})"
-                )
+                self.errors.append(f"Invalid {doc_type.upper()} filename: {md_file.name} (pattern: {pattern.pattern})")
                 self.log(f"   ✗ {md_file.name}: Invalid filename format")
                 continue
 
@@ -272,7 +282,7 @@ class DocValidator:
                     self.log(f"   ⊘ {md_file.name}: Skipping template file")
                     continue
 
-            doc = self._parse_document(md_file, doc_type)
+            doc = self._parse_document(md_file, doc_type, require_frontmatter=require_frontmatter)
             if doc:
                 self.documents.append(doc)
                 self.file_to_doc[md_file] = doc
@@ -285,7 +295,7 @@ class DocValidator:
         if not entries:
             self.log("   ⊘ No configured scan entries found", force=True)
 
-        for doc_type, folder_name, pattern_text, enforce_pattern, root_path in entries:
+        for doc_type, folder_name, pattern_text, enforce_pattern, require_frontmatter, root_path in entries:
             try:
                 pattern = re.compile(pattern_text)
             except re.error as e:
@@ -294,12 +304,21 @@ class DocValidator:
 
             folder_path = (root_path / folder_name).resolve()
             self.log(f"   Scanning {folder_path} ({doc_type} documents)...")
-            self._scan_document_folder(folder_path, folder_name, doc_type, pattern, enforce_pattern)
+            self._scan_document_folder(
+                folder_path,
+                folder_name,
+                doc_type,
+                pattern,
+                enforce_pattern,
+                require_frontmatter,
+            )
 
         # Scan general docs markdown files at docs roots
         roots_to_scan = [self._get_config_base_dir()]
         if self.project_config and self.project_config.structure:
-            roots_to_scan = [(self._get_config_base_dir() / p).resolve() for p in self.project_config.structure.docs_roots]
+            roots_to_scan = [
+                (self._get_config_base_dir() / p).resolve() for p in self.project_config.structure.docs_roots
+            ]
 
         for docs_dir in roots_to_scan:
             if not docs_dir.exists():
@@ -314,11 +333,21 @@ class DocValidator:
 
         self.log(f"   Found {len(self.documents)} documents")
 
-    def _parse_document(self, file_path: Path, doc_type: str) -> Optional[Document]:
+    def _parse_document(self, file_path: Path, doc_type: str, require_frontmatter: bool = True) -> Optional[Document]:
         """Parse a markdown file and validate frontmatter"""
-        return self._parse_document_enhanced(file_path, doc_type)
+        return self._parse_document_enhanced(file_path, doc_type, require_frontmatter=require_frontmatter)
 
-    def _parse_document_enhanced(self, file_path: Path, doc_type: str) -> Optional[Document]:
+    def _infer_plain_markdown_title(self, file_path: Path, content: str) -> str:
+        """Infer a title for plain-markdown generic documents."""
+        for line in content.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("# "):
+                return stripped[2:].strip()
+        return file_path.stem.replace("-", " ").replace("_", " ").strip().title() or file_path.name
+
+    def _parse_document_enhanced(
+        self, file_path: Path, doc_type: str, require_frontmatter: bool = True
+    ) -> Optional[Document]:
         """Parse document with python-frontmatter and pydantic validation"""
         try:
             # Read file content once and cache it
@@ -328,6 +357,11 @@ class DocValidator:
             post = frontmatter.loads(content)
 
             if not post.metadata:
+                if doc_type == "generic" and not require_frontmatter:
+                    title = self._infer_plain_markdown_title(file_path, content)
+                    self.log(f"   ✓ {file_path.name}: Plain Markdown generic doc")
+                    return Document(file_path=file_path, doc_type=doc_type, title=title, _content_cache=content)
+
                 error = "Missing YAML frontmatter"
                 self.log(f"   ✗ {file_path.name}: {error}")
                 doc = Document(file_path=file_path, doc_type=doc_type, title="Unknown", _content_cache=content)

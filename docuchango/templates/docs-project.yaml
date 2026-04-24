@@ -35,6 +35,12 @@ structure:
   #     folders: [prfaq]
   #     filename_pattern: "^prfaq-.+\\.md$"
   #     enforce_filename_pattern: true
+  #   design-notes:
+  #     schema: generic
+  #     folders: [design]
+  #     filename_pattern: ".+\\.md$"
+  #     enforce_filename_pattern: false
+  #     require_frontmatter: false  # Allow plain Markdown design notes
 
 metadata:
   created: "2025-01-01"
