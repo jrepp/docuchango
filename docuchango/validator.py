@@ -40,6 +40,7 @@ try:
     # Import schemas from the docuchango package
     from docuchango.schemas import (
         ADRFrontmatter,
+        DocTypeConfig,
         DocsProjectConfig,
         GenericDocFrontmatter,
         MemoFrontmatter,
@@ -136,27 +137,43 @@ class DocValidator:
         self.errors: list[str] = []
 
         # Load project configuration
+        self.project_config_path: Path | None = None
         self.project_config = self._load_project_config()
 
     def _load_project_config(self) -> Optional[DocsProjectConfig]:
         """Load docs-project.yaml configuration"""
-        config_path = self.repo_root / "docs-cms" / "docs-project.yaml"
-        if config_path.exists():
+        candidate_paths = [
+            self.repo_root / "docs-project.yaml",
+            self.repo_root / "docs-cms" / "docs-project.yaml",
+        ]
+
+        for config_path in candidate_paths:
+            if not config_path.exists():
+                continue
+
             try:
                 with open(config_path, encoding="utf-8") as f:
                     config_data = yaml.safe_load(f)
                     config = DocsProjectConfig(**config_data)
-                    self.log(f"✓ Loaded project config: {config.project.id}")
+                    self.project_config_path = config_path
+                    self.log(f"✓ Loaded project config: {config.project.id} ({config_path})")
                     return config
             except ValidationError as e:
-                self.log(f"⚠️  Warning: Invalid project config format: {e}")
+                self.log(f"⚠️  Warning: Invalid project config format at {config_path}: {e}")
                 return None
             except Exception as e:
-                self.log(f"⚠️  Warning: Could not load project config: {e}")
+                self.log(f"⚠️  Warning: Could not load project config at {config_path}: {e}")
                 return None
-        else:
-            self.log(f"⚠️  Warning: Project config not found at {config_path}")
-            return None
+
+        self.log("⚠️  Warning: Project config not found (looked for docs-project.yaml at repo root and docs-cms/)")
+        return None
+
+    def _get_config_base_dir(self) -> Path:
+        """Base directory for resolving structure paths."""
+        if self.project_config_path:
+            return self.project_config_path.parent
+        # Legacy default
+        return self.repo_root / "docs-cms"
 
     def log(self, message: str, force: bool = False):
         """Log if verbose or forced"""
@@ -187,31 +204,73 @@ class DocValidator:
         # Default folders to scan (includes prd now!)
         return ["adr", "rfcs", "memos", "prd"]
 
-    def _scan_document_folder(self, folder_name: str, doc_type: str, pattern: re.Pattern[str]):
+    def _build_scan_entries(self) -> list[tuple[str, str, str, bool, Path]]:
+        """Build scan entries as tuples:
+
+        (doc_type, folder_relative, filename_pattern, enforce_filename_pattern, root_path)
+        """
+        default_patterns = {
+            "adr": r"^(adr)-(\d{3})-(.+)\.md$",
+            "rfc": r"^(rfc)-(\d{3})-(.+)\.md$",
+            "memo": r"^(memo)-(\d{3})-(.+)\.md$",
+            "prd": r"^(prd)-(\d{3})-(.+)\.md$",
+        }
+
+        config_base = self._get_config_base_dir()
+
+        if self.project_config and self.project_config.structure and self.project_config.structure.doc_types:
+            roots = self.project_config.structure.docs_roots or ["."]
+            entries: list[tuple[str, str, str, bool, Path]] = []
+
+            for doc_type_name, cfg in self.project_config.structure.doc_types.items():
+                if not isinstance(cfg, DocTypeConfig):
+                    continue
+                pattern = cfg.filename_pattern or default_patterns.get(doc_type_name, r"^(.+)\.md$")
+                folders = cfg.folders or []
+                for root_rel in roots:
+                    root_path = (config_base / root_rel).resolve()
+                    for folder in folders:
+                        entries.append((cfg.frontmatter_schema, folder, pattern, cfg.enforce_filename_pattern, root_path))
+            return entries
+
+        # Legacy behavior
+        folder_config = self._get_folder_config()
+        document_folders = self._get_document_folders()
+
+        entries = []
+        for key, schema_name in [("adr", "adr"), ("rfc", "rfc"), ("memo", "memo"), ("prd", "prd")]:
+            folder_name = folder_config[key]
+            if folder_name in document_folders:
+                entries.append((schema_name, folder_name, default_patterns[schema_name], True, config_base))
+        return entries
+
+    def _scan_document_folder(
+        self, folder_path: Path, folder_name: str, doc_type: str, pattern: re.Pattern[str], enforce_filename_pattern: bool
+    ):
         """Scan a specific document folder for markdown files"""
-        folder_path = self.repo_root / "docs-cms" / folder_name
         if not folder_path.exists():
-            self.log(f"   ⊘ Folder {folder_name} does not exist, skipping")
+            self.log(f"   ⊘ Folder {folder_path} does not exist, skipping")
             return
 
-        for md_file in folder_path.glob("*.md"):
+        for md_file in folder_path.rglob("*.md"):
             # Skip README and index files (landing pages)
             if md_file.name in ["README.md", "index.md"]:
                 continue
 
             match = pattern.match(md_file.name)
-            if not match:
+            if enforce_filename_pattern and not match:
                 self.errors.append(
-                    f"Invalid {doc_type.upper()} filename: {md_file.name} (expected: {doc_type}-NNN-name-with-dashes.md - lowercase only)"
+                    f"Invalid {doc_type.upper()} filename: {md_file.name} (pattern: {pattern.pattern})"
                 )
-                self.log(f"   ✗ {md_file.name}: Invalid filename format (must be lowercase)")
+                self.log(f"   ✗ {md_file.name}: Invalid filename format")
                 continue
 
-            _prefix, num, _slug = match.groups()
-            # Skip template files (000)
-            if num == "000":
-                self.log(f"   ⊘ {md_file.name}: Skipping template file")
-                continue
+            if match and len(match.groups()) >= 2:
+                _prefix, num = match.groups()[:2]
+                # Skip template files (000)
+                if num == "000":
+                    self.log(f"   ⊘ {md_file.name}: Skipping template file")
+                    continue
 
             doc = self._parse_document(md_file, doc_type)
             if doc:
@@ -222,61 +281,36 @@ class DocValidator:
         """Scan all markdown files"""
         self.log("\n📂 Scanning documents...")
 
-        # Get folder configuration
-        folder_config = self._get_folder_config()
-        document_folders = self._get_document_folders()
+        entries = self._build_scan_entries()
+        if not entries:
+            self.log("   ⊘ No configured scan entries found", force=True)
 
-        # Filename patterns (type-NNN-name-with-dashes.md)
-        # ENFORCE lowercase only - uppercase is deprecated
-        patterns = {
-            "adr": re.compile(r"^(adr)-(\d{3})-(.+)\.md$"),
-            "rfc": re.compile(r"^(rfc)-(\d{3})-(.+)\.md$"),
-            "memo": re.compile(r"^(memo)-(\d{3})-(.+)\.md$"),
-            "prd": re.compile(r"^(prd)-(\d{3})-(.+)\.md$"),
-        }
-
-        # Map folder names to document types and detect duplicates
-        folder_to_types: dict[str, list[str]] = {}
-        for key, doc_type in [("adr", "adr"), ("rfc", "rfc"), ("memo", "memo"), ("prd", "prd")]:
-            folder = folder_config[key]
-            if folder not in folder_to_types:
-                folder_to_types[folder] = []
-            folder_to_types[folder].append(doc_type)
-
-        # Warn about duplicate folder mappings
-        for folder, types in folder_to_types.items():
-            if len(types) > 1:
-                self.log(
-                    f"⚠️  Warning: Folder '{folder}' is mapped to multiple document types: {types}. "
-                    f"This may cause ambiguous validation. Consider using unique folder names.",
-                    force=True,
-                )
-
-        # Scan configured document folders
-        for folder_name in document_folders:
-            doc_types = folder_to_types.get(folder_name, [])
-            if not doc_types:
-                self.log(
-                    f"⚠️  Warning: Document folder '{folder_name}' is not recognized and will be skipped. "
-                    f"Please check your configuration.",
-                    force=True,
-                )
+        for doc_type, folder_name, pattern_text, enforce_pattern, root_path in entries:
+            try:
+                pattern = re.compile(pattern_text)
+            except re.error as e:
+                self.errors.append(f"Invalid filename regex for {doc_type}/{folder_name}: {e}")
                 continue
 
-            for doc_type in doc_types:
-                if doc_type in patterns:
-                    self.log(f"   Scanning {folder_name}/ ({doc_type} documents)...")
-                    self._scan_document_folder(folder_name, doc_type, patterns[doc_type])
+            folder_path = (root_path / folder_name).resolve()
+            self.log(f"   Scanning {folder_path} ({doc_type} documents)...")
+            self._scan_document_folder(folder_path, folder_name, doc_type, pattern, enforce_pattern)
 
-        # Scan general docs (root level)
-        docs_dir = self.repo_root / "docs-cms"
-        if docs_dir.exists():
+        # Scan general docs markdown files at docs roots
+        roots_to_scan = [self._get_config_base_dir()]
+        if self.project_config and self.project_config.structure:
+            roots_to_scan = [(self._get_config_base_dir() / p).resolve() for p in self.project_config.structure.docs_roots]
+
+        for docs_dir in roots_to_scan:
+            if not docs_dir.exists():
+                continue
             for md_file in docs_dir.glob("*.md"):
-                if md_file.name not in ["README.md"]:
-                    doc = self._parse_document(md_file, "doc")
-                    if doc:
-                        self.documents.append(doc)
-                        self.file_to_doc[md_file] = doc
+                if md_file.name in ["README.md", "docs-project.yaml"]:
+                    continue
+                doc = self._parse_document(md_file, "doc")
+                if doc:
+                    self.documents.append(doc)
+                    self.file_to_doc[md_file] = doc
 
         self.log(f"   Found {len(self.documents)} documents")
 
@@ -1052,7 +1086,7 @@ class DocValidator:
 
         for doc in self.documents:
             # Skip docs without doc_type (generic docs)
-            if doc.doc_type not in ["adr", "rfc", "memo"]:
+            if doc.doc_type not in ["adr", "rfc", "memo", "prd"]:
                 continue
 
             # Check if ID exists
@@ -1066,7 +1100,7 @@ class DocValidator:
             # Extract expected ID from filename
             filename = doc.file_path.name
             # Match adr-XXX, rfc-XXX, or memo-XXX pattern (lowercase only)
-            filename_pattern = re.compile(r"^(adr|rfc|memo)-(\d{3})-")
+            filename_pattern = re.compile(r"^(adr|rfc|memo|prd)-(\d{3})-")
             match = filename_pattern.match(filename)
 
             if not match:
@@ -1088,7 +1122,7 @@ class DocValidator:
                 id_errors += 1
 
             # Check ID matches title number
-            title_pattern = re.compile(r"^(ADR|RFC|MEMO)-(\d{3}):", re.IGNORECASE)
+            title_pattern = re.compile(r"^(ADR|RFC|MEMO|PRD)-(\d{3}):", re.IGNORECASE)
             title_match = title_pattern.match(doc.title)
             if title_match:
                 title_prefix, title_num = title_match.groups()

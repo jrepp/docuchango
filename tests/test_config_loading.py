@@ -336,3 +336,149 @@ Test PRD content.
             # But "adr" and "prd" should be
             assert "adr" in folder_to_types
             assert "prd" in folder_to_types
+
+    def test_load_config_from_repo_root(self):
+        """Validator should load docs-project.yaml from repo root when present."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            config_data = {
+                "project": {
+                    "id": "root-config-project",
+                    "name": "Root Config Project",
+                },
+                "structure": {
+                    "document_folders": ["adr"],
+                },
+            }
+
+            config_path = repo_root / "docs-project.yaml"
+            with config_path.open("w") as f:
+                yaml.dump(config_data, f)
+
+            validator = DocValidator(repo_root, verbose=False)
+            assert validator.project_config is not None
+            assert validator.project_config.project.id == "root-config-project"
+
+    def test_doc_types_custom_layout_mixed_schema(self):
+        """Custom doc_types should support mixed folders and schema bindings."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            docs_root = repo_root / "docs"
+            docs_root.mkdir(parents=True)
+
+            # Mixed layout: numbered ADR, non-numbered PRFAQ
+            (docs_root / "adr").mkdir()
+            (docs_root / "prfaq").mkdir()
+
+            (docs_root / "adr" / "adr-001-test.md").write_text(
+                """---
+title: Test ADR Decision
+status: Accepted
+created: 2025-01-01
+deciders: Core Team
+tags: [architecture]
+id: adr-001
+project_id: mixed-project
+doc_uuid: 12345678-1234-4123-8123-123456789abc
+---
+
+# ADR content
+"""
+            )
+
+            (docs_root / "prfaq" / "prfaq-why-now.md").write_text(
+                """---
+title: Why now
+project_id: mixed-project
+doc_uuid: 87654321-4321-4321-8321-210987654321
+tags: [product]
+---
+
+# PRFAQ content
+"""
+            )
+
+            config_data = {
+                "project": {
+                    "id": "mixed-project",
+                    "name": "Mixed Project",
+                },
+                "structure": {
+                    "docs_roots": ["docs"],
+                    "doc_types": {
+                        "adr": {
+                            "schema": "adr",
+                            "folders": ["adr"],
+                            "filename_pattern": r"^(adr)-(\d{3})-(.+)\.md$",
+                            "enforce_filename_pattern": True,
+                        },
+                        "prfaq": {
+                            "schema": "generic",
+                            "folders": ["prfaq"],
+                            "filename_pattern": r"^prfaq-.+\.md$",
+                            "enforce_filename_pattern": True,
+                        },
+                    },
+                },
+            }
+
+            config_path = repo_root / "docs-project.yaml"
+            with config_path.open("w") as f:
+                yaml.dump(config_data, f)
+
+            validator = DocValidator(repo_root, verbose=False)
+            validator.scan_documents()
+
+            # ADR + PRFAQ should both be discovered
+            names = sorted(d.file_path.name for d in validator.documents)
+            assert "adr-001-test.md" in names
+            assert "prfaq-why-now.md" in names
+
+    def test_doc_types_can_disable_filename_enforcement(self):
+        """Custom doc_types can disable strict filename enforcement."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            docs_root = repo_root / "docs"
+            docs_root.mkdir(parents=True)
+            (docs_root / "notes").mkdir()
+
+            # Doesn't match strict numeric pattern but should pass when enforcement is disabled
+            (docs_root / "notes" / "draft-about-capacity.md").write_text(
+                """---
+title: Capacity Notes
+project_id: mixed-project
+doc_uuid: 11111111-1111-4111-8111-111111111111
+---
+
+# Notes
+"""
+            )
+
+            config_data = {
+                "project": {
+                    "id": "mixed-project",
+                    "name": "Mixed Project",
+                },
+                "structure": {
+                    "docs_roots": ["docs"],
+                    "doc_types": {
+                        "notes": {
+                            "schema": "generic",
+                            "folders": ["notes"],
+                            "filename_pattern": r"^note-(\d+)\.md$",
+                            "enforce_filename_pattern": False,
+                        }
+                    },
+                },
+            }
+
+            config_path = repo_root / "docs-project.yaml"
+            with config_path.open("w") as f:
+                yaml.dump(config_data, f)
+
+            validator = DocValidator(repo_root, verbose=False)
+            validator.scan_documents()
+
+            names = [d.file_path.name for d in validator.documents]
+            assert "draft-about-capacity.md" in names
+            assert not any("Invalid" in err for err in validator.errors)

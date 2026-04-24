@@ -10,11 +10,90 @@ import sys
 from pathlib import Path
 
 import click
+import yaml
 from rich.console import Console
 
 from docuchango import __version__
+from docuchango.schemas import DocsProjectConfig
 
 console = Console()
+
+
+def _load_docs_project_config(root: Path) -> tuple[DocsProjectConfig | None, Path | None]:
+    """Load docs-project.yaml from repo root or docs-cms."""
+    candidates = [root / "docs-project.yaml", root / "docs-cms" / "docs-project.yaml"]
+    for candidate in candidates:
+        if not candidate.exists():
+            continue
+        try:
+            with candidate.open(encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+            return DocsProjectConfig(**data), candidate
+        except Exception:
+            return None, candidate
+    return None, None
+
+
+def _discover_doc_files(root: Path) -> list[Path]:
+    """Discover markdown docs, preferring docs-project.yaml when present."""
+    config, config_path = _load_docs_project_config(root)
+
+    # New mixed-schema mode
+    if config and config.structure and config.structure.doc_types and config_path:
+        config_base = config_path.parent
+        roots = config.structure.docs_roots or ["."]
+        files: list[Path] = []
+        seen: set[Path] = set()
+
+        for doc_type_cfg in config.structure.doc_types.values():
+            for root_rel in roots:
+                root_path = (config_base / root_rel).resolve()
+                for folder in doc_type_cfg.folders:
+                    folder_path = (root_path / folder).resolve()
+                    if not folder_path.exists():
+                        continue
+                    for file_path in folder_path.rglob("*.md"):
+                        if file_path not in seen:
+                            seen.add(file_path)
+                            files.append(file_path)
+        return sorted(files)
+
+    # Legacy mode (backwards compatibility)
+    doc_patterns = [
+        "adr/**/*.md",
+        "rfcs/**/*.md",
+        "memos/**/*.md",
+        "prd/**/*.md",
+        "docs-cms/adr/**/*.md",
+        "docs-cms/rfcs/**/*.md",
+        "docs-cms/memos/**/*.md",
+        "docs-cms/prd/**/*.md",
+    ]
+    files: list[Path] = []
+    for pattern in doc_patterns:
+        files.extend(root.glob(pattern))
+    return sorted(set(files))
+
+
+def _guess_doc_type_from_path(file_path: Path) -> str | None:
+    """Best-effort document type inference from path segments."""
+    parts = [p.lower() for p in file_path.parts]
+    if "adr" in parts:
+        return "adr"
+    if "rfcs" in parts or "rfc" in parts:
+        return "rfc"
+    if "memos" in parts or "memo" in parts:
+        return "memo"
+    if "prd" in parts:
+        return "prd"
+    return None
+
+
+def _filter_files_by_doc_type(files: list[Path], doc_type: str | None) -> list[Path]:
+    """Filter discovered files by requested doc type."""
+    if not doc_type:
+        return files
+    return [f for f in files if _guess_doc_type_from_path(f) == doc_type]
 
 
 @click.group()
@@ -71,21 +150,7 @@ def validate(
     if dry_run:
         console.print("[yellow]DRY RUN - No changes will be made[/yellow]\n")
 
-    # Find all markdown files in docs directories
-    # Check both repo root and docs-cms subdirectory for compatibility
-    doc_patterns = [
-        "adr/**/*.md",
-        "rfcs/**/*.md",
-        "memos/**/*.md",
-        "prd/**/*.md",
-        "docs-cms/adr/**/*.md",
-        "docs-cms/rfcs/**/*.md",
-        "docs-cms/memos/**/*.md",
-        "docs-cms/prd/**/*.md",
-    ]
-    all_files = []
-    for pattern in doc_patterns:
-        all_files.extend(repo_root.glob(pattern))
+    all_files = _discover_doc_files(repo_root)
 
     # Track fixes applied and remaining issues
     fixes_applied: list[tuple[Path, str]] = []
@@ -569,31 +634,7 @@ def bulk_update(
     # Find files to process
     root = target_path or Path.cwd()
 
-    # Build glob patterns based on doc_type filter
-    if doc_type:
-        type_dirs = {
-            "adr": ["adr"],
-            "rfc": ["rfcs"],
-            "memo": ["memos"],
-            "prd": ["prd"],
-        }
-        patterns = [f"{d}/**/*.md" for d in type_dirs[doc_type]]
-        patterns += [f"docs-cms/{d}/**/*.md" for d in type_dirs[doc_type]]
-    else:
-        patterns = [
-            "adr/**/*.md",
-            "rfcs/**/*.md",
-            "memos/**/*.md",
-            "prd/**/*.md",
-            "docs-cms/adr/**/*.md",
-            "docs-cms/rfcs/**/*.md",
-            "docs-cms/memos/**/*.md",
-            "docs-cms/prd/**/*.md",
-        ]
-
-    all_files = []
-    for pattern in patterns:
-        all_files.extend(root.glob(pattern))
+    all_files = _filter_files_by_doc_type(_discover_doc_files(root), doc_type)
 
     if not all_files:
         console.print("[yellow]No files found matching criteria[/yellow]")
@@ -685,31 +726,7 @@ def bulk_timestamps(
     # Find files to process
     root = target_path or Path.cwd()
 
-    # Build glob patterns based on doc_type filter
-    if doc_type:
-        type_dirs = {
-            "adr": ["adr"],
-            "rfc": ["rfcs"],
-            "memo": ["memos"],
-            "prd": ["prd"],
-        }
-        patterns = [f"{d}/**/*.md" for d in type_dirs[doc_type]]
-        patterns += [f"docs-cms/{d}/**/*.md" for d in type_dirs[doc_type]]
-    else:
-        patterns = [
-            "adr/**/*.md",
-            "rfcs/**/*.md",
-            "memos/**/*.md",
-            "prd/**/*.md",
-            "docs-cms/adr/**/*.md",
-            "docs-cms/rfcs/**/*.md",
-            "docs-cms/memos/**/*.md",
-            "docs-cms/prd/**/*.md",
-        ]
-
-    all_files = []
-    for pattern in patterns:
-        all_files.extend(root.glob(pattern))
+    all_files = _filter_files_by_doc_type(_discover_doc_files(root), doc_type)
 
     if not all_files:
         console.print("[yellow]No files found matching criteria[/yellow]")
@@ -849,31 +866,7 @@ def migrate(
     # Find files to process
     root = target_path or Path.cwd()
 
-    # Build glob patterns based on doc_type filter
-    if doc_type:
-        type_dirs = {
-            "adr": ["adr"],
-            "rfc": ["rfcs"],
-            "memo": ["memos"],
-            "prd": ["prd"],
-        }
-        patterns = [f"{d}/**/*.md" for d in type_dirs[doc_type]]
-        patterns += [f"docs-cms/{d}/**/*.md" for d in type_dirs[doc_type]]
-    else:
-        patterns = [
-            "adr/**/*.md",
-            "rfcs/**/*.md",
-            "memos/**/*.md",
-            "prd/**/*.md",
-            "docs-cms/adr/**/*.md",
-            "docs-cms/rfcs/**/*.md",
-            "docs-cms/memos/**/*.md",
-            "docs-cms/prd/**/*.md",
-        ]
-
-    all_files = []
-    for pattern in patterns:
-        all_files.extend(root.glob(pattern))
+    all_files = _filter_files_by_doc_type(_discover_doc_files(root), doc_type)
 
     if not all_files:
         console.print("[yellow]No files found matching criteria[/yellow]")
