@@ -2,6 +2,34 @@
 
 <!-- version list -->
 
+## v1.13.0 (2026-04-25)
+
+### Bug Fixes
+
+- **validation**: Support plain markdown generic lanes
+  ([`456fd07`](https://github.com/jrepp/docuchango/commit/456fd07b1f5e256d9038effdf4469c4b85487e8a))
+
+### Chores
+
+- Sync CMS document metadata and uv lock
+  ([`cdc2056`](https://github.com/jrepp/docuchango/commit/cdc2056cadb5c4abfa8711731a271e5186818d5b))
+
+### Documentation
+
+- Align CLI docs with current validate workflow
+  ([`8842f87`](https://github.com/jrepp/docuchango/commit/8842f8754216dac0c8d98f50b623a5a24f691d79))
+
+### Features
+
+- **config**: Support mixed monorepo doc schemas
+  ([`f2f6566`](https://github.com/jrepp/docuchango/commit/f2f6566e14beb3276910dddbb1c39ec83a22a688))
+
+### Testing
+
+- Fix docs regression import ordering
+  ([`367b123`](https://github.com/jrepp/docuchango/commit/367b123f9ae24b80b48fa00a8f9c65019f2ce434))
+
+
 ## v1.12.3 (2026-04-04)
 
 ### Bug Fixes
