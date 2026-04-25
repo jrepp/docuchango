@@ -10,7 +10,45 @@ import datetime
 import re
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+class DocTypeConfig(BaseModel):
+    """Configuration for a single document type in docs-project.yaml.
+
+    This enables mixed document schemas in monorepos, including:
+    - numeric-prefix formats (e.g., adr-001-...)
+    - non-numeric formats (e.g., prfaq-why-now.md)
+    - custom folders per document type
+    - custom schema binding (adr/rfc/memo/prd/generic)
+    """
+
+    folders: list[str] = Field(
+        default_factory=list,
+        description="Folders (relative to config file directory) containing this document type",
+    )
+    filename_pattern: str | None = Field(
+        default=None,
+        description="Optional regex enforced against file names (not full paths)",
+    )
+    enforce_filename_pattern: bool = Field(
+        default=True,
+        description="Whether filename_pattern should be enforced when provided",
+    )
+    require_frontmatter: bool = Field(
+        default=True,
+        description=(
+            "Whether documents in this lane must include YAML frontmatter. "
+            "Set false for plain-Markdown generic lanes in mixed-schema repos."
+        ),
+    )
+    model_config = ConfigDict(populate_by_name=True)
+
+    frontmatter_schema: Literal["adr", "rfc", "memo", "prd", "generic"] = Field(
+        alias="schema",
+        default="generic",
+        description="Frontmatter schema to validate against for this document type",
+    )
 
 
 class DocsProjectStructure(BaseModel):
@@ -43,6 +81,17 @@ class DocsProjectStructure(BaseModel):
     document_folders: list[str] = Field(
         default_factory=lambda: ["adr", "rfcs", "memos", "prd"],
         description="List of folders to scan for documents. Override to customize which folders are validated. Default: ['adr', 'rfcs', 'memos', 'prd']",
+    )
+    docs_roots: list[str] = Field(
+        default_factory=lambda: ["."],
+        description="Optional list of roots (relative to the config file directory) to scan for folders. Useful for monorepos.",
+    )
+    doc_types: dict[str, DocTypeConfig] | None = Field(
+        default=None,
+        description=(
+            "Optional custom document type map for mixed-schema repositories. "
+            "When provided, this takes precedence over adr_dir/rfc_dir/memo_dir/prd_dir."
+        ),
     )
 
 

@@ -9,6 +9,11 @@ structure:
   memo_dir: memos
   prd_dir: prd
   template_dir: templates
+  # Optional roots to scan (relative to this file). Useful in monorepos.
+  # docs_roots:
+  #   - .
+  #   - ../project-a/docs
+  #   - ../project-b/docs
   # List of folders to scan for documents
   # Override this to customize which folders are validated
   document_folders:
@@ -16,6 +21,26 @@ structure:
     - rfcs
     - memos
     - prd
+
+  # Optional advanced mapping for mixed schemas/layouts in one repository.
+  # When doc_types is set, it takes precedence over adr_dir/rfc_dir/memo_dir/prd_dir.
+  # doc_types:
+  #   adr:
+  #     schema: adr
+  #     folders: [adr]
+  #     filename_pattern: "^(adr)-(\\d{3})-(.+)\\.md$"
+  #     enforce_filename_pattern: true
+  #   prfaq:
+  #     schema: generic
+  #     folders: [prfaq]
+  #     filename_pattern: "^prfaq-.+\\.md$"
+  #     enforce_filename_pattern: true
+  #   design-notes:
+  #     schema: generic
+  #     folders: [design]
+  #     filename_pattern: ".+\\.md$"
+  #     enforce_filename_pattern: false
+  #     require_frontmatter: false  # Allow plain Markdown design notes
 
 metadata:
   created: "2025-01-01"
