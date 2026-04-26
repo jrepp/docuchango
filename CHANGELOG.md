@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.14.0 (2026-04-26)
+
+### Code Style
+
+- Format id compression module
+  ([`89ac573`](https://github.com/jrepp/docuchango/commit/89ac573fedabb87f74a56eca16e772f2616af8f4))
+
+### Features
+
+- Compress document ids
+  ([`96511fb`](https://github.com/jrepp/docuchango/commit/96511fb7196fba4bdb5972abd6ebc27c9eaac4c0))
+
+
 ## v1.13.0 (2026-04-25)
 
 ### Bug Fixes
