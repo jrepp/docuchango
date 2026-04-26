@@ -58,6 +58,21 @@ def _discover_doc_files(root: Path) -> list[Path]:
                             files.append(file_path)
         return sorted(files)
 
+    if config and config.structure and config_path:
+        config_base = config_path.parent
+        files = []
+        seen = set()
+        for folder in config.structure.document_folders:
+            folder_path = (config_base / folder).resolve()
+            if not folder_path.exists():
+                continue
+            for file_path in folder_path.rglob("*.md"):
+                if file_path not in seen:
+                    seen.add(file_path)
+                    files.append(file_path)
+        if files:
+            return sorted(files)
+
     # Legacy mode (backwards compatibility)
     doc_patterns = [
         "adr/**/*.md",
@@ -780,6 +795,120 @@ def bulk_timestamps(
         console.print(f"[green]Modified {modified_count} of {len(all_files)} files[/green]")
         if error_count:
             console.print(f"[red]Errors: {error_count}[/red]")
+
+
+@bulk.command("compress-ids")
+@click.option(
+    "--type",
+    "doc_type",
+    type=click.Choice(["adr", "rfc", "memo", "prd"]),
+    help="Filter by document type",
+)
+@click.option(
+    "--path",
+    "target_path",
+    type=click.Path(exists=True, path_type=Path),
+    help="Repository or docs root (default: current directory)",
+)
+@click.option("--dry-run", is_flag=True, help="Preview changes without applying")
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed output")
+def bulk_compress_ids(
+    doc_type: str | None,
+    target_path: Path | None,
+    dry_run: bool,
+    verbose: bool,
+):
+    """Compress document IDs and update references.
+
+    Renumbers documents of each selected type into a contiguous sequence while
+    preserving filename suffixes. References across the repository are rewritten,
+    then an audit reports stale or missing document-like references.
+
+    Examples:
+
+        \b
+        # Compress all document types
+        docuchango bulk compress-ids
+
+        \b
+        # Compress only memos: memo-001, memo-010 -> memo-001, memo-002
+        docuchango bulk compress-ids --type memo
+
+        \b
+        # Preview all renames and reference updates
+        docuchango bulk compress-ids --dry-run --verbose
+    """
+    from docuchango.fixes.id_compression import compress_document_ids
+
+    root = target_path or Path.cwd()
+    discovered_files = _discover_doc_files(root)
+    all_files = _filter_files_by_doc_type(discovered_files, doc_type)
+
+    if not all_files:
+        console.print("[yellow]No files found matching criteria[/yellow]")
+        sys.exit(0)
+
+    console.print("[bold blue]🗜️  Compressing document IDs[/bold blue]")
+    if dry_run:
+        console.print("[yellow]DRY RUN - No changes will be made[/yellow]")
+    console.print(f"Processing {len(all_files)} files...\n")
+
+    try:
+        result = compress_document_ids(root, discovered_files, doc_type=doc_type, dry_run=dry_run)
+    except Exception as e:
+        console.print(f"[red]✗[/red] {e}")
+        sys.exit(1)
+
+    action = "Would renumber" if dry_run else "Renumbered"
+    if result.changes:
+        console.print(f"[green]{action} {len(result.changes)} document(s)[/green]")
+        for change in result.changes:
+            old_rel = change.file_path.relative_to(root)
+            new_rel = change.new_path.relative_to(root)
+            console.print(f"  {change.old_id} → {change.new_id}: {old_rel} → {new_rel}")
+    else:
+        console.print("[green]Document IDs are already contiguous[/green]")
+
+    if result.updated_files:
+        action = "Would update" if dry_run else "Updated"
+        console.print(f"\n[green]{action} references in {len(result.updated_files)} file(s)[/green]")
+        if verbose:
+            for file_path, count in sorted(result.updated_files.items()):
+                rel_path = file_path.relative_to(root)
+                console.print(f"  {rel_path}: {count} change(s)")
+    else:
+        console.print("\n[green]No references needed updates[/green]")
+
+    if result.synced_files:
+        action = "Would sync" if dry_run else "Synced"
+        console.print(f"\n[green]{action} frontmatter IDs in {len(result.synced_files)} file(s)[/green]")
+        if verbose:
+            for file_path in result.synced_files:
+                rel_path = file_path.relative_to(root)
+                console.print(f"  {rel_path}")
+
+    if result.stale_references:
+        console.print(f"\n[red]Stale references after rewrite: {len(result.stale_references)}[/red]")
+        for hit in result.stale_references[:25]:
+            rel_path = hit.file_path.relative_to(root)
+            console.print(f"  {rel_path}:{hit.line_number}: {hit.reference}")
+        if len(result.stale_references) > 25:
+            console.print(f"  ... and {len(result.stale_references) - 25} more")
+    else:
+        console.print("\n[green]No stale references to old IDs found[/green]")
+
+    if result.missing_references:
+        console.print(f"\n[yellow]Missing document references found: {len(result.missing_references)}[/yellow]")
+        for hit in result.missing_references[:25]:
+            rel_path = hit.file_path.relative_to(root)
+            console.print(f"  {rel_path}:{hit.line_number}: {hit.reference}")
+        if len(result.missing_references) > 25:
+            console.print(f"  ... and {len(result.missing_references) - 25} more")
+    elif verbose:
+        console.print("\n[green]No missing document references found[/green]")
+
+    if dry_run and (result.changes or result.updated_files):
+        console.print("\n[dim]Run without --dry-run to apply changes[/dim]")
 
 
 @main.command("migrate")
