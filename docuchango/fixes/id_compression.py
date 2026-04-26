@@ -96,7 +96,9 @@ def compress_document_ids(
         _apply_document_changes(changes)
 
     result.synced_files = _sync_frontmatter_ids(doc_files, changes, dry_run=dry_run)
-    result.stale_references = _audit_old_references(repo_root, changes, planned_updates=updated_files if dry_run else None)
+    result.stale_references = _audit_old_references(
+        repo_root, changes, planned_updates=updated_files if dry_run else None
+    )
     result.missing_references = audit_missing_document_references(repo_root, doc_files, planned_changes=changes)
     return result
 
@@ -167,9 +169,7 @@ def _apply_document_changes(changes: list[DocumentIdChange]) -> None:
         change.file_path.rename(change.new_path)
 
 
-def _sync_frontmatter_ids(
-    doc_files: list[Path], changes: list[DocumentIdChange], dry_run: bool
-) -> list[Path]:
+def _sync_frontmatter_ids(doc_files: list[Path], changes: list[DocumentIdChange], dry_run: bool) -> list[Path]:
     current_paths = {change.new_path if change.new_path.exists() else change.file_path for change in changes}
     changed_paths = {change.file_path for change in changes}
     current_paths.update(path for path in doc_files if path not in changed_paths)
@@ -198,7 +198,11 @@ def _rewrite_references(repo_root: Path, changes: list[DocumentIdChange], dry_ru
         return {}
 
     id_map = {change.old_id: change.new_id for change in changes}
-    filename_map = {change.file_path.name: change.new_path.name for change in changes if change.file_path.name != change.new_path.name}
+    filename_map = {
+        change.file_path.name: change.new_path.name
+        for change in changes
+        if change.file_path.name != change.new_path.name
+    }
     updated_files: dict[Path, int] = {}
 
     for file_path in _iter_text_files(repo_root):
