@@ -26,6 +26,7 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass, field
+from datetime import date, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Optional
@@ -710,6 +711,178 @@ class DocValidator:
         if not issues_found:
             self.log("   ✓ No problematic cross-plugin links found")
 
+    def _extract_markdown_file_links(self, content: str, source_path: Path) -> dict[Path, tuple[int, str]]:
+        """Extract Markdown file links and resolve them to absolute paths."""
+        links: dict[Path, tuple[int, str]] = {}
+        in_code_fence = False
+        link_pattern = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+
+        for line_num, line in enumerate(content.splitlines(), start=1):
+            if line.startswith("```"):
+                in_code_fence = not in_code_fence
+                continue
+            if in_code_fence:
+                continue
+
+            line_without_code = re.sub(r"`[^`]+`", "", line)
+            for match in link_pattern.finditer(line_without_code):
+                target = match.group(2).split("#", 1)[0]
+                if re.match(r"^[a-z][a-z0-9+.-]*:", target):
+                    continue
+                if not target.endswith(".md") and not target.startswith(("./", "../", "/")):
+                    continue
+
+                if target.startswith("/"):
+                    resolved = (self.repo_root / target.lstrip("/")).resolve()
+                else:
+                    resolved = (source_path.parent / target).resolve()
+                    if not target.endswith(".md"):
+                        resolved = Path(str(resolved) + ".md")
+                links[resolved] = (line_num, target)
+
+        return links
+
+    def _extract_bucket_headings(self, content: str, heading_level: int) -> dict[int, str]:
+        """Map line numbers to bucket heading text at the configured heading level."""
+        marker = "#" * heading_level
+        headings: dict[int, str] = {}
+        in_code_fence = False
+
+        for line_num, line in enumerate(content.splitlines(), start=1):
+            if line.startswith("```"):
+                in_code_fence = not in_code_fence
+                continue
+            if in_code_fence:
+                continue
+            if line.startswith(f"{marker} ") and not line.startswith(f"{marker}#"):
+                headings[line_num] = line[len(marker) :].strip()
+
+        return headings
+
+    def _bucket_for_target(self, target_path: Path, bucket_config) -> Optional[str]:  # type: ignore[no-untyped-def]
+        """Compute the expected index bucket for a target document."""
+        post = frontmatter.loads(target_path.read_text(encoding="utf-8"))
+
+        if bucket_config.cadence == "milestone":
+            milestone = post.metadata.get(bucket_config.milestone_field)
+            return str(milestone).strip() if milestone else None
+
+        value = post.metadata.get(bucket_config.field)
+        if isinstance(value, datetime):
+            target_date = value.date()
+        elif isinstance(value, date):
+            target_date = value
+        elif isinstance(value, str):
+            target_date = date.fromisoformat(value.split("T", 1)[0])
+        else:
+            return None
+
+        if bucket_config.cadence == "weekly":
+            iso_year, iso_week, _ = target_date.isocalendar()
+            return f"{iso_year}-W{iso_week:02d}"
+        if bucket_config.cadence == "monthly":
+            return f"{target_date:%Y-%m}"
+        if bucket_config.cadence == "quarterly":
+            quarter = ((target_date.month - 1) // 3) + 1
+            return f"{target_date.year}-Q{quarter}"
+        if bucket_config.cadence == "yearly":
+            return f"{target_date.year}"
+        return None
+
+    def check_document_indexes(self):
+        """Validate configured Markdown index files."""
+        if not self.project_config or not self.project_config.indexes:
+            return
+
+        self.log("\n🗂️  Checking document indexes...")
+        config_base = self._get_config_base_dir()
+
+        for index_config in self.project_config.indexes:
+            index_path = (config_base / index_config.path).resolve()
+            if not index_path.exists():
+                self.errors.append(f"Document index '{index_config.name}' not found: {index_config.path}")
+                continue
+
+            try:
+                content = index_path.read_text(encoding="utf-8")
+                links = self._extract_markdown_file_links(content, index_path)
+                target_paths: set[Path] = set()
+                for target_pattern in index_config.targets:
+                    target_paths.update(path.resolve() for path in config_base.glob(target_pattern) if path.is_file())
+                target_paths.discard(index_path)
+
+                if index_config.require_entries and target_paths and not links:
+                    self.errors.append(f"Document index '{index_config.name}' has no Markdown links")
+
+                if index_config.require_all_targets:
+                    for target_path in sorted(target_paths):
+                        if target_path not in links:
+                            rel_target = target_path.relative_to(config_base)
+                            self.errors.append(f"Document index '{index_config.name}' is missing target: {rel_target}")
+
+                if not index_config.allow_extra_links:
+                    for linked_path, (line_num, raw_target) in sorted(links.items()):
+                        if linked_path.exists() and linked_path not in target_paths:
+                            self.errors.append(
+                                f"Document index '{index_config.name}' line {line_num} links outside targets: {raw_target}"
+                            )
+
+                if index_config.time_bucket:
+                    self._check_document_index_buckets(index_config.name, content, links, target_paths, index_config.time_bucket)
+
+                self.log(f"   ✓ {index_config.name}: {len(target_paths)} target(s) checked")
+            except Exception as e:
+                self.errors.append(f"Error checking document index '{index_config.name}': {e}")
+
+    def _check_document_index_buckets(self, name: str, content: str, links: dict[Path, tuple[int, str]], target_paths: set[Path], bucket_config) -> None:  # type: ignore[no-untyped-def]
+        """Validate that index links appear under the expected time or milestone bucket."""
+        headings = self._extract_bucket_headings(content, bucket_config.heading_level)
+        if not headings:
+            self.errors.append(f"Document index '{name}' has no bucket headings")
+            return
+
+        if bucket_config.heading_pattern:
+            heading_re = re.compile(bucket_config.heading_pattern)
+            for line_num, heading in headings.items():
+                if not heading_re.match(heading):
+                    self.errors.append(f"Document index '{name}' line {line_num} has invalid bucket heading: {heading}")
+
+        sorted_headings = sorted(headings.items())
+        buckets = set(headings.values())
+
+        def bucket_at_line(line_num: int) -> Optional[str]:
+            current = None
+            for heading_line, heading in sorted_headings:
+                if heading_line >= line_num:
+                    break
+                current = heading
+            return current
+
+        for target_path in sorted(target_paths):
+            try:
+                expected_bucket = self._bucket_for_target(target_path, bucket_config)
+            except Exception as e:
+                rel_target = target_path.relative_to(self._get_config_base_dir())
+                self.errors.append(f"Document index '{name}' cannot read bucket for {rel_target}: {e}")
+                continue
+
+            rel_target = target_path.relative_to(self._get_config_base_dir())
+            if not expected_bucket:
+                self.errors.append(f"Document index '{name}' cannot determine bucket for {rel_target}")
+                continue
+            if expected_bucket not in buckets:
+                self.errors.append(f"Document index '{name}' missing bucket heading: {expected_bucket}")
+                continue
+            if target_path not in links:
+                continue
+
+            line_num, _ = links[target_path]
+            actual_bucket = bucket_at_line(line_num)
+            if actual_bucket != expected_bucket:
+                self.errors.append(
+                    f"Document index '{name}' links {rel_target} under '{actual_bucket}' instead of '{expected_bucket}'"
+                )
+
     def check_typescript_config(self):
         """Run TypeScript typecheck on Docusaurus config"""
         self.log("\n🔍 Running TypeScript typecheck...")
@@ -1340,6 +1513,7 @@ class DocValidator:
         self.check_mdx_compilation()  # Check MDX compilation with @mdx-js/mdx
         self.check_mdx_compatibility()
         self.check_cross_plugin_links()
+        self.check_document_indexes()
         self.check_formatting()
         self.check_readability()  # Check document readability
 

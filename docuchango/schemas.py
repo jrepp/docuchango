@@ -202,6 +202,60 @@ class DocsProjectReadability(BaseModel):
         )
 
 
+class DocsProjectIndexTimeBucket(BaseModel):
+    """Time or milestone bucket rules for a document index."""
+
+    cadence: Literal["weekly", "monthly", "quarterly", "yearly", "milestone"] = Field(
+        ...,
+        description="Bucket cadence for indexed documents",
+    )
+    field: str = Field(
+        default="created",
+        description="Target frontmatter field used to compute date buckets",
+    )
+    milestone_field: str = Field(
+        default="milestone",
+        description="Target frontmatter field used when cadence is milestone",
+    )
+    heading_level: int = Field(
+        default=2,
+        ge=1,
+        le=6,
+        description="Markdown heading level used for bucket headings",
+    )
+    heading_pattern: str | None = Field(
+        default=None,
+        description="Optional regex that bucket heading text must match",
+    )
+
+
+class DocsProjectIndex(BaseModel):
+    """Configuration for a Markdown file that indexes other repository documents."""
+
+    name: str = Field(..., min_length=1, description="Human-readable index name")
+    path: str = Field(..., min_length=1, description="Index Markdown file, relative to docs-project.yaml")
+    targets: list[str] = Field(
+        default_factory=list,
+        description="Glob patterns for Markdown files that must appear in the index",
+    )
+    require_all_targets: bool = Field(
+        default=True,
+        description="Require every target file to be linked from the index",
+    )
+    require_entries: bool = Field(
+        default=True,
+        description="Require the index to contain at least one Markdown link when targets exist",
+    )
+    allow_extra_links: bool = Field(
+        default=True,
+        description="Allow Markdown links to files outside the configured target set",
+    )
+    time_bucket: DocsProjectIndexTimeBucket | None = Field(
+        default=None,
+        description="Optional bucket discipline for release notes, milestone changelogs, and similar indexes",
+    )
+
+
 class DocsProjectConfig(BaseModel):
     """Schema for docs-project.yaml configuration file.
 
@@ -224,6 +278,10 @@ class DocsProjectConfig(BaseModel):
     readability: DocsProjectReadability = Field(
         default_factory=DocsProjectReadability,
         description="Readability analysis configuration and thresholds",
+    )
+    indexes: list[DocsProjectIndex] = Field(
+        default_factory=list,
+        description="Markdown index files with stricter content discipline",
     )
 
 

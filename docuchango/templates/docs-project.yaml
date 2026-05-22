@@ -42,6 +42,36 @@ structure:
   #     enforce_filename_pattern: false
   #     require_frontmatter: false  # Allow plain Markdown design notes
 
+# Optional Markdown files that index other repository files.
+# These rules are stricter than normal docs validation: targets can be required,
+# extra Markdown links can be forbidden, and release/milestone indexes can require
+# entries under time or milestone bucket headings.
+# indexes:
+#   - name: Shared Design Index
+#     path: docs/design-index.md
+#     targets:
+#       - docs/design/**/*.md
+#     require_all_targets: true
+#     require_entries: true
+#     allow_extra_links: true
+#   - name: Weekly Release Notes
+#     path: docs/release-index.md
+#     targets:
+#       - docs/release-notes/*.md
+#     time_bucket:
+#       cadence: weekly  # weekly, monthly, quarterly, yearly, or milestone
+#       field: created
+#       heading_level: 2
+#       heading_pattern: "^\\d{4}-W\\d{2}$"
+#   - name: Milestone Changelog
+#     path: docs/milestone-changelog.md
+#     targets:
+#       - docs/plans/*.md
+#     time_bucket:
+#       cadence: milestone
+#       milestone_field: milestone
+#       heading_level: 2
+
 metadata:
   created: "2025-01-01"
   maintainers:
