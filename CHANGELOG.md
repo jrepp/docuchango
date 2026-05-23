@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.15.0 (2026-05-23)
+
+### Bug Fixes
+
+- Apply ruff formatting to validator.py and test_document_indexes.py
+  ([`83d11a3`](https://github.com/jrepp/docuchango/commit/83d11a34b919aa835f7506a236a56a2b2c6e6118))
+
+### Features
+
+- Validate document indexes
+  ([`1a317b0`](https://github.com/jrepp/docuchango/commit/1a317b0db450c01fed9a6893d52b28fda523aa7a))
+
+
 ## v1.14.0 (2026-04-26)
 
 ### Code Style
