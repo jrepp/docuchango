@@ -124,6 +124,18 @@ class Link:
         return f"{status} {self.source_doc.name}:{self.line_number} -> {self.target}"
 
 
+@dataclass
+class ProjectConfigContext:
+    """Loaded docs-project.yaml with its path for relative path resolution."""
+
+    config: DocsProjectConfig
+    path: Path
+
+    @property
+    def base_dir(self) -> Path:
+        return self.path.parent
+
+
 class DocValidator:
     """Validates documentation"""
 
@@ -139,6 +151,7 @@ class DocValidator:
         # Load project configuration
         self.project_config_path: Optional[Path] = None
         self.project_config = self._load_project_config()
+        self.project_configs = self._load_project_config_contexts()
 
     def _load_project_config(self) -> Optional[DocsProjectConfig]:
         """Load docs-project.yaml configuration"""
@@ -167,6 +180,52 @@ class DocValidator:
 
         self.log("⚠️  Warning: Project config not found (looked for docs-project.yaml at repo root and docs-cms/)")
         return None
+
+    def _load_project_config_at(self, config_path: Path) -> Optional[DocsProjectConfig]:
+        """Load one docs-project.yaml file from an explicit path."""
+        if not config_path.exists():
+            self.log(f"⚠️  Warning: Sub-project config not found: {config_path}")
+            return None
+
+        try:
+            with open(config_path, encoding="utf-8") as f:
+                config_data = yaml.safe_load(f)
+            config = DocsProjectConfig(**config_data)
+            self.log(f"✓ Loaded sub-project config: {config.project.id} ({config_path})")
+            return config
+        except ValidationError as e:
+            self.log(f"⚠️  Warning: Invalid sub-project config format at {config_path}: {e}")
+            return None
+        except Exception as e:
+            self.log(f"⚠️  Warning: Could not load sub-project config at {config_path}: {e}")
+            return None
+
+    def _load_project_config_contexts(self) -> list[ProjectConfigContext]:
+        """Load the primary project config and any referenced sub-project configs."""
+        if not self.project_config or not self.project_config_path:
+            return []
+
+        contexts = [ProjectConfigContext(self.project_config, self.project_config_path)]
+        seen = {self.project_config_path.resolve()}
+        pending = list(contexts)
+
+        while pending:
+            parent = pending.pop(0)
+            for sub_project in parent.config.sub_projects:
+                sub_path = (parent.base_dir / sub_project.path).resolve()
+                if sub_path in seen:
+                    continue
+                seen.add(sub_path)
+
+                sub_config = self._load_project_config_at(sub_path)
+                if not sub_config:
+                    continue
+
+                context = ProjectConfigContext(sub_config, sub_path)
+                contexts.append(context)
+                pending.append(context)
+
+        return contexts
 
     def _get_config_base_dir(self) -> Path:
         """Base directory for resolving structure paths."""
@@ -216,31 +275,50 @@ class DocValidator:
             "prd": r"^(prd)-(\d{3})-(.+)\.md$",
         }
 
-        config_base = self._get_config_base_dir()
+        contexts = self.project_configs or []
 
-        if self.project_config and self.project_config.structure and self.project_config.structure.doc_types:
-            roots = self.project_config.structure.docs_roots or ["."]
+        if contexts:
             entries: list[tuple[str, str, str, bool, bool, Path]] = []
+            for context in contexts:
+                config = context.config
+                config_base = context.base_dir
 
-            for doc_type_name, cfg in self.project_config.structure.doc_types.items():
-                pattern = cfg.filename_pattern or default_patterns.get(doc_type_name, r"^(.+)\.md$")
-                folders = cfg.folders or []
-                for root_rel in roots:
-                    root_path = (config_base / root_rel).resolve()
-                    for folder in folders:
+                if config.structure and config.structure.doc_types:
+                    roots = config.structure.docs_roots or ["."]
+                    for doc_type_name, cfg in config.structure.doc_types.items():
+                        pattern = cfg.filename_pattern or default_patterns.get(doc_type_name, r"^(.+)\.md$")
+                        folders = cfg.folders or []
+                        for root_rel in roots:
+                            root_path = (config_base / root_rel).resolve()
+                            for folder in folders:
+                                entries.append(
+                                    (
+                                        cfg.frontmatter_schema,
+                                        folder,
+                                        pattern,
+                                        cfg.enforce_filename_pattern,
+                                        cfg.require_frontmatter,
+                                        root_path,
+                                    )
+                                )
+                    continue
+
+                folder_config = {
+                    "adr": config.structure.adr_dir,
+                    "rfc": config.structure.rfc_dir,
+                    "memo": config.structure.memo_dir,
+                    "prd": config.structure.prd_dir,
+                }
+                for key, schema_name in [("adr", "adr"), ("rfc", "rfc"), ("memo", "memo"), ("prd", "prd")]:
+                    folder_name = folder_config[key]
+                    if folder_name in config.structure.document_folders:
                         entries.append(
-                            (
-                                cfg.frontmatter_schema,
-                                folder,
-                                pattern,
-                                cfg.enforce_filename_pattern,
-                                cfg.require_frontmatter,
-                                root_path,
-                            )
+                            (schema_name, folder_name, default_patterns[schema_name], True, True, config_base)
                         )
             return entries
 
         # Legacy behavior
+        config_base = self._get_config_base_dir()
         folder_config = self._get_folder_config()
         document_folders = self._get_document_folders()
 
@@ -314,9 +392,13 @@ class DocValidator:
                 require_frontmatter,
             )
 
-        # Scan general docs markdown files at docs roots
+        # Scan general docs markdown files at each configured docs root.
         roots_to_scan = [self._get_config_base_dir()]
-        if self.project_config and self.project_config.structure:
+        if self.project_configs:
+            roots_to_scan = []
+            for context in self.project_configs:
+                roots_to_scan.extend((context.base_dir / p).resolve() for p in context.config.structure.docs_roots)
+        elif self.project_config and self.project_config.structure:
             roots_to_scan = [
                 (self._get_config_base_dir() / p).resolve() for p in self.project_config.structure.docs_roots
             ]
@@ -791,53 +873,65 @@ class DocValidator:
 
     def check_document_indexes(self):
         """Validate configured Markdown index files."""
-        if not self.project_config or not self.project_config.indexes:
+        contexts = self.project_configs or []
+        if not contexts and self.project_config and self.project_config_path:
+            contexts = [ProjectConfigContext(self.project_config, self.project_config_path)]
+
+        contexts = [context for context in contexts if context.config.indexes]
+        if not contexts:
             return
 
         self.log("\n🗂️  Checking document indexes...")
-        config_base = self._get_config_base_dir()
 
-        for index_config in self.project_config.indexes:
-            index_path = (config_base / index_config.path).resolve()
-            if not index_path.exists():
-                self.errors.append(f"Document index '{index_config.name}' not found: {index_config.path}")
-                continue
+        for context in contexts:
+            config_base = context.base_dir
+            for index_config in context.config.indexes:
+                index_path = (config_base / index_config.path).resolve()
+                if not index_path.exists():
+                    self.errors.append(f"Document index '{index_config.name}' not found: {index_config.path}")
+                    continue
 
-            try:
-                content = index_path.read_text(encoding="utf-8")
-                links = self._extract_markdown_file_links(content, index_path)
-                target_paths: set[Path] = set()
-                for target_pattern in index_config.targets:
-                    target_paths.update(path.resolve() for path in config_base.glob(target_pattern) if path.is_file())
-                target_paths.discard(index_path)
+                try:
+                    content = index_path.read_text(encoding="utf-8")
+                    links = self._extract_markdown_file_links(content, index_path)
+                    target_paths: set[Path] = set()
+                    for target_pattern in index_config.targets:
+                        target_paths.update(path.resolve() for path in config_base.glob(target_pattern) if path.is_file())
+                    target_paths.discard(index_path)
 
-                if index_config.require_entries and target_paths and not links:
-                    self.errors.append(f"Document index '{index_config.name}' has no Markdown links")
+                    if index_config.require_entries and target_paths and not links:
+                        self.errors.append(f"Document index '{index_config.name}' has no Markdown links")
 
-                if index_config.require_all_targets:
-                    for target_path in sorted(target_paths):
-                        if target_path not in links:
-                            rel_target = target_path.relative_to(config_base)
-                            self.errors.append(f"Document index '{index_config.name}' is missing target: {rel_target}")
+                    if index_config.require_all_targets:
+                        for target_path in sorted(target_paths):
+                            if target_path not in links:
+                                rel_target = target_path.relative_to(config_base)
+                                self.errors.append(f"Document index '{index_config.name}' is missing target: {rel_target}")
 
-                if not index_config.allow_extra_links:
-                    for linked_path, (line_num, raw_target) in sorted(links.items()):
-                        if linked_path.exists() and linked_path not in target_paths:
-                            self.errors.append(
-                                f"Document index '{index_config.name}' line {line_num} links outside targets: {raw_target}"
-                            )
+                    if not index_config.allow_extra_links:
+                        for linked_path, (line_num, raw_target) in sorted(links.items()):
+                            if linked_path.exists() and linked_path not in target_paths:
+                                self.errors.append(
+                                    f"Document index '{index_config.name}' line {line_num} links outside targets: {raw_target}"
+                                )
 
-                if index_config.time_bucket:
-                    self._check_document_index_buckets(
-                        index_config.name, content, links, target_paths, index_config.time_bucket
-                    )
+                    if index_config.time_bucket:
+                        self._check_document_index_buckets(
+                            index_config.name, content, links, target_paths, index_config.time_bucket, config_base
+                        )
 
-                self.log(f"   ✓ {index_config.name}: {len(target_paths)} target(s) checked")
-            except Exception as e:
-                self.errors.append(f"Error checking document index '{index_config.name}': {e}")
+                    self.log(f"   ✓ {index_config.name}: {len(target_paths)} target(s) checked")
+                except Exception as e:
+                    self.errors.append(f"Error checking document index '{index_config.name}': {e}")
 
     def _check_document_index_buckets(
-        self, name: str, content: str, links: dict[Path, tuple[int, str]], target_paths: set[Path], bucket_config
+        self,
+        name: str,
+        content: str,
+        links: dict[Path, tuple[int, str]],
+        target_paths: set[Path],
+        bucket_config,
+        config_base: Path,
     ) -> None:  # type: ignore[no-untyped-def]
         """Validate that index links appear under the expected time or milestone bucket."""
         headings = self._extract_bucket_headings(content, bucket_config.heading_level)
@@ -866,11 +960,11 @@ class DocValidator:
             try:
                 expected_bucket = self._bucket_for_target(target_path, bucket_config)
             except Exception as e:
-                rel_target = target_path.relative_to(self._get_config_base_dir())
+                rel_target = target_path.relative_to(config_base)
                 self.errors.append(f"Document index '{name}' cannot read bucket for {rel_target}: {e}")
                 continue
 
-            rel_target = target_path.relative_to(self._get_config_base_dir())
+            rel_target = target_path.relative_to(config_base)
             if not expected_bucket:
                 self.errors.append(f"Document index '{name}' cannot determine bucket for {rel_target}")
                 continue
