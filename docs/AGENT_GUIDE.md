@@ -38,6 +38,9 @@ When you start working on a project, **immediately** read the docs-cms:
 # Find and read the project config
 cat docs-cms/docs-project.yaml
 
+# Read the config format and validation schema when editing project config
+cat docs-cms/docs-project.schema.json
+
 # List all ADRs (Architecture Decision Records)
 ls docs-cms/adr/
 
@@ -48,11 +51,15 @@ ls docs-cms/rfcs/
 find docs-cms -name "*.md" -type f | head -20
 ```
 
+If the local schema is missing, use the stable published schema:
+`https://jrepp.github.io/docuchango/schemas/docs-project.schema.json`.
+
 **What to look for:**
 - Recent ADRs: What architectural decisions were made?
 - Active RFCs: What changes are being proposed?
 - Project structure: How is the codebase organized?
 - Tech stack: What technologies are in use?
+- `subprojects`: Which nested docs projects or submodules should be loaded?
 
 ### 2. Answer User Questions
 

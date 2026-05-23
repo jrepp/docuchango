@@ -1,15 +1,27 @@
 """Test suite for docs-project.yaml configuration loading."""
 
+import json
 import tempfile
 from pathlib import Path
 
 import yaml
 
+from docuchango.cli import _discover_doc_files
 from docuchango.validator import DocValidator
 
 
 class TestConfigLoading:
     """Test configuration file loading in DocValidator."""
+
+    def test_docs_project_json_schema_exists_for_editor_validation(self):
+        """Generated docs projects should have a JSON Schema for docs-project.yaml."""
+        schema_path = Path(__file__).parent.parent / "docuchango" / "templates" / "docs-project.schema.json"
+        schema = json.loads(schema_path.read_text())
+
+        assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
+        assert schema["properties"]["version"]["default"] == "1"
+        assert "subprojects" in schema["properties"]
+        assert schema["properties"]["subprojects"]["items"]["oneOf"][0]["type"] == "string"
 
     def test_load_valid_config(self):
         """Test that valid config file is loaded correctly."""
@@ -78,6 +90,8 @@ class TestConfigLoading:
 
             # Check config was loaded with defaults
             assert validator.project_config is not None
+            assert validator.project_config.version == "1"
+            assert validator.project_config.docuchango_version
             assert validator.project_config.structure.adr_dir == "adr"
             assert validator.project_config.structure.prd_dir == "prd"
             assert validator.project_config.structure.document_folders == ["adr", "rfcs", "memos", "prd"]
@@ -577,3 +591,250 @@ This document omits frontmatter and should still fail by default.
 
             assert len(validator.documents) == 1
             assert validator.documents[0].errors == ["Missing YAML frontmatter"]
+
+    def test_subprojects_load_multi_project_config_with_legacy_files(self):
+        """Parent configs can reference multiple subproject configs and keep legacy docs."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            legacy_adr_dir = repo_root / "adr"
+            service_a = repo_root / "vendor" / "service-a"
+            service_a_docs = service_a / "docs" / "adr"
+            service_b = repo_root / "vendor" / "service-b"
+            service_b_memos = service_b / "memos"
+            legacy_adr_dir.mkdir(parents=True)
+            service_a_docs.mkdir(parents=True)
+            service_b_memos.mkdir(parents=True)
+
+            (repo_root / "docs-project.yaml").write_text(
+                yaml.dump(
+                    {
+                        "version": "1",
+                        "docuchango_version": "1.15.0",
+                        "project": {"id": "parent-project", "name": "Parent Project"},
+                        "structure": {"document_folders": ["adr"]},
+                        "subprojects": [
+                            "vendor/service-a",
+                            {"path": "vendor/service-b/docs-project.yaml"},
+                        ],
+                    }
+                )
+            )
+            (service_a / "docs-project.yaml").write_text(
+                yaml.dump(
+                    {
+                        "version": "1",
+                        "docuchango_version": "1.15.0",
+                        "project": {"id": "service-a", "name": "Service A"},
+                        "structure": {
+                            "docs_roots": ["docs"],
+                            "doc_types": {
+                                "adr": {
+                                    "schema": "adr",
+                                    "folders": ["adr"],
+                                    "filename_pattern": r"^(adr)-(\d{3})-(.+)\.md$",
+                                }
+                            },
+                        },
+                    }
+                )
+            )
+            (service_b / "docs-project.yaml").write_text(
+                yaml.dump(
+                    {
+                        "version": "1",
+                        "docuchango_version": "1.15.0",
+                        "project": {"id": "service-b", "name": "Service B"},
+                        "structure": {"document_folders": ["memos"]},
+                    }
+                )
+            )
+
+            (legacy_adr_dir / "adr-001-parent-legacy.md").write_text(
+                """---
+title: Parent Legacy Decision
+status: Accepted
+created: 2025-01-01
+deciders: Core Team
+tags: [architecture]
+id: adr-001
+project_id: parent-project
+doc_uuid: 11111111-1111-4111-8111-111111111111
+---
+
+# Legacy ADR content
+"""
+            )
+            (service_a_docs / "adr-002-submodule-decision.md").write_text(
+                """---
+title: Submodule Decision
+status: Accepted
+created: 2025-01-01
+deciders: Core Team
+tags: [architecture]
+id: adr-002
+project_id: service-a
+doc_uuid: 22222222-2222-4222-8222-222222222222
+---
+
+# ADR content
+"""
+            )
+            (service_b_memos / "memo-001-legacy-submodule.md").write_text(
+                """---
+title: Legacy Submodule Memo
+author: Platform Team
+created: 2025-01-01
+tags: [operations]
+id: memo-001
+project_id: service-b
+doc_uuid: 33333333-3333-4333-8333-333333333333
+---
+
+# Memo content
+"""
+            )
+
+            validator = DocValidator(repo_root, verbose=False)
+            validator.scan_documents()
+
+            assert len(validator.project_configs) == 3
+            assert [context.config.project.id for context in validator.project_configs] == [
+                "parent-project",
+                "service-a",
+                "service-b",
+            ]
+            assert [context.config.version for context in validator.project_configs] == ["1", "1", "1"]
+            assert [context.config.docuchango_version for context in validator.project_configs] == [
+                "1.15.0",
+                "1.15.0",
+                "1.15.0",
+            ]
+            assert sorted(doc.file_path.name for doc in validator.documents) == [
+                "adr-001-parent-legacy.md",
+                "adr-002-submodule-decision.md",
+                "memo-001-legacy-submodule.md",
+            ]
+
+    def test_discover_doc_files_includes_sub_project_configs(self):
+        """CLI file discovery includes docs found through sub-project references."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            submodule = repo_root / "libs" / "service-b"
+            docs_dir = submodule / "adr"
+            docs_dir.mkdir(parents=True)
+
+            (repo_root / "docs-project.yaml").write_text(
+                yaml.dump(
+                    {
+                        "version": "1",
+                        "docuchango_version": "1.15.0",
+                        "project": {"id": "parent-project", "name": "Parent Project"},
+                        "subprojects": [{"path": "libs/service-b"}],
+                    }
+                )
+            )
+            (submodule / "docs-project.yaml").write_text(
+                yaml.dump(
+                    {
+                        "version": "1",
+                        "docuchango_version": "1.15.0",
+                        "project": {"id": "service-b", "name": "Service B"},
+                        "structure": {"document_folders": ["adr"]},
+                    }
+                )
+            )
+            doc_path = docs_dir / "adr-001-service-b.md"
+            doc_path.write_text("# Not parsed by discovery\n")
+
+            assert _discover_doc_files(repo_root) == [doc_path.resolve()]
+
+    def test_missing_sub_project_config_warns_and_continues(self, capsys):
+        """Missing sub-project configs should warn with remediation and keep validating parent docs."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            adr_dir = repo_root / "adr"
+            adr_dir.mkdir()
+
+            (repo_root / "docs-project.yaml").write_text(
+                yaml.dump(
+                    {
+                        "project": {"id": "parent-project", "name": "Parent Project"},
+                        "structure": {"document_folders": ["adr"]},
+                        "subprojects": ["missing-submodule"],
+                    }
+                )
+            )
+            (adr_dir / "adr-001-parent-decision.md").write_text(
+                """---
+title: Parent Decision
+status: Accepted
+created: 2025-01-01
+deciders: Core Team
+tags: [architecture]
+id: adr-001
+project_id: parent-project
+doc_uuid: 11111111-1111-4111-8111-111111111111
+---
+
+# Parent ADR content
+"""
+            )
+
+            validator = DocValidator(repo_root, verbose=False)
+            validator.scan_documents()
+
+            output = capsys.readouterr().out
+            assert "Sub-project config not found" in output
+            assert "Add the file or remove it from subprojects" in output
+            assert [context.config.project.id for context in validator.project_configs] == ["parent-project"]
+            assert [doc.file_path.name for doc in validator.documents] == ["adr-001-parent-decision.md"]
+
+    def test_invalid_sub_project_config_warns_and_continues(self, capsys):
+        """Invalid sub-project configs should warn with remediation and keep validating parent docs."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            submodule = repo_root / "vendor" / "invalid-service"
+            adr_dir = repo_root / "adr"
+            submodule.mkdir(parents=True)
+            adr_dir.mkdir()
+
+            (repo_root / "docs-project.yaml").write_text(
+                yaml.dump(
+                    {
+                        "project": {"id": "parent-project", "name": "Parent Project"},
+                        "structure": {"document_folders": ["adr"]},
+                        "subprojects": ["vendor/invalid-service"],
+                    }
+                )
+            )
+            (submodule / "docs-project.yaml").write_text(
+                yaml.dump(
+                    {
+                        "project": {"id": "Invalid_ID", "name": "Invalid Service"},
+                    }
+                )
+            )
+            (adr_dir / "adr-001-parent-decision.md").write_text(
+                """---
+title: Parent Decision
+status: Accepted
+created: 2025-01-01
+deciders: Core Team
+tags: [architecture]
+id: adr-001
+project_id: parent-project
+doc_uuid: 11111111-1111-4111-8111-111111111111
+---
+
+# Parent ADR content
+"""
+            )
+
+            validator = DocValidator(repo_root, verbose=False)
+            validator.scan_documents()
+
+            output = capsys.readouterr().out
+            assert "Invalid sub-project config format" in output
+            assert "Fix the config or remove it from subprojects" in output
+            assert [context.config.project.id for context in validator.project_configs] == ["parent-project"]
+            assert [doc.file_path.name for doc in validator.documents] == ["adr-001-parent-decision.md"]

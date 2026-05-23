@@ -8,9 +8,15 @@ from __future__ import annotations
 
 import datetime
 import re
+from importlib.metadata import PackageNotFoundError, version
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+try:
+    CURRENT_DOCUCHANGO_VERSION = version("docuchango")
+except PackageNotFoundError:
+    CURRENT_DOCUCHANGO_VERSION = "0.0.0.dev0"
 
 
 class DocTypeConfig(BaseModel):
@@ -256,6 +262,27 @@ class DocsProjectIndex(BaseModel):
     )
 
 
+class DocsProjectSubproject(BaseModel):
+    """Reference to another docs-project.yaml file, often in a git submodule."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    path: str = Field(
+        ...,
+        min_length=1,
+        description=(
+            "Path to a subproject directory or docs-project.yaml file, relative to the parent docs-project.yaml"
+        ),
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def allow_string_reference(cls, data):  # type: ignore[no-untyped-def]
+        if isinstance(data, str):
+            return {"path": data}
+        return data
+
+
 class DocsProjectConfig(BaseModel):
     """Schema for docs-project.yaml configuration file.
 
@@ -263,6 +290,16 @@ class DocsProjectConfig(BaseModel):
     defining project metadata, directory structure, and validation rules.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
+    version: str = Field(
+        default="1",
+        description="docs-project.yaml schema version. Reserved for future config migrations.",
+    )
+    docuchango_version: str = Field(
+        default=CURRENT_DOCUCHANGO_VERSION,
+        description="Docuchango version that generated or last updated this config.",
+    )
     project: DocsProjectInfo = Field(
         ...,
         description="Project information including ID, name, and description",
@@ -282,6 +319,10 @@ class DocsProjectConfig(BaseModel):
     indexes: list[DocsProjectIndex] = Field(
         default_factory=list,
         description="Markdown index files with stricter content discipline",
+    )
+    subprojects: list[DocsProjectSubproject] = Field(
+        default_factory=list,
+        description="Additional docs projects to load, relative to this config file. Useful for git submodules.",
     )
 
 

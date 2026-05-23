@@ -8,7 +8,7 @@ import yaml
 from docuchango.validator import DocValidator
 
 
-def write_config(repo_root: Path, config_data: dict) -> None:
+def write_config(repo_root: Path, config_data: dict[str, object]) -> None:
     with (repo_root / "docs-project.yaml").open("w") as f:
         yaml.dump(config_data, f)
 

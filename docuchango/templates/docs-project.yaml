@@ -1,3 +1,7 @@
+# yaml-language-server: $schema=./docs-project.schema.json
+version: "1"
+docuchango_version: "1.15.0"
+
 project:
   id: my-project
   name: My Project
@@ -41,6 +45,12 @@ structure:
   #     filename_pattern: ".+\\.md$"
   #     enforce_filename_pattern: false
   #     require_frontmatter: false  # Allow plain Markdown design notes
+
+# Optional subproject docs configs. Paths are relative to this file and can point
+# to either a subproject directory or its docs-project.yaml file.
+# subprojects:
+#   - vendor/service-a
+#   - vendor/service-b/docs-project.yaml
 
 # Optional Markdown files that index other repository files.
 # These rules are stricter than normal docs validation: targets can be required,

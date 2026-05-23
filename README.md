@@ -118,6 +118,10 @@ default, but you can opt specific folders into plain Markdown when frontmatter
 is not a project goal.
 
 ```yaml
+# yaml-language-server: $schema=./docs-project.schema.json
+version: "1"
+docuchango_version: "1.15.0"
+
 structure:
   docs_roots: [docs]
   doc_types:
@@ -133,6 +137,20 @@ structure:
       enforce_filename_pattern: false
       require_frontmatter: false
 ```
+
+Parent repositories can also reference configs owned by sub-projects or git
+submodules, avoiding one giant root config:
+
+```yaml
+subprojects:
+  - vendor/service-a
+  - vendor/service-b/docs-project.yaml
+```
+
+Generated projects include `docs-project.schema.json` next to
+`docs-project.yaml` for editor validation and prompt-based config authoring.
+The same schema is published at
+`https://jrepp.github.io/docuchango/schemas/docs-project.schema.json`.
 
 ### Bootstrap & Guides
 

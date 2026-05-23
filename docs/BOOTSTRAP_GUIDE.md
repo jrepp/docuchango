@@ -226,6 +226,7 @@ docuchango validate --verbose
 my-project/
 ├── docs-cms/
 │   ├── docs-project.yaml       # Project configuration
+│   ├── docs-project.schema.json # Validation schema for project configuration
 │   ├── adr/                    # Architecture Decision Records
 │   │   ├── adr-001-*.md
 │   │   ├── adr-002-*.md
@@ -241,6 +242,18 @@ my-project/
 │       ├── rfc-template.md
 │       └── memo-template.md
 └── README.md
+```
+
+`docs-project.yaml` includes a YAML language-server pointer to
+`docs-project.schema.json`. Use that schema when editing config by hand or from
+an agent prompt. The stable published schema URL is
+`https://jrepp.github.io/docuchango/schemas/docs-project.schema.json`.
+Parent repositories can include nested docs projects with:
+
+```yaml
+subprojects:
+  - vendor/service-a
+  - vendor/service-b/docs-project.yaml
 ```
 
 ## Document Types

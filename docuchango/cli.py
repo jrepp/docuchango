@@ -22,6 +22,11 @@ console = Console()
 def _load_docs_project_config(root: Path) -> tuple[DocsProjectConfig | None, Path | None]:
     """Load docs-project.yaml from repo root or docs-cms."""
     candidates = [root / "docs-project.yaml", root / "docs-cms" / "docs-project.yaml"]
+    return _load_docs_project_config_from_candidates(candidates)
+
+
+def _load_docs_project_config_from_candidates(candidates: list[Path]) -> tuple[DocsProjectConfig | None, Path | None]:
+    """Load the first valid docs-project.yaml from candidate paths."""
     for candidate in candidates:
         if not candidate.exists():
             continue
@@ -34,44 +39,75 @@ def _load_docs_project_config(root: Path) -> tuple[DocsProjectConfig | None, Pat
     return None, None
 
 
+def _iter_docs_project_configs(root: Path) -> list[tuple[DocsProjectConfig, Path]]:
+    """Load the root docs-project.yaml plus any configured subprojects."""
+    config, config_path = _load_docs_project_config(root)
+    if not config or not config_path:
+        return []
+
+    configs = [(config, config_path)]
+    seen = {config_path.resolve()}
+    pending = [(config, config_path)]
+
+    while pending:
+        parent_config, parent_path = pending.pop(0)
+        parent_base = parent_path.parent
+        for subproject in parent_config.subprojects:
+            sub_path = (parent_base / subproject.path).resolve()
+            if sub_path.is_dir():
+                sub_path = sub_path / "docs-project.yaml"
+            if sub_path in seen:
+                continue
+            seen.add(sub_path)
+
+            sub_config, loaded_path = _load_docs_project_config_from_candidates([sub_path])
+            if not sub_config or not loaded_path:
+                continue
+
+            configs.append((sub_config, loaded_path))
+            pending.append((sub_config, loaded_path))
+
+    return configs
+
+
 def _discover_doc_files(root: Path) -> list[Path]:
     """Discover markdown docs, preferring docs-project.yaml when present."""
-    config, config_path = _load_docs_project_config(root)
+    configs = _iter_docs_project_configs(root)
 
-    # New mixed-schema mode
-    if config and config.structure and config.structure.doc_types and config_path:
-        config_base = config_path.parent
-        roots = config.structure.docs_roots or ["."]
-        files: list[Path] = []
-        seen: set[Path] = set()
+    if configs:
+        all_files: list[Path] = []
+        all_seen: set[Path] = set()
 
-        for doc_type_cfg in config.structure.doc_types.values():
-            for root_rel in roots:
-                root_path = (config_base / root_rel).resolve()
-                for folder in doc_type_cfg.folders:
-                    folder_path = (root_path / folder).resolve()
+        for config, config_path in configs:
+            if not config.structure:
+                continue
+            config_base = config_path.parent
+
+            if config.structure.doc_types:
+                roots = config.structure.docs_roots or ["."]
+                for doc_type_cfg in config.structure.doc_types.values():
+                    for root_rel in roots:
+                        root_path = (config_base / root_rel).resolve()
+                        for folder in doc_type_cfg.folders:
+                            folder_path = (root_path / folder).resolve()
+                            if not folder_path.exists():
+                                continue
+                            for file_path in folder_path.rglob("*.md"):
+                                if file_path not in all_seen:
+                                    all_seen.add(file_path)
+                                    all_files.append(file_path)
+            else:
+                for folder in config.structure.document_folders:
+                    folder_path = (config_base / folder).resolve()
                     if not folder_path.exists():
                         continue
                     for file_path in folder_path.rglob("*.md"):
-                        if file_path not in seen:
-                            seen.add(file_path)
-                            files.append(file_path)
-        return sorted(files)
+                        if file_path not in all_seen:
+                            all_seen.add(file_path)
+                            all_files.append(file_path)
 
-    if config and config.structure and config_path:
-        config_base = config_path.parent
-        files = []
-        seen = set()
-        for folder in config.structure.document_folders:
-            folder_path = (config_base / folder).resolve()
-            if not folder_path.exists():
-                continue
-            for file_path in folder_path.rglob("*.md"):
-                if file_path not in seen:
-                    seen.add(file_path)
-                    files.append(file_path)
-        if files:
-            return sorted(files)
+        if all_files:
+            return sorted(all_files)
 
     # Legacy mode (backwards compatibility)
     doc_patterns = [
@@ -378,6 +414,7 @@ def init(path: Path | None, project_id: str, project_name: str, force: bool):
 
     template_files = {
         "docs-project.yaml": path / "docs-project.yaml",
+        "docs-project.schema.json": path / "docs-project.schema.json",
         "README.md": path / "README.md",
         "adr-000-template.md": path / "templates" / "adr-000-template.md",
         "rfc-000-template.md": path / "templates" / "rfc-000-template.md",
@@ -406,6 +443,7 @@ def init(path: Path | None, project_id: str, project_name: str, force: bool):
                     "my-project": "\x00PROJECT_ID\x00",
                     "My Project": "\x00PROJECT_NAME\x00",
                     "2025-01-01": "\x00DATE\x00",
+                    "1.15.0": "\x00DOCUCHANGO_VERSION\x00",
                 }
 
                 # First pass: replace placeholders with unique markers
@@ -416,6 +454,7 @@ def init(path: Path | None, project_id: str, project_name: str, force: bool):
                 content = content.replace(markers["my-project"], project_id)
                 content = content.replace(markers["My Project"], project_name)
                 content = content.replace(markers["2025-01-01"], datetime.date.today().isoformat())
+                content = content.replace(markers["1.15.0"], __version__)
 
             dest_path.write_text(content)
             console.print(f"[green]✓[/green] Created: {dest_path.relative_to(path)}")
@@ -428,8 +467,9 @@ def init(path: Path | None, project_id: str, project_name: str, force: bool):
     console.print(f"\n[bold green]✅ Successfully initialized docs-cms at {path}[/bold green]")
     console.print("\n[bold]Next steps:[/bold]")
     console.print("1. Review and customize docs-project.yaml")
-    console.print("2. Copy a template from templates/ to create your first document")
-    console.print("3. Run 'docuchango validate' to check your documents")
+    console.print("2. Use docs-project.schema.json as the config format reference")
+    console.print("3. Copy a template from templates/ to create your first document")
+    console.print("4. Run 'docuchango validate' to check your documents")
     console.print("\n[dim]Tip: Run 'docuchango bootstrap' for detailed setup instructions[/dim]")
 
 
