@@ -828,13 +828,17 @@ class DocValidator:
                             )
 
                 if index_config.time_bucket:
-                    self._check_document_index_buckets(index_config.name, content, links, target_paths, index_config.time_bucket)
+                    self._check_document_index_buckets(
+                        index_config.name, content, links, target_paths, index_config.time_bucket
+                    )
 
                 self.log(f"   ✓ {index_config.name}: {len(target_paths)} target(s) checked")
             except Exception as e:
                 self.errors.append(f"Error checking document index '{index_config.name}': {e}")
 
-    def _check_document_index_buckets(self, name: str, content: str, links: dict[Path, tuple[int, str]], target_paths: set[Path], bucket_config) -> None:  # type: ignore[no-untyped-def]
+    def _check_document_index_buckets(
+        self, name: str, content: str, links: dict[Path, tuple[int, str]], target_paths: set[Path], bucket_config
+    ) -> None:  # type: ignore[no-untyped-def]
         """Validate that index links appear under the expected time or milestone bucket."""
         headings = self._extract_bucket_headings(content, bucket_config.heading_level)
         if not headings:

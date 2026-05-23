@@ -47,7 +47,9 @@ def test_document_index_requires_all_targets():
         validator = DocValidator(repo_root, verbose=False)
         validator.check_document_indexes()
 
-        assert "Document index 'Shared Design Index' is missing target: docs/decisions/decision-b.md" in validator.errors
+        assert (
+            "Document index 'Shared Design Index' is missing target: docs/decisions/decision-b.md" in validator.errors
+        )
 
 
 def test_weekly_document_index_requires_bucket_headings_and_placement():
