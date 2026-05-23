@@ -736,3 +736,94 @@ doc_uuid: 33333333-3333-4333-8333-333333333333
             doc_path.write_text("# Not parsed by discovery\n")
 
             assert _discover_doc_files(repo_root) == [doc_path.resolve()]
+
+    def test_missing_sub_project_config_warns_and_continues(self, capsys):
+        """Missing sub-project configs should warn with remediation and keep validating parent docs."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            adr_dir = repo_root / "adr"
+            adr_dir.mkdir()
+
+            (repo_root / "docs-project.yaml").write_text(
+                yaml.dump(
+                    {
+                        "project": {"id": "parent-project", "name": "Parent Project"},
+                        "structure": {"document_folders": ["adr"]},
+                        "sub_projects": ["missing-submodule/docs-project.yaml"],
+                    }
+                )
+            )
+            (adr_dir / "adr-001-parent-decision.md").write_text(
+                """---
+title: Parent Decision
+status: Accepted
+created: 2025-01-01
+deciders: Core Team
+tags: [architecture]
+id: adr-001
+project_id: parent-project
+doc_uuid: 11111111-1111-4111-8111-111111111111
+---
+
+# Parent ADR content
+"""
+            )
+
+            validator = DocValidator(repo_root, verbose=False)
+            validator.scan_documents()
+
+            output = capsys.readouterr().out
+            assert "Sub-project config not found" in output
+            assert "Add the file or remove it from sub_projects" in output
+            assert [context.config.project.id for context in validator.project_configs] == ["parent-project"]
+            assert [doc.file_path.name for doc in validator.documents] == ["adr-001-parent-decision.md"]
+
+    def test_invalid_sub_project_config_warns_and_continues(self, capsys):
+        """Invalid sub-project configs should warn with remediation and keep validating parent docs."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            submodule = repo_root / "vendor" / "invalid-service"
+            adr_dir = repo_root / "adr"
+            submodule.mkdir(parents=True)
+            adr_dir.mkdir()
+
+            (repo_root / "docs-project.yaml").write_text(
+                yaml.dump(
+                    {
+                        "project": {"id": "parent-project", "name": "Parent Project"},
+                        "structure": {"document_folders": ["adr"]},
+                        "sub_projects": ["vendor/invalid-service/docs-project.yaml"],
+                    }
+                )
+            )
+            (submodule / "docs-project.yaml").write_text(
+                yaml.dump(
+                    {
+                        "project": {"id": "Invalid_ID", "name": "Invalid Service"},
+                    }
+                )
+            )
+            (adr_dir / "adr-001-parent-decision.md").write_text(
+                """---
+title: Parent Decision
+status: Accepted
+created: 2025-01-01
+deciders: Core Team
+tags: [architecture]
+id: adr-001
+project_id: parent-project
+doc_uuid: 11111111-1111-4111-8111-111111111111
+---
+
+# Parent ADR content
+"""
+            )
+
+            validator = DocValidator(repo_root, verbose=False)
+            validator.scan_documents()
+
+            output = capsys.readouterr().out
+            assert "Invalid sub-project config format" in output
+            assert "Fix the config or remove it from sub_projects" in output
+            assert [context.config.project.id for context in validator.project_configs] == ["parent-project"]
+            assert [doc.file_path.name for doc in validator.documents] == ["adr-001-parent-decision.md"]

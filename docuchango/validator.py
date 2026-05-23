@@ -184,7 +184,11 @@ class DocValidator:
     def _load_project_config_at(self, config_path: Path) -> Optional[DocsProjectConfig]:
         """Load one docs-project.yaml file from an explicit path."""
         if not config_path.exists():
-            self.log(f"⚠️  Warning: Sub-project config not found: {config_path}")
+            self.log(
+                f"⚠️  Warning: Sub-project config not found: {config_path}. "
+                "Add the file or remove it from sub_projects.",
+                force=True,
+            )
             return None
 
         try:
@@ -194,10 +198,18 @@ class DocValidator:
             self.log(f"✓ Loaded sub-project config: {config.project.id} ({config_path})")
             return config
         except ValidationError as e:
-            self.log(f"⚠️  Warning: Invalid sub-project config format at {config_path}: {e}")
+            self.log(
+                f"⚠️  Warning: Invalid sub-project config format at {config_path}: {e}. "
+                "Fix the config or remove it from sub_projects.",
+                force=True,
+            )
             return None
         except Exception as e:
-            self.log(f"⚠️  Warning: Could not load sub-project config at {config_path}: {e}")
+            self.log(
+                f"⚠️  Warning: Could not load sub-project config at {config_path}: {e}. "
+                "Fix the config or remove it from sub_projects.",
+                force=True,
+            )
             return None
 
     def _load_project_config_contexts(self) -> list[ProjectConfigContext]:
