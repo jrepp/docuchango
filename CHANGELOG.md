@@ -2,6 +2,34 @@
 
 <!-- version list -->
 
+## v1.16.0 (2026-05-23)
+
+### Code Style
+
+- Satisfy ci lint checks
+  ([`a1d9844`](https://github.com/jrepp/docuchango/commit/a1d98443b1aae26e65434351bfc1c2017e519998))
+
+### Continuous Integration
+
+- Publish docs project schema
+  ([`fbe2452`](https://github.com/jrepp/docuchango/commit/fbe24521081f326f78d6966d65909d20dc739fe8))
+
+### Documentation
+
+- Simplify project config authoring
+  ([`50c49b0`](https://github.com/jrepp/docuchango/commit/50c49b0859168283bc3477b4f192714515288bc3))
+
+### Features
+
+- Support sub-project docs configs
+  ([`2d9dfe2`](https://github.com/jrepp/docuchango/commit/2d9dfe26a07af8127c8abbb1cf62402d9f813ed6))
+
+### Testing
+
+- Cover sub-project config failures
+  ([`2ade43c`](https://github.com/jrepp/docuchango/commit/2ade43c52984722ebc38b8ab9d8ca9ca107074d5))
+
+
 ## v1.15.0 (2026-05-23)
 
 ### Bug Fixes
