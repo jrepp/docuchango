@@ -118,7 +118,8 @@ default, but you can opt specific folders into plain Markdown when frontmatter
 is not a project goal.
 
 ```yaml
-config_version: "1"
+# yaml-language-server: $schema=./docs-project.schema.json
+version: "1"
 docuchango_version: "1.15.0"
 
 structure:
@@ -141,10 +142,13 @@ Parent repositories can also reference configs owned by sub-projects or git
 submodules, avoiding one giant root config:
 
 ```yaml
-sub_projects:
-  - vendor/service-a/docs-project.yaml
-  - path: vendor/service-b/docs-project.yaml
+subprojects:
+  - vendor/service-a
+  - vendor/service-b/docs-project.yaml
 ```
+
+Generated projects include `docs-project.schema.json` next to
+`docs-project.yaml` for editor validation and prompt-based config authoring.
 
 ### Bootstrap & Guides
 

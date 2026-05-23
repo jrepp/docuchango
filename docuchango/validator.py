@@ -186,7 +186,7 @@ class DocValidator:
         if not config_path.exists():
             self.log(
                 f"⚠️  Warning: Sub-project config not found: {config_path}. "
-                "Add the file or remove it from sub_projects.",
+                "Add the file or remove it from subprojects.",
                 force=True,
             )
             return None
@@ -200,14 +200,14 @@ class DocValidator:
         except ValidationError as e:
             self.log(
                 f"⚠️  Warning: Invalid sub-project config format at {config_path}: {e}. "
-                "Fix the config or remove it from sub_projects.",
+                "Fix the config or remove it from subprojects.",
                 force=True,
             )
             return None
         except Exception as e:
             self.log(
                 f"⚠️  Warning: Could not load sub-project config at {config_path}: {e}. "
-                "Fix the config or remove it from sub_projects.",
+                "Fix the config or remove it from subprojects.",
                 force=True,
             )
             return None
@@ -223,8 +223,10 @@ class DocValidator:
 
         while pending:
             parent = pending.pop(0)
-            for sub_project in parent.config.sub_projects:
-                sub_path = (parent.base_dir / sub_project.path).resolve()
+            for subproject in parent.config.subprojects:
+                sub_path = (parent.base_dir / subproject.path).resolve()
+                if sub_path.is_dir():
+                    sub_path = sub_path / "docs-project.yaml"
                 if sub_path in seen:
                     continue
                 seen.add(sub_path)

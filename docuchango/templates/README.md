@@ -7,6 +7,7 @@ This directory contains structured technical documentation using the docs-cms pa
 ```
 docs-cms/
 ├── docs-project.yaml      # Project configuration
+├── docs-project.schema.json # Editor/agent schema for docs-project.yaml
 ├── adr/                   # Architecture Decision Records
 │   └── adr-000-template.md
 ├── rfcs/                  # Request for Comments
@@ -69,6 +70,10 @@ Edit `docs-project.yaml` to customize:
 - Folder names
 - Which folders to scan
 - Maintainer information
+
+The generated `docs-project.yaml` includes a YAML language-server pointer to
+`docs-project.schema.json`, which documents and validates the config format.
+Use `subprojects` to include docs configs from submodules or nested projects.
 
 ## Best Practices
 

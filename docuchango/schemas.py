@@ -262,13 +262,17 @@ class DocsProjectIndex(BaseModel):
     )
 
 
-class DocsProjectSubProject(BaseModel):
+class DocsProjectSubproject(BaseModel):
     """Reference to another docs-project.yaml file, often in a git submodule."""
+
+    model_config = ConfigDict(extra="forbid")
 
     path: str = Field(
         ...,
         min_length=1,
-        description="Path to a sub-project docs-project.yaml, relative to the parent docs-project.yaml",
+        description=(
+            "Path to a subproject directory or docs-project.yaml file, relative to the parent docs-project.yaml"
+        ),
     )
 
     @model_validator(mode="before")
@@ -286,7 +290,9 @@ class DocsProjectConfig(BaseModel):
     defining project metadata, directory structure, and validation rules.
     """
 
-    config_version: str = Field(
+    model_config = ConfigDict(extra="forbid")
+
+    version: str = Field(
         default="1",
         description="docs-project.yaml schema version. Reserved for future config migrations.",
     )
@@ -314,9 +320,9 @@ class DocsProjectConfig(BaseModel):
         default_factory=list,
         description="Markdown index files with stricter content discipline",
     )
-    sub_projects: list[DocsProjectSubProject] = Field(
+    subprojects: list[DocsProjectSubproject] = Field(
         default_factory=list,
-        description="Additional docs-project.yaml files to load, relative to this config file. Useful for git submodules.",
+        description="Additional docs projects to load, relative to this config file. Useful for git submodules.",
     )
 
 

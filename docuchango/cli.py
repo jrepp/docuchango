@@ -40,7 +40,7 @@ def _load_docs_project_config_from_candidates(candidates: list[Path]) -> tuple[D
 
 
 def _iter_docs_project_configs(root: Path) -> list[tuple[DocsProjectConfig, Path]]:
-    """Load the root docs-project.yaml plus any configured sub-projects."""
+    """Load the root docs-project.yaml plus any configured subprojects."""
     config, config_path = _load_docs_project_config(root)
     if not config or not config_path:
         return []
@@ -52,8 +52,10 @@ def _iter_docs_project_configs(root: Path) -> list[tuple[DocsProjectConfig, Path
     while pending:
         parent_config, parent_path = pending.pop(0)
         parent_base = parent_path.parent
-        for sub_project in parent_config.sub_projects:
-            sub_path = (parent_base / sub_project.path).resolve()
+        for subproject in parent_config.subprojects:
+            sub_path = (parent_base / subproject.path).resolve()
+            if sub_path.is_dir():
+                sub_path = sub_path / "docs-project.yaml"
             if sub_path in seen:
                 continue
             seen.add(sub_path)
@@ -412,6 +414,7 @@ def init(path: Path | None, project_id: str, project_name: str, force: bool):
 
     template_files = {
         "docs-project.yaml": path / "docs-project.yaml",
+        "docs-project.schema.json": path / "docs-project.schema.json",
         "README.md": path / "README.md",
         "adr-000-template.md": path / "templates" / "adr-000-template.md",
         "rfc-000-template.md": path / "templates" / "rfc-000-template.md",
@@ -464,8 +467,9 @@ def init(path: Path | None, project_id: str, project_name: str, force: bool):
     console.print(f"\n[bold green]✅ Successfully initialized docs-cms at {path}[/bold green]")
     console.print("\n[bold]Next steps:[/bold]")
     console.print("1. Review and customize docs-project.yaml")
-    console.print("2. Copy a template from templates/ to create your first document")
-    console.print("3. Run 'docuchango validate' to check your documents")
+    console.print("2. Use docs-project.schema.json as the config format reference")
+    console.print("3. Copy a template from templates/ to create your first document")
+    console.print("4. Run 'docuchango validate' to check your documents")
     console.print("\n[dim]Tip: Run 'docuchango bootstrap' for detailed setup instructions[/dim]")
 
 

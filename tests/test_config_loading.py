@@ -1,5 +1,6 @@
 """Test suite for docs-project.yaml configuration loading."""
 
+import json
 import tempfile
 from pathlib import Path
 
@@ -11,6 +12,16 @@ from docuchango.validator import DocValidator
 
 class TestConfigLoading:
     """Test configuration file loading in DocValidator."""
+
+    def test_docs_project_json_schema_exists_for_editor_validation(self):
+        """Generated docs projects should have a JSON Schema for docs-project.yaml."""
+        schema_path = Path(__file__).parent.parent / "docuchango" / "templates" / "docs-project.schema.json"
+        schema = json.loads(schema_path.read_text())
+
+        assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
+        assert schema["properties"]["version"]["default"] == "1"
+        assert "subprojects" in schema["properties"]
+        assert schema["properties"]["subprojects"]["items"]["oneOf"][0]["type"] == "string"
 
     def test_load_valid_config(self):
         """Test that valid config file is loaded correctly."""
@@ -79,7 +90,7 @@ class TestConfigLoading:
 
             # Check config was loaded with defaults
             assert validator.project_config is not None
-            assert validator.project_config.config_version == "1"
+            assert validator.project_config.version == "1"
             assert validator.project_config.docuchango_version
             assert validator.project_config.structure.adr_dir == "adr"
             assert validator.project_config.structure.prd_dir == "prd"
@@ -581,8 +592,8 @@ This document omits frontmatter and should still fail by default.
             assert len(validator.documents) == 1
             assert validator.documents[0].errors == ["Missing YAML frontmatter"]
 
-    def test_sub_projects_load_multi_project_config_with_legacy_files(self):
-        """Parent configs can reference multiple sub-project configs and keep legacy docs."""
+    def test_subprojects_load_multi_project_config_with_legacy_files(self):
+        """Parent configs can reference multiple subproject configs and keep legacy docs."""
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_root = Path(tmpdir)
             legacy_adr_dir = repo_root / "adr"
@@ -597,12 +608,12 @@ This document omits frontmatter and should still fail by default.
             (repo_root / "docs-project.yaml").write_text(
                 yaml.dump(
                     {
-                        "config_version": "1",
+                        "version": "1",
                         "docuchango_version": "1.15.0",
                         "project": {"id": "parent-project", "name": "Parent Project"},
                         "structure": {"document_folders": ["adr"]},
-                        "sub_projects": [
-                            "vendor/service-a/docs-project.yaml",
+                        "subprojects": [
+                            "vendor/service-a",
                             {"path": "vendor/service-b/docs-project.yaml"},
                         ],
                     }
@@ -611,7 +622,7 @@ This document omits frontmatter and should still fail by default.
             (service_a / "docs-project.yaml").write_text(
                 yaml.dump(
                     {
-                        "config_version": "1",
+                        "version": "1",
                         "docuchango_version": "1.15.0",
                         "project": {"id": "service-a", "name": "Service A"},
                         "structure": {
@@ -630,7 +641,7 @@ This document omits frontmatter and should still fail by default.
             (service_b / "docs-project.yaml").write_text(
                 yaml.dump(
                     {
-                        "config_version": "1",
+                        "version": "1",
                         "docuchango_version": "1.15.0",
                         "project": {"id": "service-b", "name": "Service B"},
                         "structure": {"document_folders": ["memos"]},
@@ -692,7 +703,7 @@ doc_uuid: 33333333-3333-4333-8333-333333333333
                 "service-a",
                 "service-b",
             ]
-            assert [context.config.config_version for context in validator.project_configs] == ["1", "1", "1"]
+            assert [context.config.version for context in validator.project_configs] == ["1", "1", "1"]
             assert [context.config.docuchango_version for context in validator.project_configs] == [
                 "1.15.0",
                 "1.15.0",
@@ -715,17 +726,17 @@ doc_uuid: 33333333-3333-4333-8333-333333333333
             (repo_root / "docs-project.yaml").write_text(
                 yaml.dump(
                     {
-                        "config_version": "1",
+                        "version": "1",
                         "docuchango_version": "1.15.0",
                         "project": {"id": "parent-project", "name": "Parent Project"},
-                        "sub_projects": [{"path": "libs/service-b/docs-project.yaml"}],
+                        "subprojects": [{"path": "libs/service-b"}],
                     }
                 )
             )
             (submodule / "docs-project.yaml").write_text(
                 yaml.dump(
                     {
-                        "config_version": "1",
+                        "version": "1",
                         "docuchango_version": "1.15.0",
                         "project": {"id": "service-b", "name": "Service B"},
                         "structure": {"document_folders": ["adr"]},
@@ -749,7 +760,7 @@ doc_uuid: 33333333-3333-4333-8333-333333333333
                     {
                         "project": {"id": "parent-project", "name": "Parent Project"},
                         "structure": {"document_folders": ["adr"]},
-                        "sub_projects": ["missing-submodule/docs-project.yaml"],
+                        "subprojects": ["missing-submodule"],
                     }
                 )
             )
@@ -774,7 +785,7 @@ doc_uuid: 11111111-1111-4111-8111-111111111111
 
             output = capsys.readouterr().out
             assert "Sub-project config not found" in output
-            assert "Add the file or remove it from sub_projects" in output
+            assert "Add the file or remove it from subprojects" in output
             assert [context.config.project.id for context in validator.project_configs] == ["parent-project"]
             assert [doc.file_path.name for doc in validator.documents] == ["adr-001-parent-decision.md"]
 
@@ -792,7 +803,7 @@ doc_uuid: 11111111-1111-4111-8111-111111111111
                     {
                         "project": {"id": "parent-project", "name": "Parent Project"},
                         "structure": {"document_folders": ["adr"]},
-                        "sub_projects": ["vendor/invalid-service/docs-project.yaml"],
+                        "subprojects": ["vendor/invalid-service"],
                     }
                 )
             )
@@ -824,6 +835,6 @@ doc_uuid: 11111111-1111-4111-8111-111111111111
 
             output = capsys.readouterr().out
             assert "Invalid sub-project config format" in output
-            assert "Fix the config or remove it from sub_projects" in output
+            assert "Fix the config or remove it from subprojects" in output
             assert [context.config.project.id for context in validator.project_configs] == ["parent-project"]
             assert [doc.file_path.name for doc in validator.documents] == ["adr-001-parent-decision.md"]
