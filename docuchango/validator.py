@@ -185,8 +185,7 @@ class DocValidator:
         """Load one docs-project.yaml file from an explicit path."""
         if not config_path.exists():
             self.log(
-                f"⚠️  Warning: Sub-project config not found: {config_path}. "
-                "Add the file or remove it from subprojects.",
+                f"⚠️  Warning: Sub-project config not found: {config_path}. Add the file or remove it from subprojects.",
                 force=True,
             )
             return None
@@ -855,7 +854,7 @@ class DocValidator:
 
         return headings
 
-    def _bucket_for_target(self, target_path: Path, bucket_config) -> Optional[str]:  # type: ignore[no-untyped-def]
+    def _bucket_for_target(self, target_path: Path, bucket_config) -> Optional[str]:
         """Compute the expected index bucket for a target document."""
         post = frontmatter.loads(target_path.read_text(encoding="utf-8"))
 
@@ -910,7 +909,9 @@ class DocValidator:
                     links = self._extract_markdown_file_links(content, index_path)
                     target_paths: set[Path] = set()
                     for target_pattern in index_config.targets:
-                        target_paths.update(path.resolve() for path in config_base.glob(target_pattern) if path.is_file())
+                        target_paths.update(
+                            path.resolve() for path in config_base.glob(target_pattern) if path.is_file()
+                        )
                     target_paths.discard(index_path)
 
                     if index_config.require_entries and target_paths and not links:
@@ -920,7 +921,9 @@ class DocValidator:
                         for target_path in sorted(target_paths):
                             if target_path not in links:
                                 rel_target = target_path.relative_to(config_base)
-                                self.errors.append(f"Document index '{index_config.name}' is missing target: {rel_target}")
+                                self.errors.append(
+                                    f"Document index '{index_config.name}' is missing target: {rel_target}"
+                                )
 
                     if not index_config.allow_extra_links:
                         for linked_path, (line_num, raw_target) in sorted(links.items()):
@@ -946,7 +949,7 @@ class DocValidator:
         target_paths: set[Path],
         bucket_config,
         config_base: Path,
-    ) -> None:  # type: ignore[no-untyped-def]
+    ) -> None:
         """Validate that index links appear under the expected time or milestone bucket."""
         headings = self._extract_bucket_headings(content, bucket_config.heading_level)
         if not headings:
