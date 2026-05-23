@@ -149,6 +149,8 @@ subprojects:
 
 Generated projects include `docs-project.schema.json` next to
 `docs-project.yaml` for editor validation and prompt-based config authoring.
+The same schema is published at
+`https://jrepp.github.io/docuchango/schemas/docs-project.schema.json`.
 
 ### Bootstrap & Guides
 

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/jrepp/docuchango/schemas/docs-project.schema.json",
+  "$id": "https://jrepp.github.io/docuchango/schemas/docs-project.schema.json",
   "title": "Docuchango Docs Project",
   "type": "object",
   "additionalProperties": false,

@@ -51,6 +51,9 @@ ls docs-cms/rfcs/
 find docs-cms -name "*.md" -type f | head -20
 ```
 
+If the local schema is missing, use the stable published schema:
+`https://jrepp.github.io/docuchango/schemas/docs-project.schema.json`.
+
 **What to look for:**
 - Recent ADRs: What architectural decisions were made?
 - Active RFCs: What changes are being proposed?

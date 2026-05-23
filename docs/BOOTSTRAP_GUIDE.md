@@ -246,7 +246,9 @@ my-project/
 
 `docs-project.yaml` includes a YAML language-server pointer to
 `docs-project.schema.json`. Use that schema when editing config by hand or from
-an agent prompt. Parent repositories can include nested docs projects with:
+an agent prompt. The stable published schema URL is
+`https://jrepp.github.io/docuchango/schemas/docs-project.schema.json`.
+Parent repositories can include nested docs projects with:
 
 ```yaml
 subprojects:
