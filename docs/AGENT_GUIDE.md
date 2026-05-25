@@ -785,6 +785,62 @@ def test_authentication_flow():
 - **Templates**: `docs-cms/templates/` - Document templates
 - **Examples**: `examples/docs-cms/` - Sample documents
 
+## Naming Standards
+
+Docuchango supports configurable naming standards applied to document folders via `docs-project.yaml`. Use the `naming_standard` field in `doc_types` configuration.
+
+### Built-in Naming Standards
+
+| Standard | Pattern | Example |
+|----------|---------|---------|
+| `nnn-name` | `^\d{3}-(.+)\.md$` | `001-intro.md` |
+| `year-month-day-name` | `^\d{4}-\d{2}-\d{2}-(.+)\.md$` | `2025-05-25-intro.md` |
+| `kebab-case` | `^[a-z0-9]+(-[a-z0-9]+)*\.md$` | `my-document-name.md` |
+| `snake_case` | `^[a-z0-9]+(_[a-z0-9]+)*\.md$` | `my_document_name.md` |
+| `camelCase` | `^[a-z][a-zA-Z0-9]*\.md$` | `myDocumentName.md` |
+| `PascalCase` | `^[A-Z][a-zA-Z0-9]*\.md$` | `MyDocumentName.md` |
+| `lowercase` | `^[a-z0-9]+\.md$` | `mydocumentname.md` |
+| `uppercase` | `^[A-Z0-9]+\.md$` | `MYDOCUMENTNAME.md` |
+
+### Configuration Example
+
+```yaml
+structure:
+  doc_types:
+    guides:
+      schema: generic
+      folders: [guides]
+      naming_standard: kebab-case
+    
+    runbooks:
+      schema: generic
+      folders: [ops/runbooks]
+      naming_standard: snake_case
+  
+  naming_standards:
+    my-custom: "^custom-.+\\.md$"
+```
+
+### Custom Naming Standards
+
+Define custom standards in `naming_standards` section of `docs-project.yaml`:
+
+```yaml
+structure:
+  naming_standards:
+    date-prefix: "^\\d{6}-.+必$"
+  doc_types:
+    reports:
+      naming_standard: date-prefix
+```
+
+The naming module (`docuchango/naming.py`) provides:
+- `BUILTIN_NAMING_STANDARDS`: Dict of all built-in patterns
+- `validate_name(name, pattern)`: Validate filename against regex
+- `validate_name_with_standard(name, standard, custom)`: Validate using named standard
+- `resolve_naming_standard(standard, custom)`: Resolve name to regex pattern
+- `describe_standard(standard, custom)`: Human-readable description
+
 ## Remember
 
 1. **Trust the CMS**: It's the source of truth

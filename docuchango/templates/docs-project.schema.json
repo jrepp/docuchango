@@ -71,9 +71,15 @@
               },
               "filename_pattern": {"type": ["string", "null"]},
               "enforce_filename_pattern": {"type": "boolean", "default": true},
-              "require_frontmatter": {"type": "boolean", "default": true}
+              "require_frontmatter": {"type": "boolean", "default": true},
+              "naming_standard": {"type": ["string", "null"], "description": "Named naming standard to apply (e.g., 'kebab-case', 'nnn-name'). Overrides filename_pattern if both set."}
             }
           }
+        },
+        "naming_standards": {
+          "type": ["object", "null"],
+          "description": "Custom naming standards that can be referenced by doc_types",
+          "additionalProperties": {"type": "string"}
         }
       }
     },

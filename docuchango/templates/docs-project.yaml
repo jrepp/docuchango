@@ -45,6 +45,24 @@ structure:
   #     filename_pattern: ".+\\.md$"
   #     enforce_filename_pattern: false
   #     require_frontmatter: false  # Allow plain Markdown design notes
+  #   # Example using named naming standards:
+  #   guides:
+  #     schema: generic
+  #     folders: [guides]
+  #     naming_standard: kebab-case  # Use built-in 'kebab-case' standard
+  #   runbooks:
+  #     schema: generic
+  #     folders: [ops/runbooks]
+  #     naming_standard: snake_case  # Use built-in 'snake_case' standard
+
+  # Named naming standards for document names.
+  # Built-in standards: nnn-name, year-month-day-name, kebab-case, snake_case,
+  #   camelCase, PascalCase, lowercase, uppercase
+  # Use naming_standard in doc_types to apply a named standard to a folder.
+  # Custom standards can override built-ins or define new patterns.
+  # naming_standards:
+  #   my-custom-standard: "^custom-.+\\.md$"
+  #   date-prefix: "^\\d{6}-.+必$"
 
 # Optional subproject docs configs. Paths are relative to this file and can point
 # to either a subproject directory or its docs-project.yaml file.

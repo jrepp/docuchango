@@ -36,6 +36,7 @@ try:
     import yaml
     from pydantic import ValidationError
 
+    from docuchango.naming import resolve_naming_standard
     from docuchango.readability import TEXTSTAT_AVAILABLE, ReadabilityConfig, ReadabilityScorer
 
     # Import schemas from the docuchango package
@@ -298,8 +299,18 @@ class DocValidator:
 
                 if config.structure and config.structure.doc_types:
                     roots = config.structure.docs_roots or ["."]
+                    custom_naming = config.structure.naming_standards or {}
                     for doc_type_name, cfg in config.structure.doc_types.items():
-                        pattern = cfg.filename_pattern or default_patterns.get(doc_type_name, r"^(.+)\.md$")
+                        if cfg.naming_standard:
+                            pattern = resolve_naming_standard(cfg.naming_standard, custom_naming)
+                            if pattern:
+                                pattern = f"^{pattern}" if not pattern.startswith("^") else pattern
+                            else:
+                                pattern = default_patterns.get(doc_type_name, r"^(.+)\.md$")
+                        elif cfg.filename_pattern:
+                            pattern = cfg.filename_pattern
+                        else:
+                            pattern = default_patterns.get(doc_type_name, r"^(.+)\.md$")
                         folders = cfg.folders or []
                         for root_rel in roots:
                             root_path = (config_base / root_rel).resolve()

@@ -48,6 +48,10 @@ class DocTypeConfig(BaseModel):
             "Set false for plain-Markdown generic lanes in mixed-schema repos."
         ),
     )
+    naming_standard: str | None = Field(
+        default=None,
+        description="Named naming standard to apply to document names (e.g., 'kebab-case', 'snake_case', 'date-numeric'). Overrides filename_pattern if both are set.",
+    )
     model_config = ConfigDict(populate_by_name=True)
 
     frontmatter_schema: Literal["adr", "rfc", "memo", "prd", "generic"] = Field(
@@ -97,6 +101,14 @@ class DocsProjectStructure(BaseModel):
         description=(
             "Optional custom document type map for mixed-schema repositories. "
             "When provided, this takes precedence over adr_dir/rfc_dir/memo_dir/prd_dir."
+        ),
+    )
+    naming_standards: dict[str, str] | None = Field(
+        default=None,
+        description=(
+            "Named naming standards that can be referenced by doc_types. "
+            "Keys are standard names (e.g., 'kebab-case', 'snake_case'), values are regex patterns. "
+            "Example: {'kebab-case': '^[a-z0-9]+(-[a-z0-9]+)*\\.md$', 'date-numeric': '^\\d{4}-\\d{2}-\\d{2}-.+必$"
         ),
     )
 
