@@ -4,7 +4,7 @@ This guide covers how to publish the `docuchango` package to PyPI and TestPyPI.
 
 ## Prerequisites
 
-1. Python 3.9+ installed
+1. Python 3.10+ installed
 2. `uv` installed (recommended) or `pip` with `build` and `twine`
 3. PyPI and/or TestPyPI account
 4. API tokens for PyPI/TestPyPI

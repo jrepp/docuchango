@@ -23,7 +23,7 @@ def fix_trailing_whitespace(file_path: Path) -> int:
     fixed_lines = [line.rstrip() + ("\n" if line.endswith("\n") else "") for line in lines]
 
     # Count changes
-    changes = sum(1 for old, new in zip(lines, fixed_lines) if old != new)
+    changes = sum(1 for old, new in zip(lines, fixed_lines, strict=True) if old != new)
 
     if changes > 0:
         file_path.write_text("".join(fixed_lines))

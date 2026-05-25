@@ -10,7 +10,6 @@ import re
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import frontmatter
 
@@ -57,7 +56,7 @@ STATUS_MAPPINGS = {
 }
 
 
-def get_doc_type(file_path: Path) -> Optional[str]:
+def get_doc_type(file_path: Path) -> str | None:
     """Extract document type from file path.
 
     Args:
