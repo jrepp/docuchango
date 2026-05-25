@@ -1131,7 +1131,7 @@ def migrate(
 
             # 6. Normalize id field to lowercase
             if "id" in post.metadata:
-                old_id = post.metadata["id"]
+                old_id = str(post.metadata["id"])
                 new_id = old_id.lower()
                 if new_id != old_id:
                     post.metadata["id"] = new_id
