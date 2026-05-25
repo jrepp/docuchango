@@ -381,4 +381,3 @@ class TestIntegration:
         """Test that non-.md files are rejected."""
         for _name, pattern in BUILTIN_NAMING_STANDARDS.items():
             assert validate_name("document.txt", pattern) is False
-
