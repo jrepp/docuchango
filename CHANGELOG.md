@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.17.1 (2026-05-25)
+
+### Bug Fixes
+
+- Restore main CI checks
+  ([`9f732a1`](https://github.com/jrepp/docuchango/commit/9f732a112ee57209c55dcc8bfb15889b568526b9))
+
+
 ## v1.17.0 (2026-05-25)
 
 ### Features
