@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.17.0 (2026-05-25)
+
+### Features
+
+- Add configurable naming standards for document files
+  ([`1d793ab`](https://github.com/jrepp/docuchango/commit/1d793ab3cc014bc8193bb2132fb7997d42f49460))
+
+
 ## v1.16.0 (2026-05-23)
 
 ### Code Style
