@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -302,8 +303,9 @@ def _document_id_for_file(file_path: Path) -> str | None:
         post = frontmatter.load(file_path)
     except Exception:
         post = None
-    if post and isinstance(post.metadata.get("id"), str):
-        metadata_id = post.metadata["id"].lower()
+    metadata_value = post.metadata.get("id") if post else None
+    if isinstance(metadata_value, str):
+        metadata_id = metadata_value.lower()
         if DOC_ID_RE.fullmatch(metadata_id):
             return metadata_id
 
@@ -324,7 +326,7 @@ def _set_frontmatter_id(file_path: Path, doc_id: str) -> None:
     file_path.write_text(frontmatter_dumps(post), encoding="utf-8")
 
 
-def _iter_text_files(repo_root: Path):  # type: ignore[no-untyped-def]
+def _iter_text_files(repo_root: Path) -> Iterator[Path]:
     for path in repo_root.rglob("*"):
         if any(part in SKIP_DIRS for part in path.parts):
             continue
