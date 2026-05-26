@@ -213,7 +213,7 @@ disallow_untyped_decorators = true
 no_implicit_optional = true
 # Exclude non-core modules from strict checking
 exclude = [
-    "docuchango/fixes/.*",
+    "docuchango/fixes/(bulk_update|code_blocks|cross_plugin_links|doc_links|docs|internal_links|mdx_syntax|tags|timestamps|whitespace|yaml_utils)\\.py",
     "test_install\\.py",
 ]
 

@@ -10,6 +10,7 @@ import re
 import uuid
 from datetime import date, datetime
 from pathlib import Path
+from typing import Any
 
 import frontmatter
 
@@ -375,7 +376,7 @@ def fix_all_frontmatter(file_path: Path, dry_run: bool = False) -> list[str]:
     return messages
 
 
-def _fix_status_metadata(metadata: dict, doc_type: str | None) -> str | None:
+def _fix_status_metadata(metadata: dict[str, Any], doc_type: str | None) -> str | None:
     """Normalize status in already-parsed metadata."""
     if "status" not in metadata:
         return None
@@ -405,7 +406,7 @@ def _fix_status_metadata(metadata: dict, doc_type: str | None) -> str | None:
     return None
 
 
-def _fix_date_metadata(metadata: dict, content: str) -> str | None:
+def _fix_date_metadata(metadata: dict[str, Any], content: str) -> str | None:
     """Normalize date or created in already-parsed metadata."""
     if "date" in metadata:
         date_field = "date"
@@ -461,7 +462,7 @@ def _fix_date_metadata(metadata: dict, content: str) -> str | None:
     return None
 
 
-def _fix_tags_metadata(metadata: dict) -> list[str]:
+def _fix_tags_metadata(metadata: dict[str, Any]) -> list[str]:
     """Normalize tags in already-parsed metadata."""
     messages = []
     if "tags" not in metadata:
