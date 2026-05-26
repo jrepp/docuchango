@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional, cast
 
 try:
     import frontmatter
@@ -462,8 +462,9 @@ class DocValidator:
 
             # Parse frontmatter from content
             post = frontmatter.loads(content)
+            metadata = cast(dict[str, Any], post.metadata)
 
-            if not post.metadata:
+            if not metadata:
                 if doc_type == "generic" and not require_frontmatter:
                     title = self._infer_plain_markdown_title(file_path, content)
                     self.log(f"   ✓ {file_path.name}: Plain Markdown generic doc")
@@ -478,27 +479,27 @@ class DocValidator:
             # Validate against schema
             try:
                 if doc_type == "adr":
-                    ADRFrontmatter(**post.metadata)
+                    ADRFrontmatter(**metadata)
                 elif doc_type == "rfc":
-                    RFCFrontmatter(**post.metadata)
+                    RFCFrontmatter(**metadata)
                 elif doc_type == "memo":
-                    MemoFrontmatter(**post.metadata)
+                    MemoFrontmatter(**metadata)
                 elif doc_type == "prd":
-                    PRDFrontmatter(**post.metadata)
+                    PRDFrontmatter(**metadata)
                 else:
                     # Generic validation for other docs
-                    GenericDocFrontmatter(**post.metadata)
+                    GenericDocFrontmatter(**metadata)
 
             except ValidationError as e:
                 # Pydantic validation errors - very detailed
                 doc = Document(
                     file_path=file_path,
                     doc_type=doc_type,
-                    title=post.metadata.get("title", "Unknown"),
-                    status=post.metadata.get("status", ""),
-                    date=str(post.metadata.get("date", post.metadata.get("created", ""))),
-                    tags=post.metadata.get("tags", []),
-                    doc_id=post.metadata.get("id", ""),
+                    title=metadata.get("title", "Unknown"),
+                    status=metadata.get("status", ""),
+                    date=str(metadata.get("date", metadata.get("created", ""))),
+                    tags=metadata.get("tags", []),
+                    doc_id=metadata.get("id", ""),
                     _content_cache=content,
                 )
 
@@ -522,12 +523,12 @@ class DocValidator:
             doc = Document(
                 file_path=file_path,
                 doc_type=doc_type,
-                title=post.metadata.get("title", "Unknown"),
-                status=post.metadata.get("status", ""),
-                date=str(post.metadata.get("date", post.metadata.get("created", ""))),
-                tags=post.metadata.get("tags", []),
-                doc_id=post.metadata.get("id", ""),
-                doc_uuid=post.metadata.get("doc_uuid", ""),
+                title=metadata.get("title", "Unknown"),
+                status=metadata.get("status", ""),
+                date=str(metadata.get("date", metadata.get("created", ""))),
+                tags=metadata.get("tags", []),
+                doc_id=metadata.get("id", ""),
+                doc_uuid=metadata.get("doc_uuid", ""),
                 _content_cache=content,
             )
 

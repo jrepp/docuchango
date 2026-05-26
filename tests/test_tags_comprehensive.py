@@ -268,6 +268,8 @@ tags: ['backend', "frontend", api]
         assert changed
 
         post = frontmatter.loads(doc.read_text())
-        assert "api" in post.metadata["tags"]
-        assert "backend" in post.metadata["tags"]
-        assert "frontend" in post.metadata["tags"]
+        tags = post.metadata["tags"]
+        assert isinstance(tags, list)
+        assert "api" in tags
+        assert "backend" in tags
+        assert "frontend" in tags

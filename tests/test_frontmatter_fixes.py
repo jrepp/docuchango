@@ -289,7 +289,9 @@ This is the content.
         # Verify frontmatter was added
         post = frontmatter.loads(doc.read_text())
         assert post.metadata["id"] == "adr-001"
-        assert "Python" in post.metadata["title"]
+        title = post.metadata["title"]
+        assert isinstance(title, str)
+        assert "Python" in title
         assert post.metadata["status"] == "Proposed"
         assert "deciders" in post.metadata
         assert "doc_uuid" in post.metadata
