@@ -87,6 +87,7 @@ def compress_document_ids(
     """
     repo_root = repo_root.resolve()
     changes = _plan_id_changes(doc_files, doc_type)
+    _validate_document_changes(changes)
     result = CompressionResult(changes=changes)
 
     updated_files = _rewrite_references(repo_root, changes, dry_run=dry_run)
@@ -101,6 +102,22 @@ def compress_document_ids(
     )
     result.missing_references = audit_missing_document_references(repo_root, doc_files, planned_changes=changes)
     return result
+
+
+def _validate_document_changes(changes: list[DocumentIdChange]) -> None:
+    """Fail before rewriting references if planned renames cannot be applied safely."""
+    source_paths = {change.file_path for change in changes}
+    destination_paths: set[Path] = set()
+
+    for change in changes:
+        if change.new_path in destination_paths:
+            raise FileExistsError(f"Cannot rename documents: duplicate destination {change.new_path}")
+        destination_paths.add(change.new_path)
+
+        if change.file_path == change.new_path:
+            continue
+        if change.new_path.exists() and change.new_path not in source_paths:
+            raise FileExistsError(f"Cannot rename {change.file_path} to {change.new_path}: destination exists")
 
 
 def audit_missing_document_references(
