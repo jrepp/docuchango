@@ -93,6 +93,30 @@ class TestADRFrontmatter:
         )
         assert adr.id == "adr-026-a1"
 
+    @pytest.mark.parametrize(
+        "invalid_id",
+        [
+            "adr-026-a",  # missing amendment number
+            "adr-026-a1x",  # extra characters after amendment number
+            "adr-026-b1",  # wrong amendment prefix (not 'a')
+            "adr-026-a01-x",  # extra suffix
+            "adr-26-a01",  # parent number not zero-padded to 3 digits
+        ],
+    )
+    def test_adr_amendment_invalid_id_formats(self, invalid_id):
+        """Test that malformed amendment-style IDs are rejected."""
+        with pytest.raises(ValidationError):
+            ADRFrontmatter(
+                title="Test Amendment",
+                status="Proposed",
+                created=date(2025, 10, 13),
+                deciders="Team",
+                tags=["amendment"],
+                id=invalid_id,
+                project_id="test-project",
+                doc_uuid="8b063564-82a5-4a21-943f-e868388d36b9",
+            )
+
     def test_adr_invalid_uuid(self):
         """Test that invalid UUID format is rejected."""
         with pytest.raises(ValidationError) as exc_info:

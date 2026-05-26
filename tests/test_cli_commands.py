@@ -433,7 +433,6 @@ doc_uuid: 12345678-1234-4123-8123-123456789abc
         assert "date" not in post.metadata
         assert str(post.metadata["created"]) == "2025-01-01"
 
-
     def test_migrate_preserves_existing_created(self, tmp_path):
         """Test that migrate preserves existing 'created' values."""
         # Create a git repo

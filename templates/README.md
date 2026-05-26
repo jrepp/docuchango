@@ -59,12 +59,14 @@ Templates for creating structured documentation with proper frontmatter validati
 ## Frontmatter Requirements
 
 ### ADR (Architecture Decision Record)
-Required: `id`, `title`, `status`, `date`, `deciders`, `tags`, `project_id`, `doc_uuid`
+Required: `id`, `title`, `status`, `created`, `deciders`, `tags`, `project_id`, `doc_uuid`
+- `date` is a deprecated legacy field; it will be auto-migrated to `created` by `docuchango fix all`
 
 ### ADR Amendment
-Required: `id`, `title`, `status`, `date`, `deciders`, `tags`, `project_id`, `doc_uuid`, `amends`
-- `id` must be `adr-NNN-aNN` format (e.g. `adr-026-a1`)
-- `amends` must reference the parent ADR id (e.g. `adr-026`)
+Required: `id`, `title`, `status`, `created`, `deciders`, `tags`, `project_id`, `doc_uuid`
+- `id` must be `adr-NNN-aNN` format (e.g. `adr-026-a01`)
+- `amends` is a recommended field referencing the parent ADR id (e.g. `adr-026`); it is not currently enforced by schema validation
+- `date` is a deprecated legacy field; it will be auto-migrated to `created` by `docuchango fix all`
 
 ### RFC (Request for Comments)
 Required: `id`, `title`, `status`, `author`, `created`, `updated`, `tags`, `project_id`, `doc_uuid`
