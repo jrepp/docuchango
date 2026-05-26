@@ -154,7 +154,7 @@ docuchango fix all
 
 **Testing:**
 - 61 tests covering validation, fixing, and schemas
-- Runs in CI on Python 3.10-3.13
+- Runs in CI on Python 3.10-3.14
 
 ## Why Docuchango?
 
