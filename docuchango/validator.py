@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 try:
     import frontmatter
@@ -97,7 +97,7 @@ class Document:
     doc_uuid: str = ""  # Frontmatter doc_uuid field (UUID v4)
     links: list["Link"] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
-    _content_cache: Optional[str] = None  # Cached file content to avoid multiple reads
+    _content_cache: str | None = None  # Cached file content to avoid multiple reads
 
     def __hash__(self):
         return hash(str(self.file_path))
@@ -150,11 +150,11 @@ class DocValidator:
         self.errors: list[str] = []
 
         # Load project configuration
-        self.project_config_path: Optional[Path] = None
+        self.project_config_path: Path | None = None
         self.project_config = self._load_project_config()
         self.project_configs = self._load_project_config_contexts()
 
-    def _load_project_config(self) -> Optional[DocsProjectConfig]:
+    def _load_project_config(self) -> DocsProjectConfig | None:
         """Load docs-project.yaml configuration"""
         candidate_paths = [
             self.repo_root / "docs-project.yaml",
@@ -182,7 +182,7 @@ class DocValidator:
         self.log("⚠️  Warning: Project config not found (looked for docs-project.yaml at repo root and docs-cms/)")
         return None
 
-    def _load_project_config_at(self, config_path: Path) -> Optional[DocsProjectConfig]:
+    def _load_project_config_at(self, config_path: Path) -> DocsProjectConfig | None:
         """Load one docs-project.yaml file from an explicit path."""
         if not config_path.exists():
             self.log(
@@ -440,7 +440,7 @@ class DocValidator:
 
         self.log(f"   Found {len(self.documents)} documents")
 
-    def _parse_document(self, file_path: Path, doc_type: str, require_frontmatter: bool = True) -> Optional[Document]:
+    def _parse_document(self, file_path: Path, doc_type: str, require_frontmatter: bool = True) -> Document | None:
         """Parse a markdown file and validate frontmatter"""
         return self._parse_document_enhanced(file_path, doc_type, require_frontmatter=require_frontmatter)
 
@@ -454,7 +454,7 @@ class DocValidator:
 
     def _parse_document_enhanced(
         self, file_path: Path, doc_type: str, require_frontmatter: bool = True
-    ) -> Optional[Document]:
+    ) -> Document | None:
         """Parse document with python-frontmatter and pydantic validation"""
         try:
             # Read file content once and cache it
@@ -866,7 +866,7 @@ class DocValidator:
 
         return headings
 
-    def _bucket_for_target(self, target_path: Path, bucket_config) -> Optional[str]:
+    def _bucket_for_target(self, target_path: Path, bucket_config) -> str | None:
         """Compute the expected index bucket for a target document."""
         post = frontmatter.loads(target_path.read_text(encoding="utf-8"))
 
@@ -977,7 +977,7 @@ class DocValidator:
         sorted_headings = sorted(headings.items())
         buckets = set(headings.values())
 
-        def bucket_at_line(line_num: int) -> Optional[str]:
+        def bucket_at_line(line_num: int) -> str | None:
             current = None
             for heading_line, heading in sorted_headings:
                 if heading_line >= line_num:

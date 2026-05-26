@@ -27,7 +27,6 @@ Usage:
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 try:
     import textstat  # type: ignore[import-untyped]
@@ -76,14 +75,14 @@ class ReadabilityConfig:
 
     enabled: bool = True
     # Flesch Reading Ease: minimum score (higher = easier)
-    flesch_reading_ease_min: Optional[float] = 60.0
+    flesch_reading_ease_min: float | None = 60.0
     # Grade-level metrics: maximum grade level (lower = easier)
-    flesch_kincaid_grade_max: Optional[float] = 10.0
-    gunning_fog_max: Optional[float] = 12.0
-    smog_index_max: Optional[float] = 12.0
-    automated_readability_index_max: Optional[float] = 10.0
-    coleman_liau_index_max: Optional[float] = 10.0
-    dale_chall_max: Optional[float] = 9.0
+    flesch_kincaid_grade_max: float | None = 10.0
+    gunning_fog_max: float | None = 12.0
+    smog_index_max: float | None = 12.0
+    automated_readability_index_max: float | None = 10.0
+    coleman_liau_index_max: float | None = 10.0
+    dale_chall_max: float | None = 9.0
     # Minimum paragraph length to analyze (in characters)
     min_paragraph_length: int = 100
 
@@ -94,14 +93,14 @@ class ParagraphScore:
 
     paragraph_text: str
     line_number: int
-    flesch_reading_ease: Optional[float] = None
-    flesch_kincaid_grade: Optional[float] = None
-    gunning_fog: Optional[float] = None
-    smog_index: Optional[float] = None
-    automated_readability_index: Optional[float] = None
-    coleman_liau_index: Optional[float] = None
-    dale_chall: Optional[float] = None
-    text_standard: Optional[str] = None
+    flesch_reading_ease: float | None = None
+    flesch_kincaid_grade: float | None = None
+    gunning_fog: float | None = None
+    smog_index: float | None = None
+    automated_readability_index: float | None = None
+    coleman_liau_index: float | None = None
+    dale_chall: float | None = None
+    text_standard: str | None = None
     errors: list[str] = field(default_factory=list)
 
     def has_errors(self) -> bool:

@@ -3,7 +3,7 @@
 [![PyPI version](https://badge.fury.io/py/docuchango.svg)](https://pypi.org/project/docuchango/)
 [![CI](https://github.com/jrepp/docuchango/workflows/CI/badge.svg)](https://github.com/jrepp/docuchango/actions)
 [![codecov](https://codecov.io/gh/jrepp/docuchango/branch/main/graph/badge.svg)](https://codecov.io/gh/jrepp/docuchango)
-[![Python Version](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/downloads/)
+[![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)](https://www.python.org/downloads/)
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
 
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
@@ -293,7 +293,7 @@ pytest -v                   # Verbose output
 # • 628 passing tests (with textstat installed)
 # • 569 core tests + 59 readability tests
 # • Zero flaky or xfail tests
-# • Full Python 3.9-3.13 compatibility
+# • Full Python 3.10-3.14 compatibility
 # • Comprehensive edge case coverage (frontmatter, links, timestamps, bulk updates)
 
 # Lint
@@ -314,7 +314,7 @@ uv build
 
 ## Requirements
 
-- Python 3.9+
+- Python 3.10+
 - Works on macOS, Linux, Windows
 
 ## License

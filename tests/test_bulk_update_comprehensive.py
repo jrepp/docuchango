@@ -338,7 +338,7 @@ class TestBulkUpdateFilesEdgeCases:
         assert all(changed for _, changed, _ in results)
 
         # But no files should be modified
-        for f, original in zip(files, originals):
+        for f, original in zip(files, originals, strict=True):
             assert f.read_text() == original
 
     def test_bulk_remove_all_fields(self, tmp_path):
@@ -373,7 +373,7 @@ class TestBulkUpdateFilesEdgeCases:
         assert all(changed for _, changed, _ in results)
 
         # Verify values preserved
-        for f, expected_value in zip(files, values):
+        for f, expected_value in zip(files, values, strict=True):
             post = frontmatter.loads(f.read_text())
             assert post.metadata["new_name"] == expected_value
 

@@ -519,19 +519,10 @@ def bootstrap(guide: str, output: Path | None):
 
     # Try to find the guide in the package
     try:
-        # First, try to find it in the installed package
         import importlib.resources as resources
 
-        try:
-            # Python 3.9+
-            guide_path = resources.files("docuchango") / ".." / "docs" / guide_file
-            guide_content = guide_path.read_text()
-        except AttributeError:
-            # Python 3.8 fallback
-            with resources.path("docuchango", "__init__.py") as pkg_path:
-                docs_dir = pkg_path.parent.parent / "docs"
-                guide_path = docs_dir / guide_file
-                guide_content = guide_path.read_text()
+        guide_path = resources.files("docuchango") / ".." / "docs" / guide_file
+        guide_content = guide_path.read_text()
 
     except (FileNotFoundError, ModuleNotFoundError):
         # Fallback: try relative to the script location
