@@ -1,5 +1,6 @@
 """Tests for document ID compression."""
 
+import pytest
 from click.testing import CliRunner
 
 from docuchango.cli import main
@@ -121,6 +122,29 @@ def test_compress_document_ids_dry_run_does_not_modify_files(tmp_path):
     assert not (memos_dir / "memo-002-second.md").exists()
     assert memo_010.read_text(encoding="utf-8") == original
     assert result.stale_references == []
+
+
+def test_compress_document_ids_collision_does_not_rewrite_references(tmp_path):
+    memos_dir = tmp_path / "memos"
+    memos_dir.mkdir()
+
+    memo_002 = memos_dir / "memo-002-second.md"
+    collision = memos_dir / "memo-001-second.md"
+    _write_memo(memo_002, "memo-002", "Second Memo")
+    collision.write_text("existing destination", encoding="utf-8")
+
+    notes = tmp_path / "notes.md"
+    notes.write_text("See memo-002 and memos/memo-002-second.md.", encoding="utf-8")
+    original_notes = notes.read_text(encoding="utf-8")
+    original_doc = memo_002.read_text(encoding="utf-8")
+
+    with pytest.raises(FileExistsError):
+        compress_document_ids(tmp_path, [memo_002], doc_type="memo")
+
+    assert memo_002.exists()
+    assert collision.read_text(encoding="utf-8") == "existing destination"
+    assert memo_002.read_text(encoding="utf-8") == original_doc
+    assert notes.read_text(encoding="utf-8") == original_notes
 
 
 def test_audit_missing_document_references_reports_stale_refs(tmp_path):

@@ -180,3 +180,39 @@ More content.
             e for e in all_errors if "Closing code fence has extra text" in e and "appears to be" not in e
         ]
         assert len(confusing_errors) == 0, f"Should not have confusing closing fence errors. Found: {confusing_errors}"
+
+    def test_prd_duplicate_uuid_is_reported(self, tmp_path):
+        """PRDs require doc_uuid, so duplicate PRD UUIDs must be reported."""
+        docs_root = tmp_path / "repo"
+        prd_dir = docs_root / "docs-cms" / "prd"
+        prd_dir.mkdir(parents=True)
+
+        duplicate_uuid = "12345678-1234-4123-8123-123456789abc"
+        for number, title in [(1, "First Product Requirement"), (2, "Second Product Requirement")]:
+            (prd_dir / f"prd-{number:03d}-test.md").write_text(
+                f"""---
+id: prd-{number:03d}
+title: {title}
+status: Draft
+author: Product Team
+created: 2025-01-0{number}
+target_release: TBD
+tags: []
+project_id: test-project
+doc_uuid: {duplicate_uuid}
+---
+
+# {title}
+""",
+                encoding="utf-8",
+            )
+
+        validator = DocValidator(repo_root=docs_root, verbose=False)
+        validator.scan_documents()
+        validator.check_uuids()
+
+        all_errors = []
+        for doc in validator.documents:
+            all_errors.extend(doc.errors)
+
+        assert any("Duplicate UUID" in error and duplicate_uuid in error for error in all_errors)

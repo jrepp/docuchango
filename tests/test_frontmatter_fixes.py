@@ -15,6 +15,7 @@ from docuchango.fixes.frontmatter import (
     get_doc_type,
 )
 from docuchango.fixes.yaml_utils import dumps as frontmatter_dumps
+from docuchango.schemas import ADRFrontmatter, MemoFrontmatter, PRDFrontmatter, RFCFrontmatter
 
 
 class TestGetDocType:
@@ -73,8 +74,8 @@ date: 2025-01-26
         post = frontmatter.loads(doc.read_text())
         assert post.metadata["status"] == "Proposed"
 
-    def test_fix_pending_to_in_review_rfc(self, tmp_path):
-        """Test fixing 'pending' to 'In Review' for RFC."""
+    def test_fix_pending_to_proposed_rfc(self, tmp_path):
+        """Test fixing 'pending' to schema-valid 'Proposed' for RFC."""
         doc = tmp_path / "rfcs" / "rfc-001-test.md"
         doc.parent.mkdir(parents=True)
 
@@ -91,10 +92,10 @@ date: 2025-01-26
 
         changed, msg = fix_status_value(doc)
         assert changed
-        assert "In Review" in msg
+        assert "Proposed" in msg
 
         post = frontmatter.loads(doc.read_text())
-        assert post.metadata["status"] == "In Review"
+        assert post.metadata["status"] == "Proposed"
 
     def test_already_valid_status(self, tmp_path):
         """Test that valid status is not changed."""
@@ -293,8 +294,11 @@ This is the content.
         assert isinstance(title, str)
         assert "Python" in title
         assert post.metadata["status"] == "Proposed"
+        assert "created" in post.metadata
+        assert "date" not in post.metadata
         assert "deciders" in post.metadata
         assert "doc_uuid" in post.metadata
+        ADRFrontmatter(**post.metadata)
 
     def test_add_frontmatter_rfc(self, tmp_path):
         """Test adding frontmatter to RFC."""
@@ -314,7 +318,50 @@ Content here.
         post = frontmatter.loads(doc.read_text())
         assert post.metadata["id"] == "rfc-042"
         assert post.metadata["status"] == "Draft"
+        assert "author" in post.metadata
+        assert "created" in post.metadata
+        assert "date" not in post.metadata
         assert "deciders" not in post.metadata  # RFC shouldn't have deciders
+        RFCFrontmatter(**post.metadata)
+
+    def test_add_frontmatter_memo_matches_schema(self, tmp_path):
+        """Test generated Memo frontmatter validates against schema."""
+        doc = tmp_path / "memos" / "memo-007-implementation-notes.md"
+        doc.parent.mkdir(parents=True)
+
+        doc.write_text("# Implementation Notes\n\nContent here.\n")
+
+        changed, msg = add_missing_frontmatter(doc)
+        assert changed
+        assert "memo-007" in msg
+
+        post = frontmatter.loads(doc.read_text())
+        assert post.metadata["id"] == "memo-007"
+        assert "author" in post.metadata
+        assert "status" not in post.metadata
+        assert "created" in post.metadata
+        assert "date" not in post.metadata
+        MemoFrontmatter(**post.metadata)
+
+    def test_add_frontmatter_prd_matches_schema(self, tmp_path):
+        """Test generated PRD frontmatter validates against schema."""
+        doc = tmp_path / "prd" / "prd-003-user-authentication.md"
+        doc.parent.mkdir(parents=True)
+
+        doc.write_text("# User Authentication\n\nContent here.\n")
+
+        changed, msg = add_missing_frontmatter(doc)
+        assert changed
+        assert "prd-003" in msg
+
+        post = frontmatter.loads(doc.read_text())
+        assert post.metadata["id"] == "prd-003"
+        assert post.metadata["status"] == "Draft"
+        assert "author" in post.metadata
+        assert "target_release" in post.metadata
+        assert "created" in post.metadata
+        assert "date" not in post.metadata
+        PRDFrontmatter(**post.metadata)
 
     def test_frontmatter_already_exists(self, tmp_path):
         """Test that existing frontmatter is not overwritten."""
