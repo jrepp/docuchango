@@ -14,11 +14,11 @@ This guide is for AI agents working with projects that use `docs-cms` for docume
 ## Quick Reference Commands
 
 ```bash
-# Scan and validate all documentation
+# Validate all documentation and auto-fix what can be fixed
 docuchango validate
 
-# Auto-fix common issues
-docuchango fix
+# Preview issues without changing files
+docuchango validate --dry-run
 
 # Validate with detailed output
 docuchango validate --verbose
@@ -38,6 +38,9 @@ When you start working on a project, **immediately** read the docs-cms:
 # Find and read the project config
 cat docs-cms/docs-project.yaml
 
+# Read the config format and validation schema when editing project config
+cat docs-cms/docs-project.schema.json
+
 # List all ADRs (Architecture Decision Records)
 ls docs-cms/adr/
 
@@ -48,11 +51,15 @@ ls docs-cms/rfcs/
 find docs-cms -name "*.md" -type f | head -20
 ```
 
+If the local schema is missing, use the stable published schema:
+`https://jrepp.github.io/docuchango/schemas/docs-project.schema.json`.
+
 **What to look for:**
 - Recent ADRs: What architectural decisions were made?
 - Active RFCs: What changes are being proposed?
 - Project structure: How is the codebase organized?
 - Tech stack: What technologies are in use?
+- `subprojects`: Which nested docs projects or submodules should be loaded?
 
 ### 2. Answer User Questions
 
@@ -113,11 +120,11 @@ uuidgen | tr '[:upper:]' '[:lower:]'
 
 **Step 5**: Validate before committing
 ```bash
-# Validate the new document
-docuchango validate
+# Preview issues without changing files
+docuchango validate --dry-run
 
-# Fix any issues
-docuchango fix
+# Apply automatic fixes and validate the result
+docuchango validate
 
 # Verify it passes
 docuchango validate --verbose
@@ -335,11 +342,11 @@ Why this memo exists
 ### 1. Always Validate Before Committing
 
 ```bash
-# Run validation
-docuchango validate
+# Preview issues without changing files
+docuchango validate --dry-run
 
-# If errors found, fix them
-docuchango fix
+# Apply automatic fixes and report anything remaining
+docuchango validate
 
 # Verify fixes
 docuchango validate --verbose
@@ -727,7 +734,7 @@ docuchango validate --verbose
 # - Invalid status value
 
 # Auto-fix where possible
-docuchango fix
+docuchango validate
 
 # Check schema requirements
 cat docuchango/schemas.py | grep -A 20 "class ADRSchema"
@@ -777,6 +784,62 @@ def test_authentication_flow():
 - **Schema Reference**: `docuchango/schemas.py` - Field requirements
 - **Templates**: `docs-cms/templates/` - Document templates
 - **Examples**: `examples/docs-cms/` - Sample documents
+
+## Naming Standards
+
+Docuchango supports configurable naming standards applied to document folders via `docs-project.yaml`. Use the `naming_standard` field in `doc_types` configuration.
+
+### Built-in Naming Standards
+
+| Standard | Pattern | Example |
+|----------|---------|---------|
+| `nnn-name` | `^\d{3}-(.+)\.md$` | `001-intro.md` |
+| `year-month-day-name` | `^\d{4}-\d{2}-\d{2}-(.+)\.md$` | `2025-05-25-intro.md` |
+| `kebab-case` | `^[a-z0-9]+(-[a-z0-9]+)*\.md$` | `my-document-name.md` |
+| `snake_case` | `^[a-z0-9]+(_[a-z0-9]+)*\.md$` | `my_document_name.md` |
+| `camelCase` | `^[a-z][a-zA-Z0-9]*\.md$` | `myDocumentName.md` |
+| `PascalCase` | `^[A-Z][a-zA-Z0-9]*\.md$` | `MyDocumentName.md` |
+| `lowercase` | `^[a-z0-9]+\.md$` | `mydocumentname.md` |
+| `uppercase` | `^[A-Z0-9]+\.md$` | `MYDOCUMENTNAME.md` |
+
+### Configuration Example
+
+```yaml
+structure:
+  doc_types:
+    guides:
+      schema: generic
+      folders: [guides]
+      naming_standard: kebab-case
+    
+    runbooks:
+      schema: generic
+      folders: [ops/runbooks]
+      naming_standard: snake_case
+  
+  naming_standards:
+    my-custom: "^custom-.+\\.md$"
+```
+
+### Custom Naming Standards
+
+Define custom standards in `naming_standards` section of `docs-project.yaml`:
+
+```yaml
+structure:
+  naming_standards:
+    date-prefix: "^\\d{6}-.+必$"
+  doc_types:
+    reports:
+      naming_standard: date-prefix
+```
+
+The naming module (`docuchango/naming.py`) provides:
+- `BUILTIN_NAMING_STANDARDS`: Dict of all built-in patterns
+- `validate_name(name, pattern)`: Validate filename against regex
+- `validate_name_with_standard(name, standard, custom)`: Validate using named standard
+- `resolve_naming_standard(standard, custom)`: Resolve name to regex pattern
+- `describe_standard(standard, custom)`: Human-readable description
 
 ## Remember
 

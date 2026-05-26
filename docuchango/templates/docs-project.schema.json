@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jrepp.github.io/docuchango/schemas/docs-project.schema.json",
+  "title": "Docuchango Docs Project",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "default": "1",
+      "description": "docs-project.yaml schema version. Reserved for future config migrations."
+    },
+    "docuchango_version": {
+      "type": "string",
+      "description": "Docuchango version that generated or last updated this config."
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-z0-9\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "structure": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "adr_dir": {"type": "string", "default": "adr"},
+        "rfc_dir": {"type": "string", "default": "rfcs"},
+        "memo_dir": {"type": "string", "default": "memos"},
+        "prd_dir": {"type": "string", "default": "prd"},
+        "template_dir": {"type": "string", "default": "templates"},
+        "document_folders": {
+          "type": "array",
+          "items": {"type": "string"},
+          "default": ["adr", "rfcs", "memos", "prd"]
+        },
+        "docs_roots": {
+          "type": "array",
+          "items": {"type": "string"},
+          "default": ["."]
+        },
+        "doc_types": {
+          "type": ["object", "null"],
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "schema": {
+                "type": "string",
+                "enum": ["adr", "rfc", "memo", "prd", "generic"],
+                "default": "generic"
+              },
+              "folders": {
+                "type": "array",
+                "items": {"type": "string"},
+                "default": []
+              },
+              "filename_pattern": {"type": ["string", "null"]},
+              "enforce_filename_pattern": {"type": "boolean", "default": true},
+              "require_frontmatter": {"type": "boolean", "default": true},
+              "naming_standard": {"type": ["string", "null"], "description": "Named naming standard to apply (e.g., 'kebab-case', 'nnn-name'). Overrides filename_pattern if both set."}
+            }
+          }
+        },
+        "naming_standards": {
+          "type": ["object", "null"],
+          "description": "Custom naming standards that can be referenced by doc_types",
+          "additionalProperties": {"type": "string"}
+        }
+      }
+    },
+    "subprojects": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {"type": "string"},
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path"],
+            "properties": {
+              "path": {"type": "string", "minLength": 1}
+            }
+          }
+        ]
+      },
+      "default": []
+    },
+    "indexes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "path"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "path": {"type": "string", "minLength": 1},
+          "targets": {"type": "array", "items": {"type": "string"}, "default": []},
+          "require_all_targets": {"type": "boolean", "default": true},
+          "require_entries": {"type": "boolean", "default": true},
+          "allow_extra_links": {"type": "boolean", "default": true},
+          "time_bucket": {
+            "type": ["object", "null"],
+            "additionalProperties": false,
+            "required": ["cadence"],
+            "properties": {
+              "cadence": {
+                "type": "string",
+                "enum": ["weekly", "monthly", "quarterly", "yearly", "milestone"]
+              },
+              "field": {"type": "string", "default": "created"},
+              "milestone_field": {"type": "string", "default": "milestone"},
+              "heading_level": {"type": "integer", "minimum": 1, "maximum": 6, "default": 2},
+              "heading_pattern": {"type": ["string", "null"]}
+            }
+          }
+        }
+      },
+      "default": []
+    },
+    "metadata": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["created"],
+      "properties": {
+        "created": {"type": "string", "format": "date"},
+        "maintainers": {"type": "array", "items": {"type": "string"}, "default": []},
+        "purpose": {"type": ["string", "null"]}
+      }
+    },
+    "readability": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean", "default": true},
+        "flesch_reading_ease_min": {"type": ["number", "null"], "default": 60.0},
+        "flesch_kincaid_grade_max": {"type": ["number", "null"], "default": 10.0},
+        "gunning_fog_max": {"type": ["number", "null"], "default": 12.0},
+        "smog_index_max": {"type": ["number", "null"], "default": 12.0},
+        "automated_readability_index_max": {"type": ["number", "null"], "default": 10.0},
+        "coleman_liau_index_max": {"type": ["number", "null"], "default": 10.0},
+        "dale_chall_max": {"type": ["number", "null"], "default": 9.0},
+        "min_paragraph_length": {"type": "integer", "default": 100}
+      }
+    }
+  }
+}

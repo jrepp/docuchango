@@ -46,6 +46,7 @@ class TestInitCommand:
 
             # Check files
             assert (docs_cms / "docs-project.yaml").exists()
+            assert (docs_cms / "docs-project.schema.json").exists()
             assert (docs_cms / "README.md").exists()
             assert (docs_cms / "templates" / "adr-000-template.md").exists()
             assert (docs_cms / "templates" / "rfc-000-template.md").exists()
@@ -221,6 +222,9 @@ class TestInitCommand:
             content = config_path.read_text()
 
             # Check for main sections
+            assert "# yaml-language-server: $schema=./docs-project.schema.json" in content
+            assert 'version: "1"' in content
+            assert "docuchango_version:" in content
             assert "project:" in content
             assert "structure:" in content
             assert "metadata:" in content

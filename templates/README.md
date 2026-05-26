@@ -69,13 +69,16 @@ Required: `id`, `title`, `status`, `created`, `deciders`, `tags`, `project_id`, 
 - `date` is a deprecated legacy field; it will be auto-migrated to `created` by `docuchango fix all`
 
 ### RFC (Request for Comments)
-Required: `id`, `title`, `status`, `author`, `created`, `updated`, `tags`, `project_id`, `doc_uuid`
+Required: `id`, `title`, `status`, `author`, `created`, `tags`, `project_id`, `doc_uuid`
 
 ### Memo
-Required: `id`, `title`, `author`, `date`, `created`, `updated`, `tags`, `project_id`, `doc_uuid`
+Required: `id`, `title`, `author`, `created`, `tags`, `project_id`, `doc_uuid`
 
-### PRD/FRD/PRDFAQ
-Required: `id`, `title`, `status`, `author`, `created`, `updated`, `tags`, `project_id`, `doc_uuid`
+### PRD
+Required: `id`, `title`, `status`, `author`, `created`, `target_release`, `tags`, `project_id`, `doc_uuid`
+
+### FRD/PRDFAQ
+Required: Follow the template frontmatter comments for the current fields used by those document types.
 
 ### Generic
 Required: `title`, `project_id`, `doc_uuid`
@@ -99,11 +102,11 @@ node -e "console.log(require('crypto').randomUUID())"
 All templates are designed to pass docuchango validation:
 
 ```bash
-# Validate a single document
-docuchango validate --repo-root /path/to/docs
+# Preview issues without changing files
+docuchango validate --repo-root /path/to/docs --dry-run
 
-# Fix common issues
-docuchango fix all --repo-root /path/to/docs
+# Apply automatic fixes
+docuchango validate --repo-root /path/to/docs
 ```
 
 ## Template Customization

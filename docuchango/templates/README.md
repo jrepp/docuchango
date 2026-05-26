@@ -7,6 +7,7 @@ This directory contains structured technical documentation using the docs-cms pa
 ```
 docs-cms/
 ├── docs-project.yaml      # Project configuration
+├── docs-project.schema.json # Editor/agent schema for docs-project.yaml
 ├── adr/                   # Architecture Decision Records
 │   └── adr-000-template.md
 ├── rfcs/                  # Request for Comments
@@ -52,14 +53,14 @@ Product requirements and feature specifications.
 Run validation to check your documents:
 
 ```bash
-# Validate all documents
+# Validate all documents and auto-fix what can be fixed
 docuchango validate
+
+# Preview issues without changing files
+docuchango validate --dry-run
 
 # Validate with verbose output
 docuchango validate --verbose
-
-# Auto-fix common issues
-docuchango validate --fix
 ```
 
 ## Configuration
@@ -70,12 +71,16 @@ Edit `docs-project.yaml` to customize:
 - Which folders to scan
 - Maintainer information
 
+The generated `docs-project.yaml` includes a YAML language-server pointer to
+`docs-project.schema.json`, which documents and validates the config format.
+Use `subprojects` to include docs configs from submodules or nested projects.
+
 ## Best Practices
 
 - Use meaningful, descriptive slugs in filenames
 - Keep frontmatter fields up to date
 - Use lowercase with dashes for IDs and filenames
-- Update the `updated` field when making changes
+- Preserve the `created` field once set; derive later updates from git history
 - Use appropriate tags for categorization
 - Link to related documents using relative paths
 

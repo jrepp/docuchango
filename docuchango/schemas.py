@@ -8,9 +8,57 @@ from __future__ import annotations
 
 import datetime
 import re
+from importlib.metadata import PackageNotFoundError, version
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+try:
+    CURRENT_DOCUCHANGO_VERSION = version("docuchango")
+except PackageNotFoundError:
+    CURRENT_DOCUCHANGO_VERSION = "0.0.0.dev0"
+
+
+class DocTypeConfig(BaseModel):
+    """Configuration for a single document type in docs-project.yaml.
+
+    This enables mixed document schemas in monorepos, including:
+    - numeric-prefix formats (e.g., adr-001-...)
+    - non-numeric formats (e.g., prfaq-why-now.md)
+    - custom folders per document type
+    - custom schema binding (adr/rfc/memo/prd/generic)
+    """
+
+    folders: list[str] = Field(
+        default_factory=list,
+        description="Folders (relative to config file directory) containing this document type",
+    )
+    filename_pattern: str | None = Field(
+        default=None,
+        description="Optional regex enforced against file names (not full paths)",
+    )
+    enforce_filename_pattern: bool = Field(
+        default=True,
+        description="Whether filename_pattern should be enforced when provided",
+    )
+    require_frontmatter: bool = Field(
+        default=True,
+        description=(
+            "Whether documents in this lane must include YAML frontmatter. "
+            "Set false for plain-Markdown generic lanes in mixed-schema repos."
+        ),
+    )
+    naming_standard: str | None = Field(
+        default=None,
+        description="Named naming standard to apply to document names (e.g., 'kebab-case', 'snake_case', 'date-numeric'). Overrides filename_pattern if both are set.",
+    )
+    model_config = ConfigDict(populate_by_name=True)
+
+    frontmatter_schema: Literal["adr", "rfc", "memo", "prd", "generic"] = Field(
+        alias="schema",
+        default="generic",
+        description="Frontmatter schema to validate against for this document type",
+    )
 
 
 class DocsProjectStructure(BaseModel):
@@ -43,6 +91,25 @@ class DocsProjectStructure(BaseModel):
     document_folders: list[str] = Field(
         default_factory=lambda: ["adr", "rfcs", "memos", "prd"],
         description="List of folders to scan for documents. Override to customize which folders are validated. Default: ['adr', 'rfcs', 'memos', 'prd']",
+    )
+    docs_roots: list[str] = Field(
+        default_factory=lambda: ["."],
+        description="Optional list of roots (relative to the config file directory) to scan for folders. Useful for monorepos.",
+    )
+    doc_types: dict[str, DocTypeConfig] | None = Field(
+        default=None,
+        description=(
+            "Optional custom document type map for mixed-schema repositories. "
+            "When provided, this takes precedence over adr_dir/rfc_dir/memo_dir/prd_dir."
+        ),
+    )
+    naming_standards: dict[str, str] | None = Field(
+        default=None,
+        description=(
+            "Named naming standards that can be referenced by doc_types. "
+            "Keys are standard names (e.g., 'kebab-case', 'snake_case'), values are regex patterns. "
+            "Example: {'kebab-case': '^[a-z0-9]+(-[a-z0-9]+)*\\.md$', 'date-numeric': '^\\d{4}-\\d{2}-\\d{2}-.+必$"
+        ),
     )
 
 
@@ -153,6 +220,81 @@ class DocsProjectReadability(BaseModel):
         )
 
 
+class DocsProjectIndexTimeBucket(BaseModel):
+    """Time or milestone bucket rules for a document index."""
+
+    cadence: Literal["weekly", "monthly", "quarterly", "yearly", "milestone"] = Field(
+        ...,
+        description="Bucket cadence for indexed documents",
+    )
+    field: str = Field(
+        default="created",
+        description="Target frontmatter field used to compute date buckets",
+    )
+    milestone_field: str = Field(
+        default="milestone",
+        description="Target frontmatter field used when cadence is milestone",
+    )
+    heading_level: int = Field(
+        default=2,
+        ge=1,
+        le=6,
+        description="Markdown heading level used for bucket headings",
+    )
+    heading_pattern: str | None = Field(
+        default=None,
+        description="Optional regex that bucket heading text must match",
+    )
+
+
+class DocsProjectIndex(BaseModel):
+    """Configuration for a Markdown file that indexes other repository documents."""
+
+    name: str = Field(..., min_length=1, description="Human-readable index name")
+    path: str = Field(..., min_length=1, description="Index Markdown file, relative to docs-project.yaml")
+    targets: list[str] = Field(
+        default_factory=list,
+        description="Glob patterns for Markdown files that must appear in the index",
+    )
+    require_all_targets: bool = Field(
+        default=True,
+        description="Require every target file to be linked from the index",
+    )
+    require_entries: bool = Field(
+        default=True,
+        description="Require the index to contain at least one Markdown link when targets exist",
+    )
+    allow_extra_links: bool = Field(
+        default=True,
+        description="Allow Markdown links to files outside the configured target set",
+    )
+    time_bucket: DocsProjectIndexTimeBucket | None = Field(
+        default=None,
+        description="Optional bucket discipline for release notes, milestone changelogs, and similar indexes",
+    )
+
+
+class DocsProjectSubproject(BaseModel):
+    """Reference to another docs-project.yaml file, often in a git submodule."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    path: str = Field(
+        ...,
+        min_length=1,
+        description=(
+            "Path to a subproject directory or docs-project.yaml file, relative to the parent docs-project.yaml"
+        ),
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def allow_string_reference(cls, data):  # type: ignore[no-untyped-def]
+        if isinstance(data, str):
+            return {"path": data}
+        return data
+
+
 class DocsProjectConfig(BaseModel):
     """Schema for docs-project.yaml configuration file.
 
@@ -160,6 +302,16 @@ class DocsProjectConfig(BaseModel):
     defining project metadata, directory structure, and validation rules.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
+    version: str = Field(
+        default="1",
+        description="docs-project.yaml schema version. Reserved for future config migrations.",
+    )
+    docuchango_version: str = Field(
+        default=CURRENT_DOCUCHANGO_VERSION,
+        description="Docuchango version that generated or last updated this config.",
+    )
     project: DocsProjectInfo = Field(
         ...,
         description="Project information including ID, name, and description",
@@ -175,6 +327,14 @@ class DocsProjectConfig(BaseModel):
     readability: DocsProjectReadability = Field(
         default_factory=DocsProjectReadability,
         description="Readability analysis configuration and thresholds",
+    )
+    indexes: list[DocsProjectIndex] = Field(
+        default_factory=list,
+        description="Markdown index files with stricter content discipline",
+    )
+    subprojects: list[DocsProjectSubproject] = Field(
+        default_factory=list,
+        description="Additional docs projects to load, relative to this config file. Useful for git submodules.",
     )
 
 

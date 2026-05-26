@@ -2,6 +2,137 @@
 
 <!-- version list -->
 
+## v1.17.2 (2026-05-26)
+
+### Bug Fixes
+
+- Keep frontmatter compatible with python 3.9
+  ([`f56f70f`](https://github.com/jrepp/docuchango/commit/f56f70f2bebf0dbd4be53ed9a5ae3e6615796e3e))
+
+### Chores
+
+- Audit dependency releases
+  ([`2b5c5b7`](https://github.com/jrepp/docuchango/commit/2b5c5b728275523cb4649e34eaa8a1b9838bad10))
+
+- Drop python 3.9 support
+  ([`bee475b`](https://github.com/jrepp/docuchango/commit/bee475be9917c71393c402620d8e07e0b53318bc))
+
+- Sync lockfile package version
+  ([`a8dbbe7`](https://github.com/jrepp/docuchango/commit/a8dbbe75127ee6933e373a021079a405944e6479))
+
+
+## v1.17.1 (2026-05-25)
+
+### Bug Fixes
+
+- Restore main CI checks
+  ([`9f732a1`](https://github.com/jrepp/docuchango/commit/9f732a112ee57209c55dcc8bfb15889b568526b9))
+
+
+## v1.17.0 (2026-05-25)
+
+### Features
+
+- Add configurable naming standards for document files
+  ([`1d793ab`](https://github.com/jrepp/docuchango/commit/1d793ab3cc014bc8193bb2132fb7997d42f49460))
+
+
+## v1.16.0 (2026-05-23)
+
+### Code Style
+
+- Satisfy ci lint checks
+  ([`a1d9844`](https://github.com/jrepp/docuchango/commit/a1d98443b1aae26e65434351bfc1c2017e519998))
+
+### Continuous Integration
+
+- Publish docs project schema
+  ([`fbe2452`](https://github.com/jrepp/docuchango/commit/fbe24521081f326f78d6966d65909d20dc739fe8))
+
+### Documentation
+
+- Simplify project config authoring
+  ([`50c49b0`](https://github.com/jrepp/docuchango/commit/50c49b0859168283bc3477b4f192714515288bc3))
+
+### Features
+
+- Support sub-project docs configs
+  ([`2d9dfe2`](https://github.com/jrepp/docuchango/commit/2d9dfe26a07af8127c8abbb1cf62402d9f813ed6))
+
+### Testing
+
+- Cover sub-project config failures
+  ([`2ade43c`](https://github.com/jrepp/docuchango/commit/2ade43c52984722ebc38b8ab9d8ca9ca107074d5))
+
+
+## v1.15.0 (2026-05-23)
+
+### Bug Fixes
+
+- Apply ruff formatting to validator.py and test_document_indexes.py
+  ([`83d11a3`](https://github.com/jrepp/docuchango/commit/83d11a34b919aa835f7506a236a56a2b2c6e6118))
+
+### Features
+
+- Validate document indexes
+  ([`1a317b0`](https://github.com/jrepp/docuchango/commit/1a317b0db450c01fed9a6893d52b28fda523aa7a))
+
+
+## v1.14.0 (2026-04-26)
+
+### Code Style
+
+- Format id compression module
+  ([`89ac573`](https://github.com/jrepp/docuchango/commit/89ac573fedabb87f74a56eca16e772f2616af8f4))
+
+### Features
+
+- Compress document ids
+  ([`96511fb`](https://github.com/jrepp/docuchango/commit/96511fb7196fba4bdb5972abd6ebc27c9eaac4c0))
+
+
+## v1.13.0 (2026-04-25)
+
+### Bug Fixes
+
+- **validation**: Support plain markdown generic lanes
+  ([`456fd07`](https://github.com/jrepp/docuchango/commit/456fd07b1f5e256d9038effdf4469c4b85487e8a))
+
+### Chores
+
+- Sync CMS document metadata and uv lock
+  ([`cdc2056`](https://github.com/jrepp/docuchango/commit/cdc2056cadb5c4abfa8711731a271e5186818d5b))
+
+### Documentation
+
+- Align CLI docs with current validate workflow
+  ([`8842f87`](https://github.com/jrepp/docuchango/commit/8842f8754216dac0c8d98f50b623a5a24f691d79))
+
+### Features
+
+- **config**: Support mixed monorepo doc schemas
+  ([`f2f6566`](https://github.com/jrepp/docuchango/commit/f2f6566e14beb3276910dddbb1c39ec83a22a688))
+
+### Testing
+
+- Fix docs regression import ordering
+  ([`367b123`](https://github.com/jrepp/docuchango/commit/367b123f9ae24b80b48fa00a8f9c65019f2ce434))
+
+
+## v1.12.3 (2026-04-04)
+
+### Bug Fixes
+
+- Apply ruff formatting to yaml utils
+  ([`5351f3a`](https://github.com/jrepp/docuchango/commit/5351f3af0772872672c0fc04568481206bfd5dda))
+
+- Preserve immutable created frontmatter timestamps
+  ([`d909749`](https://github.com/jrepp/docuchango/commit/d9097491c8e9b2c084578ebbd01c719dbda3dbc9))
+
+- Preserve legacy timestamps during created migration
+  ([`c03dbcf`](https://github.com/jrepp/docuchango/commit/c03dbcf5be24fed57843b9d6ec56ae6a96ff1d84))
+
+
 ## v1.12.2 (2026-03-09)
 
 ### Bug Fixes

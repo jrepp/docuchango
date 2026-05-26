@@ -10,11 +10,141 @@ import sys
 from pathlib import Path
 
 import click
+import yaml
 from rich.console import Console
 
 from docuchango import __version__
+from docuchango.schemas import DocsProjectConfig
 
 console = Console()
+
+
+def _load_docs_project_config(root: Path) -> tuple[DocsProjectConfig | None, Path | None]:
+    """Load docs-project.yaml from repo root or docs-cms."""
+    candidates = [root / "docs-project.yaml", root / "docs-cms" / "docs-project.yaml"]
+    return _load_docs_project_config_from_candidates(candidates)
+
+
+def _load_docs_project_config_from_candidates(candidates: list[Path]) -> tuple[DocsProjectConfig | None, Path | None]:
+    """Load the first valid docs-project.yaml from candidate paths."""
+    for candidate in candidates:
+        if not candidate.exists():
+            continue
+        try:
+            with candidate.open(encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+            return DocsProjectConfig(**data), candidate
+        except Exception:
+            return None, candidate
+    return None, None
+
+
+def _iter_docs_project_configs(root: Path) -> list[tuple[DocsProjectConfig, Path]]:
+    """Load the root docs-project.yaml plus any configured subprojects."""
+    config, config_path = _load_docs_project_config(root)
+    if not config or not config_path:
+        return []
+
+    configs = [(config, config_path)]
+    seen = {config_path.resolve()}
+    pending = [(config, config_path)]
+
+    while pending:
+        parent_config, parent_path = pending.pop(0)
+        parent_base = parent_path.parent
+        for subproject in parent_config.subprojects:
+            sub_path = (parent_base / subproject.path).resolve()
+            if sub_path.is_dir():
+                sub_path = sub_path / "docs-project.yaml"
+            if sub_path in seen:
+                continue
+            seen.add(sub_path)
+
+            sub_config, loaded_path = _load_docs_project_config_from_candidates([sub_path])
+            if not sub_config or not loaded_path:
+                continue
+
+            configs.append((sub_config, loaded_path))
+            pending.append((sub_config, loaded_path))
+
+    return configs
+
+
+def _discover_doc_files(root: Path) -> list[Path]:
+    """Discover markdown docs, preferring docs-project.yaml when present."""
+    configs = _iter_docs_project_configs(root)
+
+    if configs:
+        all_files: list[Path] = []
+        all_seen: set[Path] = set()
+
+        for config, config_path in configs:
+            if not config.structure:
+                continue
+            config_base = config_path.parent
+
+            if config.structure.doc_types:
+                roots = config.structure.docs_roots or ["."]
+                for doc_type_cfg in config.structure.doc_types.values():
+                    for root_rel in roots:
+                        root_path = (config_base / root_rel).resolve()
+                        for folder in doc_type_cfg.folders:
+                            folder_path = (root_path / folder).resolve()
+                            if not folder_path.exists():
+                                continue
+                            for file_path in folder_path.rglob("*.md"):
+                                if file_path not in all_seen:
+                                    all_seen.add(file_path)
+                                    all_files.append(file_path)
+            else:
+                for folder in config.structure.document_folders:
+                    folder_path = (config_base / folder).resolve()
+                    if not folder_path.exists():
+                        continue
+                    for file_path in folder_path.rglob("*.md"):
+                        if file_path not in all_seen:
+                            all_seen.add(file_path)
+                            all_files.append(file_path)
+
+        if all_files:
+            return sorted(all_files)
+
+    # Legacy mode (backwards compatibility)
+    doc_patterns = [
+        "adr/**/*.md",
+        "rfcs/**/*.md",
+        "memos/**/*.md",
+        "prd/**/*.md",
+        "docs-cms/adr/**/*.md",
+        "docs-cms/rfcs/**/*.md",
+        "docs-cms/memos/**/*.md",
+        "docs-cms/prd/**/*.md",
+    ]
+    files = []
+    for pattern in doc_patterns:
+        files.extend(root.glob(pattern))
+    return sorted(set(files))
+
+
+def _guess_doc_type_from_path(file_path: Path) -> str | None:
+    """Best-effort document type inference from path segments."""
+    parts = [p.lower() for p in file_path.parts]
+    if "adr" in parts:
+        return "adr"
+    if "rfcs" in parts or "rfc" in parts:
+        return "rfc"
+    if "memos" in parts or "memo" in parts:
+        return "memo"
+    if "prd" in parts:
+        return "prd"
+    return None
+
+
+def _filter_files_by_doc_type(files: list[Path], doc_type: str | None) -> list[Path]:
+    """Filter discovered files by requested doc type."""
+    if not doc_type:
+        return files
+    return [f for f in files if _guess_doc_type_from_path(f) == doc_type]
 
 
 @click.group()
@@ -71,21 +201,7 @@ def validate(
     if dry_run:
         console.print("[yellow]DRY RUN - No changes will be made[/yellow]\n")
 
-    # Find all markdown files in docs directories
-    # Check both repo root and docs-cms subdirectory for compatibility
-    doc_patterns = [
-        "adr/**/*.md",
-        "rfcs/**/*.md",
-        "memos/**/*.md",
-        "prd/**/*.md",
-        "docs-cms/adr/**/*.md",
-        "docs-cms/rfcs/**/*.md",
-        "docs-cms/memos/**/*.md",
-        "docs-cms/prd/**/*.md",
-    ]
-    all_files = []
-    for pattern in doc_patterns:
-        all_files.extend(repo_root.glob(pattern))
+    all_files = _discover_doc_files(repo_root)
 
     # Track fixes applied and remaining issues
     fixes_applied: list[tuple[Path, str]] = []
@@ -298,6 +414,7 @@ def init(path: Path | None, project_id: str, project_name: str, force: bool):
 
     template_files = {
         "docs-project.yaml": path / "docs-project.yaml",
+        "docs-project.schema.json": path / "docs-project.schema.json",
         "README.md": path / "README.md",
         "adr-000-template.md": path / "templates" / "adr-000-template.md",
         "rfc-000-template.md": path / "templates" / "rfc-000-template.md",
@@ -326,6 +443,7 @@ def init(path: Path | None, project_id: str, project_name: str, force: bool):
                     "my-project": "\x00PROJECT_ID\x00",
                     "My Project": "\x00PROJECT_NAME\x00",
                     "2025-01-01": "\x00DATE\x00",
+                    "1.15.0": "\x00DOCUCHANGO_VERSION\x00",
                 }
 
                 # First pass: replace placeholders with unique markers
@@ -336,6 +454,7 @@ def init(path: Path | None, project_id: str, project_name: str, force: bool):
                 content = content.replace(markers["my-project"], project_id)
                 content = content.replace(markers["My Project"], project_name)
                 content = content.replace(markers["2025-01-01"], datetime.date.today().isoformat())
+                content = content.replace(markers["1.15.0"], __version__)
 
             dest_path.write_text(content)
             console.print(f"[green]✓[/green] Created: {dest_path.relative_to(path)}")
@@ -348,8 +467,9 @@ def init(path: Path | None, project_id: str, project_name: str, force: bool):
     console.print(f"\n[bold green]✅ Successfully initialized docs-cms at {path}[/bold green]")
     console.print("\n[bold]Next steps:[/bold]")
     console.print("1. Review and customize docs-project.yaml")
-    console.print("2. Copy a template from templates/ to create your first document")
-    console.print("3. Run 'docuchango validate' to check your documents")
+    console.print("2. Use docs-project.schema.json as the config format reference")
+    console.print("3. Copy a template from templates/ to create your first document")
+    console.print("4. Run 'docuchango validate' to check your documents")
     console.print("\n[dim]Tip: Run 'docuchango bootstrap' for detailed setup instructions[/dim]")
 
 
@@ -569,31 +689,7 @@ def bulk_update(
     # Find files to process
     root = target_path or Path.cwd()
 
-    # Build glob patterns based on doc_type filter
-    if doc_type:
-        type_dirs = {
-            "adr": ["adr"],
-            "rfc": ["rfcs"],
-            "memo": ["memos"],
-            "prd": ["prd"],
-        }
-        patterns = [f"{d}/**/*.md" for d in type_dirs[doc_type]]
-        patterns += [f"docs-cms/{d}/**/*.md" for d in type_dirs[doc_type]]
-    else:
-        patterns = [
-            "adr/**/*.md",
-            "rfcs/**/*.md",
-            "memos/**/*.md",
-            "prd/**/*.md",
-            "docs-cms/adr/**/*.md",
-            "docs-cms/rfcs/**/*.md",
-            "docs-cms/memos/**/*.md",
-            "docs-cms/prd/**/*.md",
-        ]
-
-    all_files = []
-    for pattern in patterns:
-        all_files.extend(root.glob(pattern))
+    all_files = _filter_files_by_doc_type(_discover_doc_files(root), doc_type)
 
     if not all_files:
         console.print("[yellow]No files found matching criteria[/yellow]")
@@ -685,31 +781,7 @@ def bulk_timestamps(
     # Find files to process
     root = target_path or Path.cwd()
 
-    # Build glob patterns based on doc_type filter
-    if doc_type:
-        type_dirs = {
-            "adr": ["adr"],
-            "rfc": ["rfcs"],
-            "memo": ["memos"],
-            "prd": ["prd"],
-        }
-        patterns = [f"{d}/**/*.md" for d in type_dirs[doc_type]]
-        patterns += [f"docs-cms/{d}/**/*.md" for d in type_dirs[doc_type]]
-    else:
-        patterns = [
-            "adr/**/*.md",
-            "rfcs/**/*.md",
-            "memos/**/*.md",
-            "prd/**/*.md",
-            "docs-cms/adr/**/*.md",
-            "docs-cms/rfcs/**/*.md",
-            "docs-cms/memos/**/*.md",
-            "docs-cms/prd/**/*.md",
-        ]
-
-    all_files = []
-    for pattern in patterns:
-        all_files.extend(root.glob(pattern))
+    all_files = _filter_files_by_doc_type(_discover_doc_files(root), doc_type)
 
     if not all_files:
         console.print("[yellow]No files found matching criteria[/yellow]")
@@ -763,6 +835,120 @@ def bulk_timestamps(
         console.print(f"[green]Modified {modified_count} of {len(all_files)} files[/green]")
         if error_count:
             console.print(f"[red]Errors: {error_count}[/red]")
+
+
+@bulk.command("compress-ids")
+@click.option(
+    "--type",
+    "doc_type",
+    type=click.Choice(["adr", "rfc", "memo", "prd"]),
+    help="Filter by document type",
+)
+@click.option(
+    "--path",
+    "target_path",
+    type=click.Path(exists=True, path_type=Path),
+    help="Repository or docs root (default: current directory)",
+)
+@click.option("--dry-run", is_flag=True, help="Preview changes without applying")
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed output")
+def bulk_compress_ids(
+    doc_type: str | None,
+    target_path: Path | None,
+    dry_run: bool,
+    verbose: bool,
+):
+    """Compress document IDs and update references.
+
+    Renumbers documents of each selected type into a contiguous sequence while
+    preserving filename suffixes. References across the repository are rewritten,
+    then an audit reports stale or missing document-like references.
+
+    Examples:
+
+        \b
+        # Compress all document types
+        docuchango bulk compress-ids
+
+        \b
+        # Compress only memos: memo-001, memo-010 -> memo-001, memo-002
+        docuchango bulk compress-ids --type memo
+
+        \b
+        # Preview all renames and reference updates
+        docuchango bulk compress-ids --dry-run --verbose
+    """
+    from docuchango.fixes.id_compression import compress_document_ids
+
+    root = target_path or Path.cwd()
+    discovered_files = _discover_doc_files(root)
+    all_files = _filter_files_by_doc_type(discovered_files, doc_type)
+
+    if not all_files:
+        console.print("[yellow]No files found matching criteria[/yellow]")
+        sys.exit(0)
+
+    console.print("[bold blue]🗜️  Compressing document IDs[/bold blue]")
+    if dry_run:
+        console.print("[yellow]DRY RUN - No changes will be made[/yellow]")
+    console.print(f"Processing {len(all_files)} files...\n")
+
+    try:
+        result = compress_document_ids(root, discovered_files, doc_type=doc_type, dry_run=dry_run)
+    except Exception as e:
+        console.print(f"[red]✗[/red] {e}")
+        sys.exit(1)
+
+    action = "Would renumber" if dry_run else "Renumbered"
+    if result.changes:
+        console.print(f"[green]{action} {len(result.changes)} document(s)[/green]")
+        for change in result.changes:
+            old_rel = change.file_path.relative_to(root)
+            new_rel = change.new_path.relative_to(root)
+            console.print(f"  {change.old_id} → {change.new_id}: {old_rel} → {new_rel}")
+    else:
+        console.print("[green]Document IDs are already contiguous[/green]")
+
+    if result.updated_files:
+        action = "Would update" if dry_run else "Updated"
+        console.print(f"\n[green]{action} references in {len(result.updated_files)} file(s)[/green]")
+        if verbose:
+            for file_path, count in sorted(result.updated_files.items()):
+                rel_path = file_path.relative_to(root)
+                console.print(f"  {rel_path}: {count} change(s)")
+    else:
+        console.print("\n[green]No references needed updates[/green]")
+
+    if result.synced_files:
+        action = "Would sync" if dry_run else "Synced"
+        console.print(f"\n[green]{action} frontmatter IDs in {len(result.synced_files)} file(s)[/green]")
+        if verbose:
+            for file_path in result.synced_files:
+                rel_path = file_path.relative_to(root)
+                console.print(f"  {rel_path}")
+
+    if result.stale_references:
+        console.print(f"\n[red]Stale references after rewrite: {len(result.stale_references)}[/red]")
+        for hit in result.stale_references[:25]:
+            rel_path = hit.file_path.relative_to(root)
+            console.print(f"  {rel_path}:{hit.line_number}: {hit.reference}")
+        if len(result.stale_references) > 25:
+            console.print(f"  ... and {len(result.stale_references) - 25} more")
+    else:
+        console.print("\n[green]No stale references to old IDs found[/green]")
+
+    if result.missing_references:
+        console.print(f"\n[yellow]Missing document references found: {len(result.missing_references)}[/yellow]")
+        for hit in result.missing_references[:25]:
+            rel_path = hit.file_path.relative_to(root)
+            console.print(f"  {rel_path}:{hit.line_number}: {hit.reference}")
+        if len(result.missing_references) > 25:
+            console.print(f"  ... and {len(result.missing_references) - 25} more")
+    elif verbose:
+        console.print("\n[green]No missing document references found[/green]")
+
+    if dry_run and (result.changes or result.updated_files):
+        console.print("\n[dim]Run without --dry-run to apply changes[/dim]")
 
 
 @main.command("migrate")
@@ -849,31 +1035,7 @@ def migrate(
     # Find files to process
     root = target_path or Path.cwd()
 
-    # Build glob patterns based on doc_type filter
-    if doc_type:
-        type_dirs = {
-            "adr": ["adr"],
-            "rfc": ["rfcs"],
-            "memo": ["memos"],
-            "prd": ["prd"],
-        }
-        patterns = [f"{d}/**/*.md" for d in type_dirs[doc_type]]
-        patterns += [f"docs-cms/{d}/**/*.md" for d in type_dirs[doc_type]]
-    else:
-        patterns = [
-            "adr/**/*.md",
-            "rfcs/**/*.md",
-            "memos/**/*.md",
-            "prd/**/*.md",
-            "docs-cms/adr/**/*.md",
-            "docs-cms/rfcs/**/*.md",
-            "docs-cms/memos/**/*.md",
-            "docs-cms/prd/**/*.md",
-        ]
-
-    all_files = []
-    for pattern in patterns:
-        all_files.extend(root.glob(pattern))
+    all_files = _filter_files_by_doc_type(_discover_doc_files(root), doc_type)
 
     if not all_files:
         console.print("[yellow]No files found matching criteria[/yellow]")
@@ -969,7 +1131,7 @@ def migrate(
 
             # 6. Normalize id field to lowercase
             if "id" in post.metadata:
-                old_id = post.metadata["id"]
+                old_id = str(post.metadata["id"])
                 new_id = old_id.lower()
                 if new_id != old_id:
                     post.metadata["id"] = new_id

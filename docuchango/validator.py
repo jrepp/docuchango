@@ -26,15 +26,17 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass, field
+from datetime import date, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional, cast
 
 try:
     import frontmatter
     import yaml
     from pydantic import ValidationError
 
+    from docuchango.naming import resolve_naming_standard
     from docuchango.readability import TEXTSTAT_AVAILABLE, ReadabilityConfig, ReadabilityScorer
 
     # Import schemas from the docuchango package
@@ -123,6 +125,18 @@ class Link:
         return f"{status} {self.source_doc.name}:{self.line_number} -> {self.target}"
 
 
+@dataclass
+class ProjectConfigContext:
+    """Loaded docs-project.yaml with its path for relative path resolution."""
+
+    config: DocsProjectConfig
+    path: Path
+
+    @property
+    def base_dir(self) -> Path:
+        return self.path.parent
+
+
 class DocValidator:
     """Validates documentation"""
 
@@ -136,27 +150,103 @@ class DocValidator:
         self.errors: list[str] = []
 
         # Load project configuration
+        self.project_config_path: Optional[Path] = None
         self.project_config = self._load_project_config()
+        self.project_configs = self._load_project_config_contexts()
 
     def _load_project_config(self) -> Optional[DocsProjectConfig]:
         """Load docs-project.yaml configuration"""
-        config_path = self.repo_root / "docs-cms" / "docs-project.yaml"
-        if config_path.exists():
+        candidate_paths = [
+            self.repo_root / "docs-project.yaml",
+            self.repo_root / "docs-cms" / "docs-project.yaml",
+        ]
+
+        for config_path in candidate_paths:
+            if not config_path.exists():
+                continue
+
             try:
                 with open(config_path, encoding="utf-8") as f:
                     config_data = yaml.safe_load(f)
                     config = DocsProjectConfig(**config_data)
-                    self.log(f"✓ Loaded project config: {config.project.id}")
+                    self.project_config_path = config_path
+                    self.log(f"✓ Loaded project config: {config.project.id} ({config_path})")
                     return config
             except ValidationError as e:
-                self.log(f"⚠️  Warning: Invalid project config format: {e}")
+                self.log(f"⚠️  Warning: Invalid project config format at {config_path}: {e}")
                 return None
             except Exception as e:
-                self.log(f"⚠️  Warning: Could not load project config: {e}")
+                self.log(f"⚠️  Warning: Could not load project config at {config_path}: {e}")
                 return None
-        else:
-            self.log(f"⚠️  Warning: Project config not found at {config_path}")
+
+        self.log("⚠️  Warning: Project config not found (looked for docs-project.yaml at repo root and docs-cms/)")
+        return None
+
+    def _load_project_config_at(self, config_path: Path) -> Optional[DocsProjectConfig]:
+        """Load one docs-project.yaml file from an explicit path."""
+        if not config_path.exists():
+            self.log(
+                f"⚠️  Warning: Sub-project config not found: {config_path}. Add the file or remove it from subprojects.",
+                force=True,
+            )
             return None
+
+        try:
+            with open(config_path, encoding="utf-8") as f:
+                config_data = yaml.safe_load(f)
+            config = DocsProjectConfig(**config_data)
+            self.log(f"✓ Loaded sub-project config: {config.project.id} ({config_path})")
+            return config
+        except ValidationError as e:
+            self.log(
+                f"⚠️  Warning: Invalid sub-project config format at {config_path}: {e}. "
+                "Fix the config or remove it from subprojects.",
+                force=True,
+            )
+            return None
+        except Exception as e:
+            self.log(
+                f"⚠️  Warning: Could not load sub-project config at {config_path}: {e}. "
+                "Fix the config or remove it from subprojects.",
+                force=True,
+            )
+            return None
+
+    def _load_project_config_contexts(self) -> list[ProjectConfigContext]:
+        """Load the primary project config and any referenced sub-project configs."""
+        if not self.project_config or not self.project_config_path:
+            return []
+
+        contexts = [ProjectConfigContext(self.project_config, self.project_config_path)]
+        seen = {self.project_config_path.resolve()}
+        pending = list(contexts)
+
+        while pending:
+            parent = pending.pop(0)
+            for subproject in parent.config.subprojects:
+                sub_path = (parent.base_dir / subproject.path).resolve()
+                if sub_path.is_dir():
+                    sub_path = sub_path / "docs-project.yaml"
+                if sub_path in seen:
+                    continue
+                seen.add(sub_path)
+
+                sub_config = self._load_project_config_at(sub_path)
+                if not sub_config:
+                    continue
+
+                context = ProjectConfigContext(sub_config, sub_path)
+                contexts.append(context)
+                pending.append(context)
+
+        return contexts
+
+    def _get_config_base_dir(self) -> Path:
+        """Base directory for resolving structure paths."""
+        if self.project_config_path:
+            return self.project_config_path.parent
+        # Legacy default
+        return self.repo_root / "docs-cms"
 
     def log(self, message: str, force: bool = False):
         """Log if verbose or forced"""
@@ -187,33 +277,115 @@ class DocValidator:
         # Default folders to scan (includes prd now!)
         return ["adr", "rfcs", "memos", "prd"]
 
-    def _scan_document_folder(self, folder_name: str, doc_type: str, pattern: re.Pattern[str]):
+    def _build_scan_entries(self) -> list[tuple[str, str, str, bool, bool, Path]]:
+        """Build scan entries as tuples:
+
+        (doc_type, folder_relative, filename_pattern, enforce_filename_pattern, require_frontmatter, root_path)
+        """
+        default_patterns = {
+            "adr": r"^(adr)-(\d{3})-(.+)\.md$",
+            "rfc": r"^(rfc)-(\d{3})-(.+)\.md$",
+            "memo": r"^(memo)-(\d{3})-(.+)\.md$",
+            "prd": r"^(prd)-(\d{3})-(.+)\.md$",
+        }
+
+        contexts = self.project_configs or []
+
+        if contexts:
+            entries: list[tuple[str, str, str, bool, bool, Path]] = []
+            for context in contexts:
+                config = context.config
+                config_base = context.base_dir
+
+                if config.structure and config.structure.doc_types:
+                    roots = config.structure.docs_roots or ["."]
+                    custom_naming = config.structure.naming_standards or {}
+                    for doc_type_name, cfg in config.structure.doc_types.items():
+                        if cfg.naming_standard:
+                            pattern = resolve_naming_standard(cfg.naming_standard, custom_naming)
+                            if pattern:
+                                pattern = f"^{pattern}" if not pattern.startswith("^") else pattern
+                            else:
+                                pattern = default_patterns.get(doc_type_name, r"^(.+)\.md$")
+                        elif cfg.filename_pattern:
+                            pattern = cfg.filename_pattern
+                        else:
+                            pattern = default_patterns.get(doc_type_name, r"^(.+)\.md$")
+                        folders = cfg.folders or []
+                        for root_rel in roots:
+                            root_path = (config_base / root_rel).resolve()
+                            for folder in folders:
+                                entries.append(
+                                    (
+                                        cfg.frontmatter_schema,
+                                        folder,
+                                        pattern,
+                                        cfg.enforce_filename_pattern,
+                                        cfg.require_frontmatter,
+                                        root_path,
+                                    )
+                                )
+                    continue
+
+                folder_config = {
+                    "adr": config.structure.adr_dir,
+                    "rfc": config.structure.rfc_dir,
+                    "memo": config.structure.memo_dir,
+                    "prd": config.structure.prd_dir,
+                }
+                for key, schema_name in [("adr", "adr"), ("rfc", "rfc"), ("memo", "memo"), ("prd", "prd")]:
+                    folder_name = folder_config[key]
+                    if folder_name in config.structure.document_folders:
+                        entries.append(
+                            (schema_name, folder_name, default_patterns[schema_name], True, True, config_base)
+                        )
+            return entries
+
+        # Legacy behavior
+        config_base = self._get_config_base_dir()
+        folder_config = self._get_folder_config()
+        document_folders = self._get_document_folders()
+
+        entries = []
+        for key, schema_name in [("adr", "adr"), ("rfc", "rfc"), ("memo", "memo"), ("prd", "prd")]:
+            folder_name = folder_config[key]
+            if folder_name in document_folders:
+                entries.append((schema_name, folder_name, default_patterns[schema_name], True, True, config_base))
+        return entries
+
+    def _scan_document_folder(
+        self,
+        folder_path: Path,
+        _folder_name: str,
+        doc_type: str,
+        pattern: re.Pattern[str],
+        enforce_filename_pattern: bool,
+        require_frontmatter: bool,
+    ):
         """Scan a specific document folder for markdown files"""
-        folder_path = self.repo_root / "docs-cms" / folder_name
         if not folder_path.exists():
-            self.log(f"   ⊘ Folder {folder_name} does not exist, skipping")
+            self.log(f"   ⊘ Folder {folder_path} does not exist, skipping")
             return
 
-        for md_file in folder_path.glob("*.md"):
+        for md_file in folder_path.rglob("*.md"):
             # Skip README and index files (landing pages)
             if md_file.name in ["README.md", "index.md"]:
                 continue
 
             match = pattern.match(md_file.name)
-            if not match:
-                self.errors.append(
-                    f"Invalid {doc_type.upper()} filename: {md_file.name} (expected: {doc_type}-NNN-name-with-dashes.md - lowercase only)"
-                )
-                self.log(f"   ✗ {md_file.name}: Invalid filename format (must be lowercase)")
+            if enforce_filename_pattern and not match:
+                self.errors.append(f"Invalid {doc_type.upper()} filename: {md_file.name} (pattern: {pattern.pattern})")
+                self.log(f"   ✗ {md_file.name}: Invalid filename format")
                 continue
 
-            _prefix, num, _slug = match.groups()
-            # Skip template files (000)
-            if num == "000":
-                self.log(f"   ⊘ {md_file.name}: Skipping template file")
-                continue
+            if match and len(match.groups()) >= 2:
+                _prefix, num = match.groups()[:2]
+                # Skip template files (000)
+                if num == "000":
+                    self.log(f"   ⊘ {md_file.name}: Skipping template file")
+                    continue
 
-            doc = self._parse_document(md_file, doc_type)
+            doc = self._parse_document(md_file, doc_type, require_frontmatter=require_frontmatter)
             if doc:
                 self.documents.append(doc)
                 self.file_to_doc[md_file] = doc
@@ -222,69 +394,67 @@ class DocValidator:
         """Scan all markdown files"""
         self.log("\n📂 Scanning documents...")
 
-        # Get folder configuration
-        folder_config = self._get_folder_config()
-        document_folders = self._get_document_folders()
+        entries = self._build_scan_entries()
+        if not entries:
+            self.log("   ⊘ No configured scan entries found", force=True)
 
-        # Filename patterns (type-NNN-name-with-dashes.md)
-        # ENFORCE lowercase only - uppercase is deprecated
-        patterns = {
-            "adr": re.compile(r"^(adr)-(\d{3})-(.+)\.md$"),
-            "rfc": re.compile(r"^(rfc)-(\d{3})-(.+)\.md$"),
-            "memo": re.compile(r"^(memo)-(\d{3})-(.+)\.md$"),
-            "prd": re.compile(r"^(prd)-(\d{3})-(.+)\.md$"),
-        }
-
-        # Map folder names to document types and detect duplicates
-        folder_to_types: dict[str, list[str]] = {}
-        for key, doc_type in [("adr", "adr"), ("rfc", "rfc"), ("memo", "memo"), ("prd", "prd")]:
-            folder = folder_config[key]
-            if folder not in folder_to_types:
-                folder_to_types[folder] = []
-            folder_to_types[folder].append(doc_type)
-
-        # Warn about duplicate folder mappings
-        for folder, types in folder_to_types.items():
-            if len(types) > 1:
-                self.log(
-                    f"⚠️  Warning: Folder '{folder}' is mapped to multiple document types: {types}. "
-                    f"This may cause ambiguous validation. Consider using unique folder names.",
-                    force=True,
-                )
-
-        # Scan configured document folders
-        for folder_name in document_folders:
-            doc_types = folder_to_types.get(folder_name, [])
-            if not doc_types:
-                self.log(
-                    f"⚠️  Warning: Document folder '{folder_name}' is not recognized and will be skipped. "
-                    f"Please check your configuration.",
-                    force=True,
-                )
+        for doc_type, folder_name, pattern_text, enforce_pattern, require_frontmatter, root_path in entries:
+            try:
+                pattern = re.compile(pattern_text)
+            except re.error as e:
+                self.errors.append(f"Invalid filename regex for {doc_type}/{folder_name}: {e}")
                 continue
 
-            for doc_type in doc_types:
-                if doc_type in patterns:
-                    self.log(f"   Scanning {folder_name}/ ({doc_type} documents)...")
-                    self._scan_document_folder(folder_name, doc_type, patterns[doc_type])
+            folder_path = (root_path / folder_name).resolve()
+            self.log(f"   Scanning {folder_path} ({doc_type} documents)...")
+            self._scan_document_folder(
+                folder_path,
+                folder_name,
+                doc_type,
+                pattern,
+                enforce_pattern,
+                require_frontmatter,
+            )
 
-        # Scan general docs (root level)
-        docs_dir = self.repo_root / "docs-cms"
-        if docs_dir.exists():
+        # Scan general docs markdown files at each configured docs root.
+        roots_to_scan = [self._get_config_base_dir()]
+        if self.project_configs:
+            roots_to_scan = []
+            for context in self.project_configs:
+                roots_to_scan.extend((context.base_dir / p).resolve() for p in context.config.structure.docs_roots)
+        elif self.project_config and self.project_config.structure:
+            roots_to_scan = [
+                (self._get_config_base_dir() / p).resolve() for p in self.project_config.structure.docs_roots
+            ]
+
+        for docs_dir in roots_to_scan:
+            if not docs_dir.exists():
+                continue
             for md_file in docs_dir.glob("*.md"):
-                if md_file.name not in ["README.md"]:
-                    doc = self._parse_document(md_file, "doc")
-                    if doc:
-                        self.documents.append(doc)
-                        self.file_to_doc[md_file] = doc
+                if md_file.name in ["README.md", "docs-project.yaml"]:
+                    continue
+                doc = self._parse_document(md_file, "doc")
+                if doc:
+                    self.documents.append(doc)
+                    self.file_to_doc[md_file] = doc
 
         self.log(f"   Found {len(self.documents)} documents")
 
-    def _parse_document(self, file_path: Path, doc_type: str) -> Optional[Document]:
+    def _parse_document(self, file_path: Path, doc_type: str, require_frontmatter: bool = True) -> Optional[Document]:
         """Parse a markdown file and validate frontmatter"""
-        return self._parse_document_enhanced(file_path, doc_type)
+        return self._parse_document_enhanced(file_path, doc_type, require_frontmatter=require_frontmatter)
 
-    def _parse_document_enhanced(self, file_path: Path, doc_type: str) -> Optional[Document]:
+    def _infer_plain_markdown_title(self, file_path: Path, content: str) -> str:
+        """Infer a title for plain-markdown generic documents."""
+        for line in content.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("# "):
+                return stripped[2:].strip()
+        return file_path.stem.replace("-", " ").replace("_", " ").strip().title() or file_path.name
+
+    def _parse_document_enhanced(
+        self, file_path: Path, doc_type: str, require_frontmatter: bool = True
+    ) -> Optional[Document]:
         """Parse document with python-frontmatter and pydantic validation"""
         try:
             # Read file content once and cache it
@@ -292,8 +462,14 @@ class DocValidator:
 
             # Parse frontmatter from content
             post = frontmatter.loads(content)
+            metadata = cast(dict[str, Any], post.metadata)
 
-            if not post.metadata:
+            if not metadata:
+                if doc_type == "generic" and not require_frontmatter:
+                    title = self._infer_plain_markdown_title(file_path, content)
+                    self.log(f"   ✓ {file_path.name}: Plain Markdown generic doc")
+                    return Document(file_path=file_path, doc_type=doc_type, title=title, _content_cache=content)
+
                 error = "Missing YAML frontmatter"
                 self.log(f"   ✗ {file_path.name}: {error}")
                 doc = Document(file_path=file_path, doc_type=doc_type, title="Unknown", _content_cache=content)
@@ -303,27 +479,27 @@ class DocValidator:
             # Validate against schema
             try:
                 if doc_type == "adr":
-                    ADRFrontmatter(**post.metadata)
+                    ADRFrontmatter(**metadata)
                 elif doc_type == "rfc":
-                    RFCFrontmatter(**post.metadata)
+                    RFCFrontmatter(**metadata)
                 elif doc_type == "memo":
-                    MemoFrontmatter(**post.metadata)
+                    MemoFrontmatter(**metadata)
                 elif doc_type == "prd":
-                    PRDFrontmatter(**post.metadata)
+                    PRDFrontmatter(**metadata)
                 else:
                     # Generic validation for other docs
-                    GenericDocFrontmatter(**post.metadata)
+                    GenericDocFrontmatter(**metadata)
 
             except ValidationError as e:
                 # Pydantic validation errors - very detailed
                 doc = Document(
                     file_path=file_path,
                     doc_type=doc_type,
-                    title=post.metadata.get("title", "Unknown"),
-                    status=post.metadata.get("status", ""),
-                    date=str(post.metadata.get("date", post.metadata.get("created", ""))),
-                    tags=post.metadata.get("tags", []),
-                    doc_id=post.metadata.get("id", ""),
+                    title=metadata.get("title", "Unknown"),
+                    status=metadata.get("status", ""),
+                    date=str(metadata.get("date", metadata.get("created", ""))),
+                    tags=metadata.get("tags", []),
+                    doc_id=metadata.get("id", ""),
                     _content_cache=content,
                 )
 
@@ -347,12 +523,12 @@ class DocValidator:
             doc = Document(
                 file_path=file_path,
                 doc_type=doc_type,
-                title=post.metadata.get("title", "Unknown"),
-                status=post.metadata.get("status", ""),
-                date=str(post.metadata.get("date", post.metadata.get("created", ""))),
-                tags=post.metadata.get("tags", []),
-                doc_id=post.metadata.get("id", ""),
-                doc_uuid=post.metadata.get("doc_uuid", ""),
+                title=metadata.get("title", "Unknown"),
+                status=metadata.get("status", ""),
+                date=str(metadata.get("date", metadata.get("created", ""))),
+                tags=metadata.get("tags", []),
+                doc_id=metadata.get("id", ""),
+                doc_uuid=metadata.get("doc_uuid", ""),
                 _content_cache=content,
             )
 
@@ -641,6 +817,198 @@ class DocValidator:
 
         if not issues_found:
             self.log("   ✓ No problematic cross-plugin links found")
+
+    def _extract_markdown_file_links(self, content: str, source_path: Path) -> dict[Path, tuple[int, str]]:
+        """Extract Markdown file links and resolve them to absolute paths."""
+        links: dict[Path, tuple[int, str]] = {}
+        in_code_fence = False
+        link_pattern = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+
+        for line_num, line in enumerate(content.splitlines(), start=1):
+            if line.startswith("```"):
+                in_code_fence = not in_code_fence
+                continue
+            if in_code_fence:
+                continue
+
+            line_without_code = re.sub(r"`[^`]+`", "", line)
+            for match in link_pattern.finditer(line_without_code):
+                target = match.group(2).split("#", 1)[0]
+                if re.match(r"^[a-z][a-z0-9+.-]*:", target):
+                    continue
+                if not target.endswith(".md") and not target.startswith(("./", "../", "/")):
+                    continue
+
+                if target.startswith("/"):
+                    resolved = (self.repo_root / target.lstrip("/")).resolve()
+                else:
+                    resolved = (source_path.parent / target).resolve()
+                    if not target.endswith(".md"):
+                        resolved = Path(str(resolved) + ".md")
+                links[resolved] = (line_num, target)
+
+        return links
+
+    def _extract_bucket_headings(self, content: str, heading_level: int) -> dict[int, str]:
+        """Map line numbers to bucket heading text at the configured heading level."""
+        marker = "#" * heading_level
+        headings: dict[int, str] = {}
+        in_code_fence = False
+
+        for line_num, line in enumerate(content.splitlines(), start=1):
+            if line.startswith("```"):
+                in_code_fence = not in_code_fence
+                continue
+            if in_code_fence:
+                continue
+            if line.startswith(f"{marker} ") and not line.startswith(f"{marker}#"):
+                headings[line_num] = line[len(marker) :].strip()
+
+        return headings
+
+    def _bucket_for_target(self, target_path: Path, bucket_config) -> Optional[str]:
+        """Compute the expected index bucket for a target document."""
+        post = frontmatter.loads(target_path.read_text(encoding="utf-8"))
+
+        if bucket_config.cadence == "milestone":
+            milestone = post.metadata.get(bucket_config.milestone_field)
+            return str(milestone).strip() if milestone else None
+
+        value = post.metadata.get(bucket_config.field)
+        if isinstance(value, datetime):
+            target_date = value.date()
+        elif isinstance(value, date):
+            target_date = value
+        elif isinstance(value, str):
+            target_date = date.fromisoformat(value.split("T", 1)[0])
+        else:
+            return None
+
+        if bucket_config.cadence == "weekly":
+            iso_year, iso_week, _ = target_date.isocalendar()
+            return f"{iso_year}-W{iso_week:02d}"
+        if bucket_config.cadence == "monthly":
+            return f"{target_date:%Y-%m}"
+        if bucket_config.cadence == "quarterly":
+            quarter = ((target_date.month - 1) // 3) + 1
+            return f"{target_date.year}-Q{quarter}"
+        if bucket_config.cadence == "yearly":
+            return f"{target_date.year}"
+        return None
+
+    def check_document_indexes(self):
+        """Validate configured Markdown index files."""
+        contexts = self.project_configs or []
+        if not contexts and self.project_config and self.project_config_path:
+            contexts = [ProjectConfigContext(self.project_config, self.project_config_path)]
+
+        contexts = [context for context in contexts if context.config.indexes]
+        if not contexts:
+            return
+
+        self.log("\n🗂️  Checking document indexes...")
+
+        for context in contexts:
+            config_base = context.base_dir
+            for index_config in context.config.indexes:
+                index_path = (config_base / index_config.path).resolve()
+                if not index_path.exists():
+                    self.errors.append(f"Document index '{index_config.name}' not found: {index_config.path}")
+                    continue
+
+                try:
+                    content = index_path.read_text(encoding="utf-8")
+                    links = self._extract_markdown_file_links(content, index_path)
+                    target_paths: set[Path] = set()
+                    for target_pattern in index_config.targets:
+                        target_paths.update(
+                            path.resolve() for path in config_base.glob(target_pattern) if path.is_file()
+                        )
+                    target_paths.discard(index_path)
+
+                    if index_config.require_entries and target_paths and not links:
+                        self.errors.append(f"Document index '{index_config.name}' has no Markdown links")
+
+                    if index_config.require_all_targets:
+                        for target_path in sorted(target_paths):
+                            if target_path not in links:
+                                rel_target = target_path.relative_to(config_base)
+                                self.errors.append(
+                                    f"Document index '{index_config.name}' is missing target: {rel_target}"
+                                )
+
+                    if not index_config.allow_extra_links:
+                        for linked_path, (line_num, raw_target) in sorted(links.items()):
+                            if linked_path.exists() and linked_path not in target_paths:
+                                self.errors.append(
+                                    f"Document index '{index_config.name}' line {line_num} links outside targets: {raw_target}"
+                                )
+
+                    if index_config.time_bucket:
+                        self._check_document_index_buckets(
+                            index_config.name, content, links, target_paths, index_config.time_bucket, config_base
+                        )
+
+                    self.log(f"   ✓ {index_config.name}: {len(target_paths)} target(s) checked")
+                except Exception as e:
+                    self.errors.append(f"Error checking document index '{index_config.name}': {e}")
+
+    def _check_document_index_buckets(
+        self,
+        name: str,
+        content: str,
+        links: dict[Path, tuple[int, str]],
+        target_paths: set[Path],
+        bucket_config,
+        config_base: Path,
+    ) -> None:
+        """Validate that index links appear under the expected time or milestone bucket."""
+        headings = self._extract_bucket_headings(content, bucket_config.heading_level)
+        if not headings:
+            self.errors.append(f"Document index '{name}' has no bucket headings")
+            return
+
+        if bucket_config.heading_pattern:
+            heading_re = re.compile(bucket_config.heading_pattern)
+            for line_num, heading in headings.items():
+                if not heading_re.match(heading):
+                    self.errors.append(f"Document index '{name}' line {line_num} has invalid bucket heading: {heading}")
+
+        sorted_headings = sorted(headings.items())
+        buckets = set(headings.values())
+
+        def bucket_at_line(line_num: int) -> Optional[str]:
+            current = None
+            for heading_line, heading in sorted_headings:
+                if heading_line >= line_num:
+                    break
+                current = heading
+            return current
+
+        for target_path in sorted(target_paths):
+            try:
+                expected_bucket = self._bucket_for_target(target_path, bucket_config)
+            except Exception as e:
+                rel_target = target_path.relative_to(config_base)
+                self.errors.append(f"Document index '{name}' cannot read bucket for {rel_target}: {e}")
+                continue
+
+            rel_target = target_path.relative_to(config_base)
+            if not expected_bucket:
+                self.errors.append(f"Document index '{name}' cannot determine bucket for {rel_target}")
+                continue
+            if expected_bucket not in buckets:
+                self.errors.append(f"Document index '{name}' missing bucket heading: {expected_bucket}")
+                continue
+            if target_path not in links:
+                continue
+
+            line_num, _ = links[target_path]
+            actual_bucket = bucket_at_line(line_num)
+            if actual_bucket != expected_bucket:
+                self.errors.append(
+                    f"Document index '{name}' links {rel_target} under '{actual_bucket}' instead of '{expected_bucket}'"
+                )
 
     def check_typescript_config(self):
         """Run TypeScript typecheck on Docusaurus config"""
@@ -1052,7 +1420,7 @@ class DocValidator:
 
         for doc in self.documents:
             # Skip docs without doc_type (generic docs)
-            if doc.doc_type not in ["adr", "rfc", "memo"]:
+            if doc.doc_type not in ["adr", "rfc", "memo", "prd"]:
                 continue
 
             # Check if ID exists
@@ -1066,7 +1434,7 @@ class DocValidator:
             # Extract expected ID from filename
             filename = doc.file_path.name
             # Match adr-XXX, rfc-XXX, or memo-XXX pattern (lowercase only)
-            filename_pattern = re.compile(r"^(adr|rfc|memo)-(\d{3})-")
+            filename_pattern = re.compile(r"^(adr|rfc|memo|prd)-(\d{3})-")
             match = filename_pattern.match(filename)
 
             if not match:
@@ -1088,7 +1456,7 @@ class DocValidator:
                 id_errors += 1
 
             # Check ID matches title number
-            title_pattern = re.compile(r"^(ADR|RFC|MEMO)-(\d{3}):", re.IGNORECASE)
+            title_pattern = re.compile(r"^(ADR|RFC|MEMO|PRD)-(\d{3}):", re.IGNORECASE)
             title_match = title_pattern.match(doc.title)
             if title_match:
                 title_prefix, title_num = title_match.groups()
@@ -1272,6 +1640,7 @@ class DocValidator:
         self.check_mdx_compilation()  # Check MDX compilation with @mdx-js/mdx
         self.check_mdx_compatibility()
         self.check_cross_plugin_links()
+        self.check_document_indexes()
         self.check_formatting()
         self.check_readability()  # Check document readability
 
