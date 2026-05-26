@@ -79,6 +79,20 @@ class TestADRFrontmatter:
             )
         assert "adr-XXX" in str(exc_info.value).lower() or "lowercase" in str(exc_info.value).lower()
 
+    def test_adr_amendment_id_valid(self):
+        """Test that amendment id format adr-NNN-aNN is accepted."""
+        adr = ADRFrontmatter(
+            title="Test Amendment",
+            status="Proposed",
+            created=date(2025, 10, 13),
+            deciders="Team",
+            tags=["amendment"],
+            id="adr-026-a1",
+            project_id="test-project",
+            doc_uuid="8b063564-82a5-4a21-943f-e868388d36b9",
+        )
+        assert adr.id == "adr-026-a1"
+
     def test_adr_invalid_uuid(self):
         """Test that invalid UUID format is rejected."""
         with pytest.raises(ValidationError) as exc_info:
