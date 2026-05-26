@@ -378,7 +378,7 @@ class ADRFrontmatter(BaseModel):
     )
     id: str = Field(
         ...,
-        description="Lowercase ID matching filename format: 'adr-XXX' where XXX is 3-digit number (e.g., 'adr-001')",
+        description="Lowercase ID matching filename format: 'adr-XXX' for standard ADRs (e.g., 'adr-001'), or 'adr-XXX-aNN' for amendments (e.g., 'adr-026-a1')",
     )
     project_id: str = Field(
         ...,
@@ -414,9 +414,12 @@ class ADRFrontmatter(BaseModel):
     @field_validator("id")
     @classmethod
     def validate_id_format(cls, v: str) -> str:
-        """Ensure ID is lowercase adr-XXX format"""
-        if not re.match(r"^adr-\d{3}$", v):
-            raise ValueError(f"ADR id must be lowercase 'adr-XXX' format (e.g., 'adr-001'). Got: {v}")
+        """Ensure ID is lowercase adr-XXX or adr-XXX-aNN format (for amendments)"""
+        if not re.match(r"^adr-\d{3}(-a\d+)?$", v):
+            raise ValueError(
+                f"ADR id must be lowercase 'adr-XXX' format (e.g., 'adr-001') "
+                f"or amendment format 'adr-XXX-aNN' (e.g., 'adr-026-a1'). Got: {v}"
+            )
         return v
 
     @field_validator("doc_uuid")

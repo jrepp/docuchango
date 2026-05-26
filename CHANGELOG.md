@@ -2,6 +2,32 @@
 
 <!-- version list -->
 
+## v1.18.0 (2026-05-26)
+
+
+## v1.0.0 (2026-05-26)
+
+- Initial Release
+
+## v1.17.2 (2026-05-26)
+
+### Bug Fixes
+
+- Keep frontmatter compatible with python 3.9
+  ([`f56f70f`](https://github.com/jrepp/docuchango/commit/f56f70f2bebf0dbd4be53ed9a5ae3e6615796e3e))
+
+### Chores
+
+- Audit dependency releases
+  ([`2b5c5b7`](https://github.com/jrepp/docuchango/commit/2b5c5b728275523cb4649e34eaa8a1b9838bad10))
+
+- Drop python 3.9 support
+  ([`bee475b`](https://github.com/jrepp/docuchango/commit/bee475be9917c71393c402620d8e07e0b53318bc))
+
+- Sync lockfile package version
+  ([`a8dbbe7`](https://github.com/jrepp/docuchango/commit/a8dbbe75127ee6933e373a021079a405944e6479))
+
+
 ## v1.17.1 (2026-05-25)
 
 ### Bug Fixes
