@@ -941,17 +941,24 @@ def migrate(
                 changes.append(f"Generated doc_uuid: {new_uuid}")
                 modified = True
 
-            # 3. Remove legacy 'date' field
+            legacy_date = post.metadata.get("date")
+
+            # 3. Add created only when missing (preserve immutability)
+            if "created" not in post.metadata:
+                created_datetime, _ = get_git_dates(file_path)
+                if created_datetime:
+                    post.metadata["created"] = created_datetime
+                    changes.append(f"Added created: {created_datetime} (from git)")
+                    modified = True
+                elif legacy_date is not None:
+                    post.metadata["created"] = legacy_date
+                    changes.append("Added created from legacy 'date' field")
+                    modified = True
+
+            # 4. Remove legacy 'date' field once created is preserved or recovered
             if "date" in post.metadata:
                 del post.metadata["date"]
                 changes.append("Removed deprecated 'date' field")
-                modified = True
-
-            # 4. Add created from git only when missing (preserve immutability)
-            created_datetime, _ = get_git_dates(file_path)
-            if created_datetime and "created" not in post.metadata:
-                post.metadata["created"] = created_datetime
-                changes.append(f"Added created: {created_datetime} (from git)")
                 modified = True
 
             # 5. Remove 'updated' field (derived from git history)
