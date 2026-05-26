@@ -10,6 +10,12 @@ Templates for creating structured documentation with proper frontmatter validati
   - Use for documenting significant architectural decisions
   - Includes context, options analysis, and decision rationale
 
+- **adr-amendment-template.md** - ADR Amendment
+  - Use to make a scoped change to an existing accepted ADR
+  - id format: `adr-NNN-aNN` (e.g. `adr-026-a1`)
+  - Requires `amends: adr-NNN` frontmatter field
+  - Use when changing one specific rule/value; use supersession for full replacement
+
 - **rfc-template.md** - Request for Comments
   - Use for proposing new features or significant changes
   - Includes detailed design, alternatives, and implementation plan
@@ -53,7 +59,14 @@ Templates for creating structured documentation with proper frontmatter validati
 ## Frontmatter Requirements
 
 ### ADR (Architecture Decision Record)
-Required: `id`, `title`, `status`, `date`, `deciders`, `tags`, `project_id`, `doc_uuid`
+Required: `id`, `title`, `status`, `created`, `deciders`, `tags`, `project_id`, `doc_uuid`
+- `date` is a deprecated legacy field; it will be auto-migrated to `created` by `docuchango fix all`
+
+### ADR Amendment
+Required: `id`, `title`, `status`, `created`, `deciders`, `tags`, `project_id`, `doc_uuid`
+- `id` must be `adr-NNN-aNN` format (e.g. `adr-026-a01`)
+- `amends` is a recommended field referencing the parent ADR id (e.g. `adr-026`); it is not currently enforced by schema validation
+- `date` is a deprecated legacy field; it will be auto-migrated to `created` by `docuchango fix all`
 
 ### RFC (Request for Comments)
 Required: `id`, `title`, `status`, `author`, `created`, `tags`, `project_id`, `doc_uuid`
