@@ -11,9 +11,9 @@ Validates markdown documents for:
 - Docusaurus build validation
 
 Usage:
-    docugo validate
-    docugo validate --verbose
-    docugo fix all
+    docuchango validate
+    docuchango validate --verbose
+    docuchango validate --dry-run
 
 Exit Codes:
     0 - All documents valid

@@ -427,9 +427,6 @@ jobs:
 
       - name: Validate docs-cms
         run: docuchango validate --verbose
-
-      - name: Check for broken links
-        run: docuchango validate --check-links
 ```
 
 ## Next Steps

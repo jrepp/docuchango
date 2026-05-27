@@ -43,11 +43,11 @@ A Python CLI that:
 # Validate everything
 docuchango validate
 
-# Fix issues automatically
-docuchango fix all
+# Preview issues without changing files
+docuchango validate --dry-run
 
-# Fix specific things
-docuchango fix code-blocks
+# Fix issues automatically
+docuchango validate
 ```
 
 ## Who Uses It
@@ -114,7 +114,7 @@ docuchango validate --repo-root /path/to/docs
    - Invalid status: 'Draft' (use: Proposed, Accepted, Deprecated, Superseded)
 
 # Fix automatically
-docuchango fix all
+docuchango validate
 
 # Use in CI
 - name: Validate docs

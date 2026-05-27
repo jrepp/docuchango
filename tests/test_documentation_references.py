@@ -13,12 +13,14 @@ USER_FACING_DOCS = [
     REPO_ROOT / "docs" / "BEST_PRACTICES.md",
     REPO_ROOT / "templates" / "README.md",
     REPO_ROOT / "docuchango" / "templates" / "README.md",
+    REPO_ROOT / "docs-cms" / "prd" / "prd-001-validation-framework.md",
 ]
 
 STALE_COMMAND_REFERENCES = [
     "docuchango fix",
     "dcc-fix",
     "docuchango validate --fix",
+    "docuchango validate --check-links",
 ]
 
 
