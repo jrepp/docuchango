@@ -10,6 +10,25 @@ from docuchango.cli import _discover_doc_files
 from docuchango.validator import DocValidator
 
 
+def write_valid_adr(path: Path, project_id: str = "secure-project", adr_id: str = "adr-001") -> None:
+    """Write a minimal valid ADR document."""
+    path.write_text(
+        f"""---
+title: Secure Boundary Decision
+status: Accepted
+created: 2025-01-01
+deciders: Core Team
+tags: [security]
+id: {adr_id}
+project_id: {project_id}
+doc_uuid: 12345678-1234-4123-8123-123456789abc
+---
+
+# Decision
+"""
+    )
+
+
 class TestConfigLoading:
     """Test configuration file loading in DocValidator."""
 
@@ -22,6 +41,8 @@ class TestConfigLoading:
         assert schema["properties"]["version"]["default"] == "1"
         assert "subprojects" in schema["properties"]
         assert schema["properties"]["subprojects"]["items"]["oneOf"][0]["type"] == "string"
+        assert "security" in schema["properties"]
+        assert schema["properties"]["security"]["properties"]["allow_external_paths"]["default"] is False
 
     def test_load_valid_config(self):
         """Test that valid config file is loaded correctly."""
@@ -373,6 +394,27 @@ Test PRD content.
             assert validator.project_config is not None
             assert validator.project_config.project.id == "root-config-project"
 
+    def test_load_config_from_docs_directory(self):
+        """Validator should load docs/docs-project.yaml when docs-cms config is absent."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            docs_dir = repo_root / "docs"
+            docs_dir.mkdir()
+            (docs_dir / "docs-project.yaml").write_text(
+                yaml.dump(
+                    {
+                        "project": {"id": "docs-project", "name": "Docs Project"},
+                        "structure": {"document_folders": ["adr"]},
+                    }
+                )
+            )
+
+            validator = DocValidator(repo_root, verbose=False)
+
+            assert validator.project_config is not None
+            assert validator.project_config_path == (docs_dir / "docs-project.yaml").resolve()
+            assert validator.project_config.project.id == "docs-project"
+
     def test_doc_types_custom_layout_mixed_schema(self):
         """Custom doc_types should support mixed folders and schema bindings."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -447,6 +489,116 @@ tags: [product]
             names = sorted(d.file_path.name for d in validator.documents)
             assert "adr-001-test.md" in names
             assert "prfaq-why-now.md" in names
+
+    def test_docs_directory_config_blocks_folder_escape(self):
+        """A docs-local config should not process sibling repo folders via ../ paths."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            docs_dir = repo_root / "docs"
+            in_scope_adr = docs_dir / "adr"
+            outside_adr = repo_root / "adr"
+            in_scope_adr.mkdir(parents=True)
+            outside_adr.mkdir()
+
+            write_valid_adr(in_scope_adr / "adr-001-in-scope.md")
+            write_valid_adr(outside_adr / "adr-002-outside.md", adr_id="adr-002")
+
+            (docs_dir / "docs-project.yaml").write_text(
+                yaml.dump(
+                    {
+                        "project": {"id": "secure-project", "name": "Secure Project"},
+                        "structure": {
+                            "docs_roots": ["."],
+                            "doc_types": {
+                                "adr": {
+                                    "schema": "adr",
+                                    "folders": ["adr", "../adr"],
+                                    "filename_pattern": r"^(adr)-(\d{3})-(.+)\.md$",
+                                }
+                            },
+                        },
+                    }
+                )
+            )
+
+            validator = DocValidator(repo_root, verbose=False)
+            validator.scan_documents()
+
+            assert [doc.file_path.name for doc in validator.documents] == ["adr-001-in-scope.md"]
+            assert any("Blocked document folder path '../adr'" in error for error in validator.errors)
+            assert _discover_doc_files(repo_root) == [(in_scope_adr / "adr-001-in-scope.md").resolve()]
+
+    def test_docs_directory_config_can_explicitly_allow_external_paths(self):
+        """The explicit security allow flag permits legacy external path layouts."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            docs_dir = repo_root / "docs"
+            outside_adr = repo_root / "adr"
+            docs_dir.mkdir()
+            outside_adr.mkdir()
+
+            write_valid_adr(outside_adr / "adr-001-outside.md")
+
+            (docs_dir / "docs-project.yaml").write_text(
+                yaml.dump(
+                    {
+                        "project": {"id": "secure-project", "name": "Secure Project"},
+                        "security": {"allow_external_paths": True},
+                        "structure": {
+                            "docs_roots": ["."],
+                            "doc_types": {
+                                "adr": {
+                                    "schema": "adr",
+                                    "folders": ["../adr"],
+                                    "filename_pattern": r"^(adr)-(\d{3})-(.+)\.md$",
+                                }
+                            },
+                        },
+                    }
+                )
+            )
+
+            validator = DocValidator(repo_root, verbose=False)
+            validator.scan_documents()
+
+            assert [doc.file_path.name for doc in validator.documents] == ["adr-001-outside.md"]
+            assert not any("Blocked" in error for error in validator.errors)
+
+    def test_docs_directory_config_blocks_subproject_escape(self):
+        """A nested docs config should not load sibling subprojects through ../ by default."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            docs_dir = repo_root / "docs"
+            service_dir = repo_root / "service-a"
+            service_adr = service_dir / "adr"
+            docs_dir.mkdir()
+            service_adr.mkdir(parents=True)
+
+            (docs_dir / "docs-project.yaml").write_text(
+                yaml.dump(
+                    {
+                        "project": {"id": "parent-project", "name": "Parent Project"},
+                        "subprojects": ["../service-a"],
+                    }
+                )
+            )
+            (service_dir / "docs-project.yaml").write_text(
+                yaml.dump(
+                    {
+                        "project": {"id": "service-a", "name": "Service A"},
+                        "structure": {"document_folders": ["adr"]},
+                    }
+                )
+            )
+            write_valid_adr(service_adr / "adr-001-service.md", project_id="service-a")
+
+            validator = DocValidator(repo_root, verbose=False)
+            validator.scan_documents()
+
+            assert [context.config.project.id for context in validator.project_configs] == ["parent-project"]
+            assert validator.documents == []
+            assert any("Blocked subproject path '../service-a'" in error for error in validator.errors)
+            assert _discover_doc_files(repo_root) == []
 
     def test_doc_types_can_disable_filename_enforcement(self):
         """Custom doc_types can disable strict filename enforcement."""

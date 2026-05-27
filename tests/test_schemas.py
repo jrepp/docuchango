@@ -410,6 +410,21 @@ class TestDocsProjectConfig:
         assert config.structure.template_dir == "templates"
         assert config.structure.document_folders == ["adr", "rfcs", "memos", "prd"]
         assert config.metadata is None
+        assert config.security.allow_external_paths is False
+
+    def test_config_can_explicitly_allow_external_paths(self):
+        """Projects must opt in before config paths can escape their config directory."""
+        config = DocsProjectConfig(
+            project={
+                "id": "external-paths",
+                "name": "External Paths",
+            },
+            security={
+                "allow_external_paths": True,
+            },
+        )
+
+        assert config.security.allow_external_paths is True
 
     def test_config_custom_document_folders(self):
         """Test that document_folders can be customized."""

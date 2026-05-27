@@ -100,6 +100,18 @@
       },
       "default": []
     },
+    "security": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allow_external_paths": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow configured document paths to resolve outside this docs-project.yaml directory. Prefer subprojects for additional docs roots."
+        }
+      },
+      "default": {"allow_external_paths": false}
+    },
     "indexes": {
       "type": "array",
       "items": {

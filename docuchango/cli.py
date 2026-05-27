@@ -14,6 +14,7 @@ import yaml
 from rich.console import Console
 
 from docuchango import __version__
+from docuchango.config_paths import resolve_config_path
 from docuchango.schemas import DocsProjectConfig
 
 console = Console()
@@ -21,7 +22,11 @@ console = Console()
 
 def _load_docs_project_config(root: Path) -> tuple[DocsProjectConfig | None, Path | None]:
     """Load docs-project.yaml from repo root or docs-cms."""
-    candidates = [root / "docs-project.yaml", root / "docs-cms" / "docs-project.yaml"]
+    candidates = [
+        root / "docs-project.yaml",
+        root / "docs-cms" / "docs-project.yaml",
+        root / "docs" / "docs-project.yaml",
+    ]
     return _load_docs_project_config_from_candidates(candidates)
 
 
@@ -52,8 +57,11 @@ def _iter_docs_project_configs(root: Path) -> list[tuple[DocsProjectConfig, Path
     while pending:
         parent_config, parent_path = pending.pop(0)
         parent_base = parent_path.parent
+        allow_external_paths = parent_config.security.allow_external_paths
         for subproject in parent_config.subprojects:
-            sub_path = (parent_base / subproject.path).resolve()
+            sub_path = resolve_config_path(parent_base, subproject.path, parent_base, allow_external_paths)
+            if not sub_path:
+                continue
             if sub_path.is_dir():
                 sub_path = sub_path / "docs-project.yaml"
             if sub_path in seen:
@@ -82,14 +90,19 @@ def _discover_doc_files(root: Path) -> list[Path]:
             if not config.structure:
                 continue
             config_base = config_path.parent
+            allow_external_paths = config.security.allow_external_paths
 
             if config.structure.doc_types:
                 roots = config.structure.docs_roots or ["."]
                 for doc_type_cfg in config.structure.doc_types.values():
                     for root_rel in roots:
-                        root_path = (config_base / root_rel).resolve()
+                        root_path = resolve_config_path(config_base, root_rel, config_base, allow_external_paths)
+                        if not root_path:
+                            continue
                         for folder in doc_type_cfg.folders:
-                            folder_path = (root_path / folder).resolve()
+                            folder_path = resolve_config_path(root_path, folder, root_path, allow_external_paths)
+                            if not folder_path:
+                                continue
                             if not folder_path.exists():
                                 continue
                             for file_path in folder_path.rglob("*.md"):
@@ -98,7 +111,9 @@ def _discover_doc_files(root: Path) -> list[Path]:
                                     all_files.append(file_path)
             else:
                 for folder in config.structure.document_folders:
-                    folder_path = (config_base / folder).resolve()
+                    folder_path = resolve_config_path(config_base, folder, config_base, allow_external_paths)
+                    if not folder_path:
+                        continue
                     if not folder_path.exists():
                         continue
                     for file_path in folder_path.rglob("*.md"):
