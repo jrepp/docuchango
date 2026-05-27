@@ -497,6 +497,110 @@ doc_uuid: 11111111-1111-4111-8111-111111111111
             assert "draft-about-capacity.md" in names
             assert not any("Invalid" in err for err in validator.errors)
 
+    def test_custom_naming_standard_does_not_force_numeric_id_from_filename(self):
+        """ID checks should not assume type-NNN filenames for custom naming lanes."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            decisions_dir = repo_root / "docs" / "decisions"
+            decisions_dir.mkdir(parents=True)
+
+            (decisions_dir / "choose-login-architecture.md").write_text(
+                """---
+title: Choose Login Architecture
+status: Accepted
+created: 2025-01-01
+deciders: Core Team
+tags: [architecture]
+id: adr-001
+project_id: custom-naming
+doc_uuid: 12345678-1234-4123-8123-123456789abc
+---
+
+# Decision
+"""
+            )
+
+            config_data = {
+                "project": {
+                    "id": "custom-naming",
+                    "name": "Custom Naming",
+                },
+                "structure": {
+                    "docs_roots": ["docs"],
+                    "doc_types": {
+                        "adr": {
+                            "schema": "adr",
+                            "folders": ["decisions"],
+                            "naming_standard": "kebab-case",
+                            "enforce_filename_pattern": True,
+                        }
+                    },
+                },
+            }
+
+            config_path = repo_root / "docs-project.yaml"
+            with config_path.open("w") as f:
+                yaml.dump(config_data, f)
+
+            validator = DocValidator(repo_root, verbose=False)
+            validator.scan_documents()
+            validator.check_ids()
+
+            assert [doc.file_path.name for doc in validator.documents] == ["choose-login-architecture.md"]
+            assert validator.errors == []
+            assert validator.documents[0].errors == []
+
+    def test_numbered_filename_pattern_still_checks_frontmatter_id(self):
+        """Configured numeric filename patterns should still enforce matching IDs."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            adr_dir = repo_root / "docs" / "adr"
+            adr_dir.mkdir(parents=True)
+
+            (adr_dir / "adr-002-test.md").write_text(
+                """---
+title: Test ADR Decision
+status: Accepted
+created: 2025-01-01
+deciders: Core Team
+tags: [architecture]
+id: adr-001
+project_id: custom-naming
+doc_uuid: 12345678-1234-4123-8123-123456789abc
+---
+
+# Decision
+"""
+            )
+
+            config_data = {
+                "project": {
+                    "id": "custom-naming",
+                    "name": "Custom Naming",
+                },
+                "structure": {
+                    "docs_roots": ["docs"],
+                    "doc_types": {
+                        "adr": {
+                            "schema": "adr",
+                            "folders": ["adr"],
+                            "filename_pattern": r"^(adr)-(\d{3})-(.+)\.md$",
+                            "enforce_filename_pattern": True,
+                        }
+                    },
+                },
+            }
+
+            config_path = repo_root / "docs-project.yaml"
+            with config_path.open("w") as f:
+                yaml.dump(config_data, f)
+
+            validator = DocValidator(repo_root, verbose=False)
+            validator.scan_documents()
+            validator.check_ids()
+
+            assert any("filename suggests 'adr-002'" in error for error in validator.documents[0].errors)
+
     def test_generic_doc_types_can_allow_plain_markdown_without_frontmatter(self):
         """Generic lanes can opt into plain markdown without YAML frontmatter."""
         with tempfile.TemporaryDirectory() as tmpdir:

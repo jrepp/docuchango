@@ -7,7 +7,7 @@ import random
 import string
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Optional
+from typing import Any
 
 import pytest
 
@@ -90,10 +90,10 @@ class MarkdownGenerator:
 
     @staticmethod
     def frontmatter(
-        title: Optional[str] = None,
-        doc_id: Optional[str] = None,
-        project_id: Optional[str] = None,
-        doc_uuid: Optional[str] = None,
+        title: str | None = None,
+        doc_id: str | None = None,
+        project_id: str | None = None,
+        doc_uuid: str | None = None,
         **kwargs: Any,
     ) -> str:
         """Generate frontmatter YAML."""
@@ -140,14 +140,14 @@ class MarkdownGenerator:
         return " ".join(paragraph_lines)
 
     @staticmethod
-    def heading(level: int = 2, text: Optional[str] = None) -> str:
+    def heading(level: int = 2, text: str | None = None) -> str:
         """Generate a heading."""
         gen = DataGenerator()
         text = text or gen.random_title()
         return f"{'#' * level} {text}"
 
     @staticmethod
-    def link(text: Optional[str] = None, url: Optional[str] = None) -> str:
+    def link(text: str | None = None, url: str | None = None) -> str:
         """Generate a markdown link."""
         gen = DataGenerator()
         text = text or gen.random_title(2)

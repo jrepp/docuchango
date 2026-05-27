@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -87,6 +88,7 @@ def compress_document_ids(
     """
     repo_root = repo_root.resolve()
     changes = _plan_id_changes(doc_files, doc_type)
+    _validate_document_changes(changes)
     result = CompressionResult(changes=changes)
 
     updated_files = _rewrite_references(repo_root, changes, dry_run=dry_run)
@@ -101,6 +103,22 @@ def compress_document_ids(
     )
     result.missing_references = audit_missing_document_references(repo_root, doc_files, planned_changes=changes)
     return result
+
+
+def _validate_document_changes(changes: list[DocumentIdChange]) -> None:
+    """Fail before rewriting references if planned renames cannot be applied safely."""
+    source_paths = {change.file_path for change in changes}
+    destination_paths: set[Path] = set()
+
+    for change in changes:
+        if change.new_path in destination_paths:
+            raise FileExistsError(f"Cannot rename documents: duplicate destination {change.new_path}")
+        destination_paths.add(change.new_path)
+
+        if change.file_path == change.new_path:
+            continue
+        if change.new_path.exists() and change.new_path not in source_paths:
+            raise FileExistsError(f"Cannot rename {change.file_path} to {change.new_path}: destination exists")
 
 
 def audit_missing_document_references(
@@ -285,8 +303,9 @@ def _document_id_for_file(file_path: Path) -> str | None:
         post = frontmatter.load(file_path)
     except Exception:
         post = None
-    if post and isinstance(post.metadata.get("id"), str):
-        metadata_id = post.metadata["id"].lower()
+    metadata_value = post.metadata.get("id") if post else None
+    if isinstance(metadata_value, str):
+        metadata_id = metadata_value.lower()
         if DOC_ID_RE.fullmatch(metadata_id):
             return metadata_id
 
@@ -307,7 +326,7 @@ def _set_frontmatter_id(file_path: Path, doc_id: str) -> None:
     file_path.write_text(frontmatter_dumps(post), encoding="utf-8")
 
 
-def _iter_text_files(repo_root: Path):  # type: ignore[no-untyped-def]
+def _iter_text_files(repo_root: Path) -> Iterator[Path]:
     for path in repo_root.rglob("*"):
         if any(part in SKIP_DIRS for part in path.parts):
             continue

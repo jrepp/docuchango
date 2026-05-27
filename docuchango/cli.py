@@ -186,10 +186,8 @@ def validate(
     - Consistent ADR/RFC numbering
     """
     from docuchango.fixes.code_blocks import fix_code_blocks
-    from docuchango.fixes.frontmatter import fix_all_frontmatter
-    from docuchango.fixes.tags import fix_tags
+    from docuchango.fixes.frontmatter import fix_frontmatter_metadata
     from docuchango.fixes.timestamps import update_document_timestamps
-    from docuchango.fixes.whitespace import fix_whitespace_and_fields
 
     try:
         from docuchango.validator import DocValidator
@@ -209,53 +207,57 @@ def validate(
 
     # Phase 1: Apply automatic fixes
     if all_files:
-        # Define fix functions: (name, function, supports_dry_run)
-        fix_types = [
-            ("Frontmatter", fix_all_frontmatter, True),
-            ("Tags", fix_tags, True),
-            ("Whitespace", fix_whitespace_and_fields, True),
-            ("Timestamps", update_document_timestamps, True),
-            ("Code blocks", fix_code_blocks, False),
-        ]
+        for file_path in all_files:
+            try:
+                changed, messages = fix_frontmatter_metadata(file_path, dry_run=dry_run)
+                if changed and messages:
+                    for msg in messages:
+                        fixes_applied.append((file_path, f"[Frontmatter metadata] {msg}"))
+            except Exception as e:
+                if verbose:
+                    rel_path = file_path.relative_to(repo_root)
+                    console.print(f"  [red]✗[/red] {rel_path}: Error in Frontmatter metadata - {e}")
 
-        for fix_name, fix_func, supports_dry_run_flag in fix_types:
-            for file_path in all_files:
+            try:
+                changed, messages = update_document_timestamps(file_path, dry_run=dry_run)
+                if changed and messages:
+                    for msg in messages:
+                        fixes_applied.append((file_path, f"[Timestamps] {msg}"))
+            except Exception as e:
+                if verbose:
+                    rel_path = file_path.relative_to(repo_root)
+                    console.print(f"  [red]✗[/red] {rel_path}: Error in Timestamps - {e}")
+
+            if not dry_run:
                 try:
-                    # Skip code blocks fix in dry_run mode since it doesn't support it
-                    if not supports_dry_run_flag and dry_run:
-                        continue
-
-                    # Call the fix function
-                    result = fix_func(file_path, dry_run=dry_run) if supports_dry_run_flag else fix_func(file_path)
-
-                    # Handle different return types
-                    if isinstance(result, list):
-                        messages = result
-                        changed = bool(messages)
-                    else:
-                        changed, messages = result
-
+                    changed, messages = fix_code_blocks(file_path)
                     if changed and messages:
                         for msg in messages:
-                            fixes_applied.append((file_path, f"[{fix_name}] {msg}"))
-
+                            fixes_applied.append((file_path, f"[Code blocks] {msg}"))
                 except Exception as e:
                     if verbose:
                         rel_path = file_path.relative_to(repo_root)
-                        console.print(f"  [red]✗[/red] {rel_path}: Error in {fix_name} - {e}")
+                        console.print(f"  [red]✗[/red] {rel_path}: Error in Code blocks - {e}")
 
     # Phase 2: Run validation to find remaining issues
     try:
         # Don't pass fix=True to validator since we already applied fixes above
         validator = DocValidator(repo_root=repo_root, verbose=verbose, fix=False)
         validator.scan_documents()
+        validator.extract_links()
+        validator.validate_links()
+        validator.check_ids()
+        validator.check_uuids()
         validator.check_code_blocks()
+        validator.check_mdx_compilation()
+        validator.check_mdx_compatibility()
+        validator.check_cross_plugin_links()
+        validator.check_document_indexes()
         validator.check_formatting()
+        validator.check_readability()
 
-        # Check if we should run build validation
-        if not skip_build:
-            # This would need to be implemented based on the validate_docs.py logic
-            pass
+        build_passed = validator.check_typescript_config()
+        build_passed = validator.check_docusaurus_build(skip_build) and build_passed
 
         # Collect remaining errors
         for doc in validator.documents:
@@ -263,8 +265,20 @@ def validate(
                 for error in doc.errors:
                     remaining_issues.append((doc.file_path, error))
 
+        for link in validator.all_links:
+            if not link.is_valid:
+                remaining_issues.append(
+                    (
+                        link.source_doc,
+                        f"Line {link.line_number}: Broken link '{link.target}' - {link.error_message}",
+                    )
+                )
+
         for error in validator.errors:
             remaining_issues.append((repo_root, error))
+
+        if not build_passed and not validator.errors:
+            remaining_issues.append((repo_root, "Build validation failed"))
 
     except Exception as e:
         console.print(f"[bold red]Error during validation: {e}[/bold red]")
@@ -519,19 +533,10 @@ def bootstrap(guide: str, output: Path | None):
 
     # Try to find the guide in the package
     try:
-        # First, try to find it in the installed package
         import importlib.resources as resources
 
-        try:
-            # Python 3.9+
-            guide_path = resources.files("docuchango") / ".." / "docs" / guide_file
-            guide_content = guide_path.read_text()
-        except AttributeError:
-            # Python 3.8 fallback
-            with resources.path("docuchango", "__init__.py") as pkg_path:
-                docs_dir = pkg_path.parent.parent / "docs"
-                guide_path = docs_dir / guide_file
-                guide_content = guide_path.read_text()
+        guide_path = resources.files("docuchango") / ".." / "docs" / guide_file
+        guide_content = guide_path.read_text()
 
     except (FileNotFoundError, ModuleNotFoundError):
         # Fallback: try relative to the script location

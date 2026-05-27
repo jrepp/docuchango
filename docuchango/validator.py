@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 try:
     import frontmatter
@@ -94,10 +94,11 @@ class Document:
     date: str = ""
     tags: list[str] = field(default_factory=list)
     doc_id: str = ""  # Frontmatter id field (e.g., "adr-001", "rfc-015")
+    expected_id: str | None = None  # ID inferred from configured filename pattern, when available
     doc_uuid: str = ""  # Frontmatter doc_uuid field (UUID v4)
     links: list["Link"] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
-    _content_cache: Optional[str] = None  # Cached file content to avoid multiple reads
+    _content_cache: str | None = None  # Cached file content to avoid multiple reads
 
     def __hash__(self):
         return hash(str(self.file_path))
@@ -150,11 +151,11 @@ class DocValidator:
         self.errors: list[str] = []
 
         # Load project configuration
-        self.project_config_path: Optional[Path] = None
+        self.project_config_path: Path | None = None
         self.project_config = self._load_project_config()
         self.project_configs = self._load_project_config_contexts()
 
-    def _load_project_config(self) -> Optional[DocsProjectConfig]:
+    def _load_project_config(self) -> DocsProjectConfig | None:
         """Load docs-project.yaml configuration"""
         candidate_paths = [
             self.repo_root / "docs-project.yaml",
@@ -182,7 +183,7 @@ class DocValidator:
         self.log("⚠️  Warning: Project config not found (looked for docs-project.yaml at repo root and docs-cms/)")
         return None
 
-    def _load_project_config_at(self, config_path: Path) -> Optional[DocsProjectConfig]:
+    def _load_project_config_at(self, config_path: Path) -> DocsProjectConfig | None:
         """Load one docs-project.yaml file from an explicit path."""
         if not config_path.exists():
             self.log(
@@ -378,14 +379,19 @@ class DocValidator:
                 self.log(f"   ✗ {md_file.name}: Invalid filename format")
                 continue
 
+            expected_id = None
             if match and len(match.groups()) >= 2:
-                _prefix, num = match.groups()[:2]
+                prefix, num = match.groups()[:2]
                 # Skip template files (000)
                 if num == "000":
                     self.log(f"   ⊘ {md_file.name}: Skipping template file")
                     continue
+                if isinstance(prefix, str) and isinstance(num, str) and prefix.lower() == doc_type and num.isdigit():
+                    expected_id = f"{doc_type}-{num}"
 
-            doc = self._parse_document(md_file, doc_type, require_frontmatter=require_frontmatter)
+            doc = self._parse_document(
+                md_file, doc_type, require_frontmatter=require_frontmatter, expected_id=expected_id
+            )
             if doc:
                 self.documents.append(doc)
                 self.file_to_doc[md_file] = doc
@@ -440,9 +446,13 @@ class DocValidator:
 
         self.log(f"   Found {len(self.documents)} documents")
 
-    def _parse_document(self, file_path: Path, doc_type: str, require_frontmatter: bool = True) -> Optional[Document]:
+    def _parse_document(
+        self, file_path: Path, doc_type: str, require_frontmatter: bool = True, expected_id: str | None = None
+    ) -> Document | None:
         """Parse a markdown file and validate frontmatter"""
-        return self._parse_document_enhanced(file_path, doc_type, require_frontmatter=require_frontmatter)
+        return self._parse_document_enhanced(
+            file_path, doc_type, require_frontmatter=require_frontmatter, expected_id=expected_id
+        )
 
     def _infer_plain_markdown_title(self, file_path: Path, content: str) -> str:
         """Infer a title for plain-markdown generic documents."""
@@ -453,8 +463,8 @@ class DocValidator:
         return file_path.stem.replace("-", " ").replace("_", " ").strip().title() or file_path.name
 
     def _parse_document_enhanced(
-        self, file_path: Path, doc_type: str, require_frontmatter: bool = True
-    ) -> Optional[Document]:
+        self, file_path: Path, doc_type: str, require_frontmatter: bool = True, expected_id: str | None = None
+    ) -> Document | None:
         """Parse document with python-frontmatter and pydantic validation"""
         try:
             # Read file content once and cache it
@@ -468,11 +478,23 @@ class DocValidator:
                 if doc_type == "generic" and not require_frontmatter:
                     title = self._infer_plain_markdown_title(file_path, content)
                     self.log(f"   ✓ {file_path.name}: Plain Markdown generic doc")
-                    return Document(file_path=file_path, doc_type=doc_type, title=title, _content_cache=content)
+                    return Document(
+                        file_path=file_path,
+                        doc_type=doc_type,
+                        title=title,
+                        expected_id=expected_id,
+                        _content_cache=content,
+                    )
 
                 error = "Missing YAML frontmatter"
                 self.log(f"   ✗ {file_path.name}: {error}")
-                doc = Document(file_path=file_path, doc_type=doc_type, title="Unknown", _content_cache=content)
+                doc = Document(
+                    file_path=file_path,
+                    doc_type=doc_type,
+                    title="Unknown",
+                    expected_id=expected_id,
+                    _content_cache=content,
+                )
                 doc.errors.append(error)
                 return doc
 
@@ -500,6 +522,7 @@ class DocValidator:
                     date=str(metadata.get("date", metadata.get("created", ""))),
                     tags=metadata.get("tags", []),
                     doc_id=metadata.get("id", ""),
+                    expected_id=expected_id,
                     _content_cache=content,
                 )
 
@@ -528,6 +551,7 @@ class DocValidator:
                 date=str(metadata.get("date", metadata.get("created", ""))),
                 tags=metadata.get("tags", []),
                 doc_id=metadata.get("id", ""),
+                expected_id=expected_id,
                 doc_uuid=metadata.get("doc_uuid", ""),
                 _content_cache=content,
             )
@@ -866,7 +890,7 @@ class DocValidator:
 
         return headings
 
-    def _bucket_for_target(self, target_path: Path, bucket_config) -> Optional[str]:
+    def _bucket_for_target(self, target_path: Path, bucket_config) -> str | None:
         """Compute the expected index bucket for a target document."""
         post = frontmatter.loads(target_path.read_text(encoding="utf-8"))
 
@@ -977,7 +1001,7 @@ class DocValidator:
         sorted_headings = sorted(headings.items())
         buckets = set(headings.values())
 
-        def bucket_at_line(line_num: int) -> Optional[str]:
+        def bucket_at_line(line_num: int) -> str | None:
             current = None
             for heading_line, heading in sorted_headings:
                 if heading_line >= line_num:
@@ -1433,24 +1457,10 @@ class DocValidator:
 
             # Extract expected ID from filename
             filename = doc.file_path.name
-            # Match adr-XXX, rfc-XXX, or memo-XXX pattern (lowercase only)
-            filename_pattern = re.compile(r"^(adr|rfc|memo|prd)-(\d{3})-")
-            match = filename_pattern.match(filename)
-
-            if not match:
-                # This shouldn't happen (caught in scan_documents), but check anyway
-                error = f"Filename doesn't match expected pattern ({doc.doc_type}-NNN-title.md)"
-                doc.errors.append(error)
-                self.log(f"   ✗ {filename}: {error}")
-                id_errors += 1
-                continue
-
-            _prefix, num = match.groups()
-            expected_id = f"{doc.doc_type}-{num}"
 
             # Check ID matches filename
-            if doc.doc_id != expected_id:
-                error = f"ID mismatch: frontmatter has '{doc.doc_id}' but filename suggests '{expected_id}'"
+            if doc.expected_id and doc.doc_id != doc.expected_id:
+                error = f"ID mismatch: frontmatter has '{doc.doc_id}' but filename suggests '{doc.expected_id}'"
                 doc.errors.append(error)
                 self.log(f"   ✗ {filename}: {error}")
                 id_errors += 1
@@ -1494,7 +1504,7 @@ class DocValidator:
 
         for doc in self.documents:
             # Skip docs without doc_type (generic docs) or without UUID
-            if doc.doc_type not in ["adr", "rfc", "memo"] or not doc.doc_uuid:
+            if doc.doc_type not in ["adr", "rfc", "memo", "prd"] or not doc.doc_uuid:
                 continue
 
             # Check for duplicate UUIDs

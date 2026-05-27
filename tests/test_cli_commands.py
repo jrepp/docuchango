@@ -1,6 +1,7 @@
 """Tests for CLI commands in cli.py to improve coverage."""
 
 import subprocess
+from pathlib import Path
 
 import frontmatter
 from click.testing import CliRunner
@@ -183,6 +184,49 @@ tags: "API Design"
             "File was modified during --dry-run! Dry run should not modify any files."
         )
 
+    def test_validate_writes_frontmatter_metadata_once(self, tmp_path, monkeypatch):
+        """Frontmatter metadata fixes should be batched into one write per file."""
+        adr_dir = tmp_path / "adr"
+        adr_dir.mkdir()
+
+        test_file = adr_dir / "adr-001-batched-fixes.md"
+        test_file.write_text(
+            """---
+id: adr-001
+title: "Batched Metadata Fixes  "
+status: accepted
+created: 2025-01-01
+deciders: Core Team
+tags: "API Design"
+project_id: test-project
+doc_uuid: 12345678-1234-4123-8123-123456789abc
+---
+
+# Batched Metadata Fixes
+""",
+            encoding="utf-8",
+        )
+
+        original_write_text = Path.write_text
+        writes = []
+
+        def counting_write_text(self, *args, **kwargs):
+            if self == test_file:
+                writes.append(args[0])
+            return original_write_text(self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "write_text", counting_write_text)
+
+        runner = CliRunner()
+        result = runner.invoke(validate, ["--repo-root", str(tmp_path), "--skip-build"])
+
+        assert result.exit_code == 0
+        assert len(writes) == 1
+        fixed_content = test_file.read_text(encoding="utf-8")
+        assert "status: Accepted" in fixed_content
+        assert "api-design" in fixed_content
+        assert 'title: "Batched Metadata Fixes  "' not in fixed_content
+
     def test_validate_output_shows_fixes_and_issues_with_paths(self, tmp_path):
         """Test that validate output shows both fixed and unfixable issues with file paths.
 
@@ -265,6 +309,86 @@ more code
         assert "tags:" in fixed_content
         # Original string format should be gone
         assert 'tags: "API Design, Database"' not in fixed_content
+
+    def test_validate_reports_broken_links(self, tmp_path):
+        """Regression test: CLI validate must run link validation."""
+        adr_dir = tmp_path / "docs-cms" / "adr"
+        adr_dir.mkdir(parents=True)
+
+        test_file = adr_dir / "adr-001-broken-link.md"
+        test_file.write_text(
+            """---
+id: adr-001
+title: Valid ADR Title
+status: Accepted
+created: 2025-01-01
+deciders: Core Team
+tags: []
+project_id: test-project
+doc_uuid: 12345678-1234-4123-8123-123456789abc
+---
+
+# Valid ADR Title
+
+[Missing document](./missing.md)
+""",
+            encoding="utf-8",
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(validate, ["--repo-root", str(tmp_path), "--skip-build", "--dry-run"])
+
+        assert result.exit_code == 1
+        assert "adr-001-broken-link.md" in result.output
+        assert "Broken link './missing.md'" in result.output
+
+    def test_validate_reports_duplicate_ids(self, tmp_path):
+        """Regression test: CLI validate must run document ID validation."""
+        adr_dir = tmp_path / "docs-cms" / "adr"
+        adr_dir.mkdir(parents=True)
+
+        first_file = adr_dir / "adr-001-first.md"
+        first_file.write_text(
+            """---
+id: adr-001
+title: First ADR Title
+status: Accepted
+created: 2025-01-01
+deciders: Core Team
+tags: []
+project_id: test-project
+doc_uuid: 12345678-1234-4123-8123-123456789abc
+---
+
+# First ADR Title
+""",
+            encoding="utf-8",
+        )
+
+        second_file = adr_dir / "adr-002-second.md"
+        second_file.write_text(
+            """---
+id: adr-001
+title: Second ADR Title
+status: Accepted
+created: 2025-01-02
+deciders: Core Team
+tags: []
+project_id: test-project
+doc_uuid: 12345678-1234-4123-8123-123456789abd
+---
+
+# Second ADR Title
+""",
+            encoding="utf-8",
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(validate, ["--repo-root", str(tmp_path), "--skip-build", "--dry-run"])
+
+        assert result.exit_code == 1
+        assert "adr-002-second.md" in result.output
+        assert "Duplicate ID 'adr-001'" in result.output
 
 
 class TestMainCommandGroup:

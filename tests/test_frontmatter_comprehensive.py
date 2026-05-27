@@ -365,11 +365,10 @@ id: adr-001
         changed, msg = add_missing_frontmatter(doc)
         assert changed
         post = frontmatter.loads(doc.read_text())
-        # Should generate UUID-based fallback ID (format: doc_type-uuid)
+        # Should generate a schema-valid fallback ID.
         doc_id = post.metadata["id"]
         assert isinstance(doc_id, str)
-        assert doc_id.startswith("adr-")
-        assert len(doc_id) == 12  # "adr-" + 8 hex chars
+        assert doc_id == "adr-001"
 
     def test_filename_with_special_characters(self, tmp_path):
         """Test filename with special characters."""

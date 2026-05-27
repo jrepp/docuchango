@@ -8,25 +8,31 @@ This module provides fixes for common frontmatter problems:
 
 import re
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any
 
 import frontmatter
 
+from docuchango.fixes.tags import normalize_tag
+from docuchango.fixes.whitespace import ensure_required_fields, normalize_empty_values, trim_string_values
 from docuchango.fixes.yaml_utils import dumps as frontmatter_dumps
 
 # Valid status values by document type
 VALID_STATUSES = {
-    "adr": ["Proposed", "Accepted", "Deprecated", "Superseded"],
-    "rfc": ["Draft", "In Review", "Accepted", "Rejected", "Implemented"],
-    "memo": ["Draft", "Published", "Archived"],
+    "adr": ["Proposed", "Accepted", "Implemented", "Deprecated", "Superseded"],
+    "rfc": ["Draft", "Proposed", "Accepted", "Implemented", "Deprecated", "Superseded"],
     "prd": ["Draft", "In Review", "Approved", "In Progress", "Completed", "Cancelled"],
 }
 
 # Common status value mappings (incorrect -> correct)
 STATUS_MAPPINGS = {
     "adr": {
+        "proposed": "Proposed",
+        "accepted": "Accepted",
+        "implemented": "Implemented",
+        "deprecated": "Deprecated",
+        "superseded": "Superseded",
         "draft": "Proposed",
         "pending": "Proposed",
         "active": "Accepted",
@@ -35,29 +41,37 @@ STATUS_MAPPINGS = {
         "replaced": "Superseded",
     },
     "rfc": {
-        "proposed": "Draft",
-        "pending": "In Review",
+        "draft": "Draft",
+        "proposed": "Proposed",
+        "accepted": "Accepted",
+        "implemented": "Implemented",
+        "deprecated": "Deprecated",
+        "superseded": "Superseded",
+        "pending": "Proposed",
+        "review": "Proposed",
+        "in review": "Proposed",
         "approved": "Accepted",
         "done": "Implemented",
-        "declined": "Rejected",
-    },
-    "memo": {
-        "pending": "Draft",
-        "public": "Published",
-        "retired": "Archived",
+        "retired": "Deprecated",
+        "replaced": "Superseded",
     },
     "prd": {
+        "draft": "Draft",
+        "in review": "In Review",
+        "approved": "Approved",
+        "in progress": "In Progress",
+        "completed": "Completed",
+        "cancelled": "Cancelled",
         "proposed": "Draft",
         "review": "In Review",
         "active": "In Progress",
         "done": "Completed",
         "closed": "Completed",
-        "cancelled": "Cancelled",
     },
 }
 
 
-def get_doc_type(file_path: Path) -> Optional[str]:
+def get_doc_type(file_path: Path) -> str | None:
     """Extract document type from file path.
 
     Args:
@@ -109,6 +123,8 @@ def fix_status_value(file_path: Path, dry_run: bool = False) -> tuple[bool, str]
 
         # Check if already valid
         valid_statuses = VALID_STATUSES.get(doc_type, [])
+        if not valid_statuses:
+            return False, f"No status validation configured for document type '{doc_type}'"
         if status in valid_statuses:
             return False, "Status already valid"
 
@@ -262,11 +278,10 @@ def add_missing_frontmatter(file_path: Path, dry_run: bool = False) -> tuple[boo
         if not doc_type:
             return False, "Could not determine document type"
 
-        # Extract ID from filename (e.g., "adr-001" from "adr-001-some-title.md")
-        # Fallback: generate a valid ID using doc_type and a short UUID if no match
+        # Extract ID from filename (e.g., "adr-001" from "adr-001-some-title.md").
         filename = file_path.stem
-        id_match = re.match(r"^([a-zA-Z]+-\d+)", filename)
-        doc_id = id_match.group(1) if id_match else f"{doc_type}-{uuid.uuid4().hex[:8]}"
+        id_match = re.match(rf"^({doc_type})-(\d+)", filename, re.IGNORECASE)
+        doc_id = f"{doc_type}-{int(id_match.group(2)):03d}" if id_match else f"{doc_type}-001"
 
         # Generate title from filename
         title_parts = filename.replace("-", " ").split()
@@ -286,8 +301,7 @@ def add_missing_frontmatter(file_path: Path, dry_run: bool = False) -> tuple[boo
             "---",
             f'id: "{doc_id}"',
             f'title: "{title}"',
-            f"status: {default_status}",
-            f"date: {today}",
+            f"created: {today}",
             "tags: []",
             'project_id: "my-project"',
             f'doc_uuid: "{doc_uuid}"',
@@ -295,7 +309,17 @@ def add_missing_frontmatter(file_path: Path, dry_run: bool = False) -> tuple[boo
 
         # Add document-type-specific fields
         if doc_type == "adr":
+            frontmatter_lines.insert(3, f"status: {default_status}")
             frontmatter_lines.insert(-2, 'deciders: "Engineering Team"')
+        elif doc_type == "rfc":
+            frontmatter_lines.insert(3, f"status: {default_status}")
+            frontmatter_lines.insert(-2, 'author: "Engineering Team"')
+        elif doc_type == "memo":
+            frontmatter_lines.insert(-2, 'author: "Engineering Team"')
+        elif doc_type == "prd":
+            frontmatter_lines.insert(3, f"status: {default_status}")
+            frontmatter_lines.insert(-2, 'author: "Product Team"')
+            frontmatter_lines.insert(-2, 'target_release: "TBD"')
 
         frontmatter_lines.append("---")
         frontmatter_block = "\n".join(frontmatter_lines)
@@ -350,3 +374,184 @@ def fix_all_frontmatter(file_path: Path, dry_run: bool = False) -> list[str]:
         messages.append(f"✓ {msg}")
 
     return messages
+
+
+def _fix_status_metadata(metadata: dict[str, Any], doc_type: str | None) -> str | None:
+    """Normalize status in already-parsed metadata."""
+    if "status" not in metadata:
+        return None
+    if not doc_type:
+        return None
+
+    status = metadata["status"]
+    if not isinstance(status, str) or not status.strip():
+        return None
+
+    valid_statuses = VALID_STATUSES.get(doc_type, [])
+    if status in valid_statuses:
+        return None
+
+    mappings = STATUS_MAPPINGS.get(doc_type, {})
+    status_lower = status.lower().strip()
+    if status_lower in mappings:
+        new_status = mappings[status_lower]
+        metadata["status"] = new_status
+        return f"Changed status from '{status}' to '{new_status}'"
+
+    for key, value in mappings.items():
+        if key in status_lower or status_lower in key:
+            metadata["status"] = value
+            return f"Changed status from '{status}' to '{value}'"
+
+    return None
+
+
+def _fix_date_metadata(metadata: dict[str, Any], content: str) -> str | None:
+    """Normalize date or created in already-parsed metadata."""
+    if "date" in metadata:
+        date_field = "date"
+    elif "created" in metadata:
+        date_field = "created"
+    else:
+        return None
+
+    date_value = metadata[date_field]
+
+    if isinstance(date_value, (datetime, date)):
+        raw_lines = content.split("---")[1].strip().splitlines() if "---" in content else []
+        raw_value = None
+        for line in raw_lines:
+            if line.startswith(f"{date_field}:"):
+                raw_value = line.split(":", 1)[1].strip()
+                break
+        canonical_re = re.compile(r"^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}Z?)?$")
+        if raw_value and canonical_re.match(raw_value):
+            return None
+        return f"Normalized {date_field} object to canonical format"
+
+    if not isinstance(date_value, str):
+        return None
+
+    if re.match(
+        r"^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})?)?$",
+        date_value,
+    ):
+        return None
+
+    formats = [
+        "%Y/%m/%d",
+        "%d/%m/%Y",
+        "%m/%d/%Y",
+        "%Y.%m.%d",
+        "%d.%m.%Y",
+        "%B %d, %Y",
+        "%b %d, %Y",
+        "%d %B %Y",
+        "%d %b %Y",
+    ]
+
+    for fmt in formats:
+        try:
+            parsed_date = datetime.strptime(date_value, fmt)
+        except ValueError:
+            continue
+        iso_date = parsed_date.strftime("%Y-%m-%d")
+        metadata[date_field] = iso_date
+        return f"Converted {date_field} from '{date_value}' to '{iso_date}'"
+
+    return None
+
+
+def _fix_tags_metadata(metadata: dict[str, Any]) -> list[str]:
+    """Normalize tags in already-parsed metadata."""
+    messages = []
+    if "tags" not in metadata:
+        metadata["tags"] = []
+        return ["Added missing tags field (empty array)"]
+
+    tags = metadata["tags"]
+    if isinstance(tags, str):
+        tags = [tags.strip()] if tags.strip() else []
+        messages.append("Converted string tags to array")
+    if not isinstance(tags, list):
+        return messages
+
+    original_tags = tags.copy()
+    normalized_tags = []
+    for tag in tags:
+        if not isinstance(tag, str):
+            messages.append(f"Skipped non-string tag: {tag}")
+            continue
+        normalized = normalize_tag(tag)
+        if normalized:
+            normalized_tags.append(normalized)
+
+    unique_tags = []
+    seen = set()
+    for tag in normalized_tags:
+        if tag not in seen:
+            seen.add(tag)
+            unique_tags.append(tag)
+
+    sorted_tags = sorted(unique_tags)
+    if sorted_tags != original_tags:
+        if len(sorted_tags) < len(original_tags):
+            messages.append(f"Removed {len(original_tags) - len(sorted_tags)} duplicate/invalid tags")
+        if sorted_tags != normalized_tags:
+            messages.append("Sorted tags alphabetically")
+        if normalized_tags != original_tags:
+            messages.append(f"Normalized tags: {len(normalized_tags)} tags")
+    metadata["tags"] = sorted_tags
+    return messages
+
+
+def fix_frontmatter_metadata(file_path: Path, dry_run: bool = False) -> tuple[bool, list[str]]:
+    """Apply frontmatter metadata fixes with a single parse/write pass."""
+    try:
+        content = file_path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as e:
+        raise ValueError(f"File contains binary content: {e}") from e
+    except Exception as e:
+        return False, [f"Error reading file: {e}"]
+
+    try:
+        post = frontmatter.loads(content)
+    except Exception as e:
+        return False, [f"Error parsing frontmatter: {e}"]
+
+    if not post.metadata:
+        changed, message = add_missing_frontmatter(file_path, dry_run=dry_run)
+        return (changed, [message] if changed else [])
+
+    metadata = post.metadata.copy()
+    original_metadata = metadata.copy()
+    messages = []
+
+    status_message = _fix_status_metadata(metadata, get_doc_type(file_path))
+    if status_message:
+        messages.append(status_message)
+
+    date_message = _fix_date_metadata(metadata, content)
+    force_write = date_message is not None and metadata == original_metadata
+    if date_message:
+        messages.append(date_message)
+
+    messages.extend(_fix_tags_metadata(metadata))
+
+    metadata, trim_messages = trim_string_values(metadata)
+    messages.extend(trim_messages)
+
+    metadata, empty_messages = normalize_empty_values(metadata)
+    messages.extend(empty_messages)
+
+    metadata, required_messages = ensure_required_fields(metadata)
+    messages.extend(required_messages)
+
+    changed = metadata != original_metadata or force_write
+    if changed:
+        post.metadata = metadata
+        if not dry_run:
+            file_path.write_text(frontmatter_dumps(post), encoding="utf-8")
+        return True, messages
+
+    return False, []
