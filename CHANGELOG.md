@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.18.1 (2026-05-27)
+
+### Chores
+
+- Align template docs and formatting
+  ([`b4034ee`](https://github.com/jrepp/docuchango/commit/b4034ee31dec081e683e6678aca1495e473a9a5c))
+
+
 ## v1.18.0 (2026-05-26)
 
 
