@@ -211,6 +211,12 @@ class ReadabilityScorer:
                     in_html_comment = False
                 continue
 
+            # Check if we're closing an HTML block
+            if in_html_block:
+                if stripped.startswith("</") or stripped.endswith(">"):
+                    in_html_block = False
+                continue
+
             # Track HTML/MDX blocks (opening and closing tags)
             if stripped.startswith("<"):
                 # Flush current paragraph when entering HTML block
@@ -223,12 +229,6 @@ class ReadabilityScorer:
                 # Check if this is a self-closing tag or opening tag
                 if not stripped.endswith("/>"):
                     in_html_block = True
-                continue
-
-            # Check if we're closing an HTML block
-            if in_html_block:
-                if stripped.startswith("</") or stripped.endswith(">"):
-                    in_html_block = False
                 continue
 
             # Skip headings, lists, empty lines, blockquotes

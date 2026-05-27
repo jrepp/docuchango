@@ -208,12 +208,64 @@ class TestReadabilityDataStructures:
 class TestReadabilityParagraphExtraction:
     """Test paragraph extraction logic independently."""
 
-    @pytest.mark.skipif(True, reason="Would need to mock textstat for ReadabilityScorer instantiation")
     def test_extract_paragraphs_logic(self):
         """Test paragraph extraction without requiring textstat calculations."""
-        # This would require restructuring to separate extraction from scoring
-        # Keeping as placeholder for potential refactoring
-        pass
+        import docuchango.readability as readability_module
+        from docuchango.readability import ReadabilityConfig, ReadabilityScorer
+
+        class UnexpectedTextstatUse:
+            def __getattr__(self, name: str) -> object:
+                raise AssertionError(f"extract_paragraphs should not call textstat.{name}")
+
+        content = """---
+title: Test Document
+---
+
+# Heading
+
+This paragraph should be extracted because it is long enough to pass the configured minimum length.
+It continues on a second line so extraction should join both lines with one space.
+
+- This list item should be ignored even though it has words.
+
+```python
+print("code blocks should be ignored")
+```
+
+<!-- comments should be ignored -->
+
+<Component>
+MDX component content should be ignored.
+</Component>
+
+This final paragraph should also be extracted because it is plain markdown text with sufficient length.
+"""
+
+        original_available = readability_module.TEXTSTAT_AVAILABLE
+        original_textstat = getattr(readability_module, "textstat", None)
+
+        try:
+            readability_module.TEXTSTAT_AVAILABLE = True
+            vars(readability_module)["textstat"] = UnexpectedTextstatUse()
+
+            scorer = ReadabilityScorer(ReadabilityConfig(min_paragraph_length=80))
+            paragraphs = scorer.extract_paragraphs(content)
+
+            assert paragraphs == [
+                (
+                    "This paragraph should be extracted because it is long enough to pass the configured minimum "
+                    "length. It continues on a second line so extraction should join both lines with one space.",
+                    7,
+                ),
+                (
+                    "This final paragraph should also be extracted because it is plain markdown text with "
+                    "sufficient length.",
+                    22,
+                ),
+            ]
+        finally:
+            readability_module.TEXTSTAT_AVAILABLE = original_available
+            vars(readability_module)["textstat"] = original_textstat
 
 
 class TestReadabilityConfigSchema:
