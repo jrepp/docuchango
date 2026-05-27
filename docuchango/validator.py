@@ -389,7 +389,9 @@ class DocValidator:
                 if isinstance(prefix, str) and isinstance(num, str) and prefix.lower() == doc_type and num.isdigit():
                     expected_id = f"{doc_type}-{num}"
 
-            doc = self._parse_document(md_file, doc_type, require_frontmatter=require_frontmatter, expected_id=expected_id)
+            doc = self._parse_document(
+                md_file, doc_type, require_frontmatter=require_frontmatter, expected_id=expected_id
+            )
             if doc:
                 self.documents.append(doc)
                 self.file_to_doc[md_file] = doc
