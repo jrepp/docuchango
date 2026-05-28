@@ -25,6 +25,7 @@ import json
 import re
 import subprocess
 import sys
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import Enum
@@ -228,10 +229,10 @@ class DocValidator:
 
         contexts = [ProjectConfigContext(self.project_config, self.project_config_path)]
         seen = {self.project_config_path.resolve()}
-        pending = list(contexts)
+        pending = deque(contexts)
 
         while pending:
-            parent = pending.pop(0)
+            parent = pending.popleft()
             for subproject in parent.config.subprojects:
                 sub_path = self._resolve_config_path(
                     parent,

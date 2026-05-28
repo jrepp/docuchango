@@ -404,6 +404,24 @@ Another regular paragraph.
         for para_text, _ in paragraphs:
             assert "<Custom" not in para_text
 
+    def test_single_line_html_does_not_swallow_next_paragraph(self):
+        """Test that a standalone HTML line only skips that line."""
+        config = ReadabilityConfig(min_paragraph_length=20)
+        scorer = ReadabilityScorer(config)
+
+        content = """
+First regular paragraph with enough text.
+
+<br>
+
+Second regular paragraph with enough text.
+"""
+        paragraphs = scorer.extract_paragraphs(content)
+
+        assert len(paragraphs) == 2
+        assert "First regular paragraph" in paragraphs[0][0]
+        assert "Second regular paragraph" in paragraphs[1][0]
+
     def test_blockquotes_skipped(self):
         """Test that blockquotes are skipped."""
         config = ReadabilityConfig(min_paragraph_length=20)

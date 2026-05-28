@@ -7,6 +7,7 @@ Docusaurus validation and repair framework for opinionated micro-CMS documentati
 from __future__ import annotations
 
 import sys
+from collections import deque
 from pathlib import Path
 
 import click
@@ -52,10 +53,10 @@ def _iter_docs_project_configs(root: Path) -> list[tuple[DocsProjectConfig, Path
 
     configs = [(config, config_path)]
     seen = {config_path.resolve()}
-    pending = [(config, config_path)]
+    pending = deque([(config, config_path)])
 
     while pending:
-        parent_config, parent_path = pending.pop(0)
+        parent_config, parent_path = pending.popleft()
         parent_base = parent_path.parent
         allow_external_paths = parent_config.security.allow_external_paths
         for subproject in parent_config.subprojects:
@@ -688,15 +689,24 @@ def bulk_update(
             console.print("[red]Error: --set requires FIELD=VALUE format[/red]")
             sys.exit(1)
         field_name, value = set_field.split("=", 1)
+        if not field_name:
+            console.print("[red]Error: --set requires a non-empty field name[/red]")
+            sys.exit(1)
         operation = "set"
     elif add_field:
         if "=" not in add_field:
             console.print("[red]Error: --add requires FIELD=VALUE format[/red]")
             sys.exit(1)
         field_name, value = add_field.split("=", 1)
+        if not field_name:
+            console.print("[red]Error: --add requires a non-empty field name[/red]")
+            sys.exit(1)
         operation = "add"
     elif remove_field:
         field_name = remove_field
+        if not field_name:
+            console.print("[red]Error: --remove requires a non-empty field name[/red]")
+            sys.exit(1)
         value = None
         operation = "remove"
     elif rename_field:
@@ -704,6 +714,9 @@ def bulk_update(
             console.print("[red]Error: --rename requires OLD=NEW format[/red]")
             sys.exit(1)
         field_name, value = rename_field.split("=", 1)
+        if not field_name or not value:
+            console.print("[red]Error: --rename requires non-empty OLD and NEW field names[/red]")
+            sys.exit(1)
         operation = "rename"
 
     # Find files to process

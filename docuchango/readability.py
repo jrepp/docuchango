@@ -169,6 +169,22 @@ class ReadabilityScorer:
         in_html_comment = False
         frontmatter_count = 0
 
+        def flush_current_paragraph() -> None:
+            nonlocal current_paragraph
+            if not current_paragraph:
+                return
+            para_text = " ".join(current_paragraph).strip()
+            if len(para_text) >= self.config.min_paragraph_length:
+                paragraphs.append((para_text, current_paragraph_start_line))
+            current_paragraph = []
+
+        def is_void_html_tag_line(stripped_line: str) -> bool:
+            lower_line = stripped_line.lower()
+            return any(
+                lower_line == f"<{tag}>" or lower_line.startswith(f"<{tag} ")
+                for tag in ("br", "hr", "img", "input", "meta", "link")
+            )
+
         for i, line in enumerate(lines, start=1):
             stripped = line.strip()
 
@@ -185,12 +201,8 @@ class ReadabilityScorer:
             # Track code blocks
             if stripped.startswith("```"):
                 in_code_block = not in_code_block
-                # Flush current paragraph when entering code block
-                if in_code_block and current_paragraph:
-                    para_text = " ".join(current_paragraph).strip()
-                    if len(para_text) >= self.config.min_paragraph_length:
-                        paragraphs.append((para_text, current_paragraph_start_line))
-                    current_paragraph = []
+                if in_code_block:
+                    flush_current_paragraph()
                 continue
 
             if in_code_block:
@@ -199,12 +211,7 @@ class ReadabilityScorer:
             # Track HTML comments (multi-line support)
             if "<!--" in stripped:
                 in_html_comment = True
-                # Flush current paragraph
-                if current_paragraph:
-                    para_text = " ".join(current_paragraph).strip()
-                    if len(para_text) >= self.config.min_paragraph_length:
-                        paragraphs.append((para_text, current_paragraph_start_line))
-                    current_paragraph = []
+                flush_current_paragraph()
 
             if in_html_comment:
                 if "-->" in stripped:
@@ -219,15 +226,10 @@ class ReadabilityScorer:
 
             # Track HTML/MDX blocks (opening and closing tags)
             if stripped.startswith("<"):
-                # Flush current paragraph when entering HTML block
-                if current_paragraph:
-                    para_text = " ".join(current_paragraph).strip()
-                    if len(para_text) >= self.config.min_paragraph_length:
-                        paragraphs.append((para_text, current_paragraph_start_line))
-                    current_paragraph = []
+                flush_current_paragraph()
 
-                # Check if this is a self-closing tag or opening tag
-                if not stripped.endswith("/>"):
+                is_single_line_tag = stripped.endswith("/>") or "</" in stripped or is_void_html_tag_line(stripped)
+                if not is_single_line_tag:
                     in_html_block = True
                 continue
 
@@ -240,12 +242,7 @@ class ReadabilityScorer:
                 or stripped.startswith(">")  # blockquotes
                 or not stripped
             ):
-                # Flush current paragraph
-                if current_paragraph:
-                    para_text = " ".join(current_paragraph).strip()
-                    if len(para_text) >= self.config.min_paragraph_length:
-                        paragraphs.append((para_text, current_paragraph_start_line))
-                    current_paragraph = []
+                flush_current_paragraph()
                 continue
 
             # Start new paragraph if this is the first line
@@ -256,10 +253,7 @@ class ReadabilityScorer:
             current_paragraph.append(stripped)
 
         # Flush final paragraph
-        if current_paragraph:
-            para_text = " ".join(current_paragraph).strip()
-            if len(para_text) >= self.config.min_paragraph_length:
-                paragraphs.append((para_text, current_paragraph_start_line))
+        flush_current_paragraph()
 
         return paragraphs
 
