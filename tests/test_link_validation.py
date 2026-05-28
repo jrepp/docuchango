@@ -596,6 +596,112 @@ doc_uuid: "8b063564-82a5-4a21-943f-e868388d36b9"
         assert rfc_doc.links[0].is_valid is True
         assert not rfc_doc.links[0].error_message.endswith(".png.md")
 
+    def test_valid_relative_static_asset_link_with_query_and_anchor(self, tmp_path):
+        """Test validation ignores query strings and anchors on asset links."""
+        docs_root = tmp_path / "repo"
+        rfc_dir = docs_root / "docs-cms" / "rfcs"
+        static_dir = docs_root / "docs-cms" / "static" / "rfc-001"
+        rfc_dir.mkdir(parents=True)
+        static_dir.mkdir(parents=True)
+
+        target_file = static_dir / "architecture.svg"
+        target_file.write_text("<svg></svg>")
+
+        doc_file = rfc_dir / "rfc-001-test.md"
+        content = """---
+id: "rfc-001"
+title: "Test RFC"
+status: Draft
+created: 2025-10-13
+authors: Team
+tags: ["test"]
+project_id: "test-project"
+doc_uuid: "8b063564-82a5-4a21-943f-e868388d36b9"
+---
+
+![Architecture](../static/rfc-001/architecture.svg?raw=true#diagram)
+"""
+        doc_file.write_text(content)
+
+        validator = DocValidator(repo_root=docs_root, verbose=False)
+        validator.scan_documents()
+        validator.extract_links()
+        validator.validate_links()
+
+        rfc_doc = [doc for doc in validator.documents if "rfc-001" in str(doc.file_path)][0]
+        assert len(rfc_doc.links) == 1
+        assert rfc_doc.links[0].is_valid is True
+
+    def test_valid_relative_asset_link_with_url_escaped_name(self, tmp_path):
+        """Test validation decodes URL-escaped local file names."""
+        docs_root = tmp_path / "repo"
+        rfc_dir = docs_root / "docs-cms" / "rfcs"
+        static_dir = docs_root / "docs-cms" / "static" / "rfc-001"
+        rfc_dir.mkdir(parents=True)
+        static_dir.mkdir(parents=True)
+
+        target_file = static_dir / "expanded architecture.png"
+        target_file.write_bytes(b"png")
+
+        doc_file = rfc_dir / "rfc-001-test.md"
+        content = """---
+id: "rfc-001"
+title: "Test RFC"
+status: Draft
+created: 2025-10-13
+authors: Team
+tags: ["test"]
+project_id: "test-project"
+doc_uuid: "8b063564-82a5-4a21-943f-e868388d36b9"
+---
+
+![Architecture](../static/rfc-001/expanded%20architecture.png)
+"""
+        doc_file.write_text(content)
+
+        validator = DocValidator(repo_root=docs_root, verbose=False)
+        validator.scan_documents()
+        validator.extract_links()
+        validator.validate_links()
+
+        rfc_doc = [doc for doc in validator.documents if "rfc-001" in str(doc.file_path)][0]
+        assert len(rfc_doc.links) == 1
+        assert rfc_doc.links[0].is_valid is True
+
+    def test_valid_extensionless_relative_internal_link(self, tmp_path):
+        """Test extensionless document links still fall back to .md."""
+        docs_root = tmp_path / "repo"
+        doc_dir = docs_root / "docs-cms" / "adr"
+        doc_dir.mkdir(parents=True)
+
+        target_file = doc_dir / "adr-002-target.md"
+        target_file.write_text("# Target\n")
+
+        doc_file = doc_dir / "adr-001-test.md"
+        content = """---
+id: "adr-001"
+title: "Test Decision"
+status: Accepted
+date: 2025-10-13
+deciders: Team
+tags: ["test"]
+project_id: "test-project"
+doc_uuid: "8b063564-82a5-4a21-943f-e868388d36b9"
+---
+
+See [ADR 002](./adr-002-target#context) for details.
+"""
+        doc_file.write_text(content)
+
+        validator = DocValidator(repo_root=docs_root, verbose=False)
+        validator.scan_documents()
+        validator.extract_links()
+        validator.validate_links()
+
+        adr_doc = [doc for doc in validator.documents if "adr-001" in str(doc.file_path)][0]
+        assert len(adr_doc.links) == 1
+        assert adr_doc.links[0].is_valid is True
+
     def test_link_with_anchor_validates_base_file(self, tmp_path):
         """Test that links with anchors validate the base file."""
         docs_root = tmp_path / "repo"

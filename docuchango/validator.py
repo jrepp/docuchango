@@ -30,6 +30,7 @@ from datetime import date, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any, cast
+from urllib.parse import unquote
 
 try:
     import frontmatter
@@ -253,6 +254,11 @@ class DocValidator:
         """Log if verbose or forced"""
         if self.verbose or force:
             print(message)
+
+    @staticmethod
+    def _link_path_target(target: str) -> str:
+        """Return the filesystem path portion of a Markdown link target."""
+        return unquote(re.split(r"[?#]", target, maxsplit=1)[0])
 
     def _get_folder_config(self) -> dict[str, str]:
         """Get folder configuration from project config or use defaults"""
@@ -662,7 +668,7 @@ class DocValidator:
 
     def _validate_internal_link(self, link: Link):
         """Validate internal document link"""
-        target = link.target.split("#")[0]  # Remove anchor
+        target = self._link_path_target(link.target)
 
         # Handle relative paths
         if target.startswith(("./", "../")):
@@ -857,7 +863,7 @@ class DocValidator:
 
             line_without_code = re.sub(r"`[^`]+`", "", line)
             for match in link_pattern.finditer(line_without_code):
-                target = match.group(2).split("#", 1)[0]
+                target = self._link_path_target(match.group(2))
                 if re.match(r"^[a-z][a-z0-9+.-]*:", target):
                     continue
                 if not target.endswith(".md") and not target.startswith(("./", "../", "/")):
@@ -867,7 +873,7 @@ class DocValidator:
                     resolved = (self.repo_root / target.lstrip("/")).resolve()
                 else:
                     resolved = (source_path.parent / target).resolve()
-                    if not target.endswith(".md"):
+                    if not resolved.suffix:
                         resolved = Path(str(resolved) + ".md")
                 links[resolved] = (line_num, target)
 

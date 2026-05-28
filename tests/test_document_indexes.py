@@ -169,3 +169,39 @@ doc_uuid: 11111111-1111-4111-8111-111111111111
         validator.check_document_indexes()
 
         assert "Document index 'Plan Index' missing bucket heading: M2" in validator.errors
+
+
+def test_document_index_accepts_extensionless_links_with_query_and_anchor():
+    """Configured indexes should resolve clean local path targets before matching."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        repo_root = Path(tmpdir)
+        docs = repo_root / "docs"
+        decisions = docs / "decisions"
+        decisions.mkdir(parents=True)
+
+        (decisions / "decision-a.md").write_text("# Decision A\n")
+        (docs / "design-index.md").write_text(
+            """# Design Index
+
+- [Decision A](./decisions/decision-a?view=full#context)
+"""
+        )
+
+        write_config(
+            repo_root,
+            {
+                "project": {"id": "index-project", "name": "Index Project"},
+                "indexes": [
+                    {
+                        "name": "Shared Design Index",
+                        "path": "docs/design-index.md",
+                        "targets": ["docs/decisions/*.md"],
+                    }
+                ],
+            },
+        )
+
+        validator = DocValidator(repo_root, verbose=False)
+        validator.check_document_indexes()
+
+        assert validator.errors == []
