@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v1.19.0 (2026-05-28)
+
+### Features
+
+- Contain docs project config paths
+  ([`1d59938`](https://github.com/jrepp/docuchango/commit/1d5993865a9c09a36ad6db05124512e58f1a9e5e))
+
+### Testing
+
+- Cover quality pass edge cases
+  ([`b140b4a`](https://github.com/jrepp/docuchango/commit/b140b4aa4e431d7af2ba1e1df3b1de6f0228255e))
+
+- Enable readability paragraph extraction coverage
+  ([`6efc857`](https://github.com/jrepp/docuchango/commit/6efc857ea405eadb8cff3d300313457b82ef9a26))
+
+
 ## v1.18.1 (2026-05-27)
 
 ### Chores
