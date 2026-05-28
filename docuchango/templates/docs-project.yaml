@@ -64,6 +64,11 @@ structure:
   #   my-custom-standard: "^custom-.+\\.md$"
   #   date-prefix: "^\\d{6}-.+必$"
 
+security:
+  # Keep configured paths inside this docs-project.yaml directory by default.
+  # Use subprojects to include other docs roots instead of ../ path escapes.
+  allow_external_paths: false
+
 # Optional subproject docs configs. Paths are relative to this file and can point
 # to either a subproject directory or its docs-project.yaml file.
 # subprojects:

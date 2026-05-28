@@ -147,6 +147,13 @@ subprojects:
   - vendor/service-b/docs-project.yaml
 ```
 
+Configured paths are contained to the directory that owns each
+`docs-project.yaml` by default. If a docs project lives in `./docs`, its
+`docs_roots`, folders, indexes, and subproject references cannot escape
+`./docs` with `../` paths. Use `subprojects` from a parent config to include
+other docs roots, or set `security.allow_external_paths: true` only for a
+trusted legacy layout that intentionally crosses that boundary.
+
 Generated projects include `docs-project.schema.json` next to
 `docs-project.yaml` for editor validation and prompt-based config authoring.
 The same schema is published at

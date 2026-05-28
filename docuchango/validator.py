@@ -25,6 +25,7 @@ import json
 import re
 import subprocess
 import sys
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import Enum
@@ -69,6 +70,9 @@ except ImportError as e:
         print("   $ uv run tooling/validate_docs.py", file=sys.stderr)
         print(f"\n   Error details: {e}\n", file=sys.stderr)
         sys.exit(2)
+
+
+from docuchango.config_paths import is_within_path, resolve_config_path
 
 
 class LinkType(Enum):
@@ -137,6 +141,10 @@ class ProjectConfigContext:
     def base_dir(self) -> Path:
         return self.path.parent
 
+    @property
+    def allow_external_paths(self) -> bool:
+        return self.config.security.allow_external_paths
+
 
 class DocValidator:
     """Validates documentation"""
@@ -160,6 +168,7 @@ class DocValidator:
         candidate_paths = [
             self.repo_root / "docs-project.yaml",
             self.repo_root / "docs-cms" / "docs-project.yaml",
+            self.repo_root / "docs" / "docs-project.yaml",
         ]
 
         for config_path in candidate_paths:
@@ -220,12 +229,20 @@ class DocValidator:
 
         contexts = [ProjectConfigContext(self.project_config, self.project_config_path)]
         seen = {self.project_config_path.resolve()}
-        pending = list(contexts)
+        pending = deque(contexts)
 
         while pending:
-            parent = pending.pop(0)
+            parent = pending.popleft()
             for subproject in parent.config.subprojects:
-                sub_path = (parent.base_dir / subproject.path).resolve()
+                sub_path = self._resolve_config_path(
+                    parent,
+                    parent.base_dir,
+                    subproject.path,
+                    parent.base_dir,
+                    "subproject",
+                )
+                if not sub_path:
+                    continue
                 if sub_path.is_dir():
                     sub_path = sub_path / "docs-project.yaml"
                 if sub_path in seen:
@@ -248,6 +265,32 @@ class DocValidator:
             return self.project_config_path.parent
         # Legacy default
         return self.repo_root / "docs-cms"
+
+    def _add_path_escape_error(
+        self, context: ProjectConfigContext, path_value: str, purpose: str, boundary: Path
+    ) -> None:
+        """Record a blocked config path that resolved outside its allowed boundary."""
+        message = (
+            f"Blocked {purpose} path '{path_value}' in {context.path}: configured paths must stay within "
+            f"{boundary}. Use subprojects for additional docs roots or set security.allow_external_paths: true."
+        )
+        if message not in self.errors:
+            self.errors.append(message)
+        self.log(f"⚠️  Warning: {message}", force=True)
+
+    def _resolve_config_path(
+        self,
+        context: ProjectConfigContext,
+        base_dir: Path,
+        path_value: str,
+        boundary: Path,
+        purpose: str,
+    ) -> Path | None:
+        """Resolve a configured path and block escapes by default."""
+        resolved = resolve_config_path(base_dir, path_value, boundary, context.allow_external_paths)
+        if resolved is None:
+            self._add_path_escape_error(context, path_value, purpose, boundary.resolve())
+        return resolved
 
     def log(self, message: str, force: bool = False):
         """Log if verbose or forced"""
@@ -278,10 +321,11 @@ class DocValidator:
         # Default folders to scan (includes prd now!)
         return ["adr", "rfcs", "memos", "prd"]
 
-    def _build_scan_entries(self) -> list[tuple[str, str, str, bool, bool, Path]]:
+    def _build_scan_entries(self) -> list[tuple[str, str, str, bool, bool, Path, Path, bool]]:
         """Build scan entries as tuples:
 
-        (doc_type, folder_relative, filename_pattern, enforce_filename_pattern, require_frontmatter, root_path)
+        (doc_type, folder_relative, filename_pattern, enforce_filename_pattern,
+        require_frontmatter, root_path, boundary, allow_external_paths)
         """
         default_patterns = {
             "adr": r"^(adr)-(\d{3})-(.+)\.md$",
@@ -293,7 +337,7 @@ class DocValidator:
         contexts = self.project_configs or []
 
         if contexts:
-            entries: list[tuple[str, str, str, bool, bool, Path]] = []
+            entries: list[tuple[str, str, str, bool, bool, Path, Path, bool]] = []
             for context in contexts:
                 config = context.config
                 config_base = context.base_dir
@@ -314,7 +358,15 @@ class DocValidator:
                             pattern = default_patterns.get(doc_type_name, r"^(.+)\.md$")
                         folders = cfg.folders or []
                         for root_rel in roots:
-                            root_path = (config_base / root_rel).resolve()
+                            root_path = self._resolve_config_path(
+                                context,
+                                config_base,
+                                root_rel,
+                                config_base,
+                                "docs root",
+                            )
+                            if not root_path:
+                                continue
                             for folder in folders:
                                 entries.append(
                                     (
@@ -324,6 +376,8 @@ class DocValidator:
                                         cfg.enforce_filename_pattern,
                                         cfg.require_frontmatter,
                                         root_path,
+                                        root_path,
+                                        context.allow_external_paths,
                                     )
                                 )
                     continue
@@ -338,7 +392,16 @@ class DocValidator:
                     folder_name = folder_config[key]
                     if folder_name in config.structure.document_folders:
                         entries.append(
-                            (schema_name, folder_name, default_patterns[schema_name], True, True, config_base)
+                            (
+                                schema_name,
+                                folder_name,
+                                default_patterns[schema_name],
+                                True,
+                                True,
+                                config_base,
+                                config_base,
+                                context.allow_external_paths,
+                            )
                         )
             return entries
 
@@ -351,7 +414,18 @@ class DocValidator:
         for key, schema_name in [("adr", "adr"), ("rfc", "rfc"), ("memo", "memo"), ("prd", "prd")]:
             folder_name = folder_config[key]
             if folder_name in document_folders:
-                entries.append((schema_name, folder_name, default_patterns[schema_name], True, True, config_base))
+                entries.append(
+                    (
+                        schema_name,
+                        folder_name,
+                        default_patterns[schema_name],
+                        True,
+                        True,
+                        config_base,
+                        config_base,
+                        False,
+                    )
+                )
         return entries
 
     def _scan_document_folder(
@@ -404,7 +478,16 @@ class DocValidator:
         if not entries:
             self.log("   ⊘ No configured scan entries found", force=True)
 
-        for doc_type, folder_name, pattern_text, enforce_pattern, require_frontmatter, root_path in entries:
+        for (
+            doc_type,
+            folder_name,
+            pattern_text,
+            enforce_pattern,
+            require_frontmatter,
+            root_path,
+            boundary,
+            allow_external_paths,
+        ) in entries:
             try:
                 pattern = re.compile(pattern_text)
             except re.error as e:
@@ -412,6 +495,11 @@ class DocValidator:
                 continue
 
             folder_path = (root_path / folder_name).resolve()
+            if not allow_external_paths and not is_within_path(folder_path, boundary):
+                self.errors.append(
+                    f"Blocked document folder path '{folder_name}': configured paths must stay within {boundary}"
+                )
+                continue
             self.log(f"   Scanning {folder_path} ({doc_type} documents)...")
             self._scan_document_folder(
                 folder_path,
@@ -427,7 +515,12 @@ class DocValidator:
         if self.project_configs:
             roots_to_scan = []
             for context in self.project_configs:
-                roots_to_scan.extend((context.base_dir / p).resolve() for p in context.config.structure.docs_roots)
+                for path_value in context.config.structure.docs_roots:
+                    resolved = self._resolve_config_path(
+                        context, context.base_dir, path_value, context.base_dir, "docs root"
+                    )
+                    if resolved:
+                        roots_to_scan.append(resolved)
         elif self.project_config and self.project_config.structure:
             roots_to_scan = [
                 (self._get_config_base_dir() / p).resolve() for p in self.project_config.structure.docs_roots
@@ -920,6 +1013,25 @@ class DocValidator:
             return f"{target_date.year}"
         return None
 
+    def _glob_static_prefix(self, pattern: str) -> str:
+        """Return the non-glob path prefix used for containment checks."""
+        parts = Path(pattern).parts
+        prefix_parts: list[str] = []
+        for part in parts:
+            if any(char in part for char in "*?["):
+                break
+            prefix_parts.append(part)
+        if not prefix_parts:
+            return "."
+        return str(Path(*prefix_parts))
+
+    def _safe_index_target_paths(self, context: ProjectConfigContext, target_pattern: str) -> set[Path]:
+        """Expand an index target glob only when its static prefix stays in the config boundary."""
+        prefix = self._glob_static_prefix(target_pattern)
+        if not self._resolve_config_path(context, context.base_dir, prefix, context.base_dir, "index target"):
+            return set()
+        return {path.resolve() for path in context.base_dir.glob(target_pattern) if path.is_file()}
+
     def check_document_indexes(self):
         """Validate configured Markdown index files."""
         contexts = self.project_configs or []
@@ -935,7 +1047,11 @@ class DocValidator:
         for context in contexts:
             config_base = context.base_dir
             for index_config in context.config.indexes:
-                index_path = (config_base / index_config.path).resolve()
+                index_path = self._resolve_config_path(
+                    context, config_base, index_config.path, config_base, "document index"
+                )
+                if not index_path:
+                    continue
                 if not index_path.exists():
                     self.errors.append(f"Document index '{index_config.name}' not found: {index_config.path}")
                     continue
@@ -945,9 +1061,7 @@ class DocValidator:
                     links = self._extract_markdown_file_links(content, index_path)
                     target_paths: set[Path] = set()
                     for target_pattern in index_config.targets:
-                        target_paths.update(
-                            path.resolve() for path in config_base.glob(target_pattern) if path.is_file()
-                        )
+                        target_paths.update(self._safe_index_target_paths(context, target_pattern))
                     target_paths.discard(index_path)
 
                     if index_config.require_entries and target_paths and not links:

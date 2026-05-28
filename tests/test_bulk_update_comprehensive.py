@@ -195,6 +195,20 @@ id: test
         with pytest.raises(ValueError, match="Invalid operation"):
             update_frontmatter_bulk(content, "field", "value", "invalid_op")
 
+    def test_rename_requires_new_field_name(self):
+        """Test rename operation rejects empty target names."""
+        content = """---
+id: test
+old_name: value
+---
+# Test
+"""
+        with pytest.raises(ValueError, match="non-empty new field name"):
+            update_frontmatter_bulk(content, "old_name", "", "rename")
+
+        with pytest.raises(ValueError, match="non-empty new field name"):
+            update_frontmatter_bulk(content, "old_name", None, "rename")
+
     def test_very_long_field_name(self):
         """Test with very long field name."""
         content = """---

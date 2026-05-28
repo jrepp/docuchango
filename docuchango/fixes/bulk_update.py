@@ -37,7 +37,7 @@ def should_skip_file(file_path: Path) -> bool:
     return file_path.name == "index.md"
 
 
-def serialize_frontmatter(metadata: dict) -> str:
+def serialize_frontmatter(metadata: dict[str, object]) -> str:
     """Serialize frontmatter dict back to YAML with proper formatting.
 
     Args:
@@ -76,6 +76,9 @@ def update_frontmatter_bulk(
     # Validate operation
     if operation not in VALID_OPERATIONS:
         raise ValueError(f"Invalid operation '{operation}'. Must be one of: {', '.join(VALID_OPERATIONS)}")
+    rename_target = new_value
+    if operation == "rename" and not rename_target:
+        raise ValueError("Rename operation requires a non-empty new field name")
 
     try:
         post = frontmatter.loads(content)
@@ -128,9 +131,11 @@ def update_frontmatter_bulk(
     elif operation == "rename":
         # Rename field (field_name is old_name, new_value is new_name)
         if field_name in post.metadata:
-            post.metadata[new_value] = post.metadata.pop(field_name)
+            if rename_target is None:
+                raise ValueError("Rename operation requires a non-empty new field name")
+            post.metadata[rename_target] = post.metadata.pop(field_name)
             modified = True
-            message = f"Renamed {field_name} → {new_value}"
+            message = f"Renamed {field_name} → {rename_target}"
         else:
             message = f"Field {field_name} not found"
 

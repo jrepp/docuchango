@@ -700,3 +700,23 @@ class TestCLIErrorHandling:
         )
         # May succeed or fail, but should not crash
         assert result.exit_code in [0, 1, 2]
+
+
+class TestBulkUpdateCommand:
+    """Test bulk update command validation."""
+
+    def test_bulk_update_rejects_empty_set_field_name(self):
+        runner = CliRunner()
+
+        result = runner.invoke(main, ["bulk", "update", "--set", "=value"])
+
+        assert result.exit_code == 1
+        assert "non-empty field name" in result.output
+
+    def test_bulk_update_rejects_empty_rename_target(self):
+        runner = CliRunner()
+
+        result = runner.invoke(main, ["bulk", "update", "--rename", "old_name="])
+
+        assert result.exit_code == 1
+        assert "non-empty OLD and NEW" in result.output

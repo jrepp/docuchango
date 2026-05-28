@@ -220,6 +220,18 @@ class DocsProjectReadability(BaseModel):
         )
 
 
+class DocsProjectSecurity(BaseModel):
+    """Security controls for docs-project.yaml path resolution."""
+
+    allow_external_paths: bool = Field(
+        default=False,
+        description=(
+            "Allow configured document paths to resolve outside this docs-project.yaml directory. "
+            "Keep false for normal projects; use subprojects to include other documentation roots."
+        ),
+    )
+
+
 class DocsProjectIndexTimeBucket(BaseModel):
     """Time or milestone bucket rules for a document index."""
 
@@ -327,6 +339,10 @@ class DocsProjectConfig(BaseModel):
     readability: DocsProjectReadability = Field(
         default_factory=DocsProjectReadability,
         description="Readability analysis configuration and thresholds",
+    )
+    security: DocsProjectSecurity = Field(
+        default_factory=DocsProjectSecurity,
+        description="Security controls for config-relative path resolution",
     )
     indexes: list[DocsProjectIndex] = Field(
         default_factory=list,
