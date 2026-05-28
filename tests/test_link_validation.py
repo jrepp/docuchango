@@ -559,6 +559,43 @@ See [RFC 001](../rfcs/rfc-001-test.md) for details.
         assert len(adr_doc.links) == 1
         assert adr_doc.links[0].is_valid is True
 
+    def test_valid_relative_static_asset_link(self, tmp_path):
+        """Test validation of relative links to non-markdown assets."""
+        docs_root = tmp_path / "repo"
+        rfc_dir = docs_root / "docs-cms" / "rfcs"
+        static_dir = docs_root / "docs-cms" / "static" / "rfc-001"
+        rfc_dir.mkdir(parents=True)
+        static_dir.mkdir(parents=True)
+
+        target_file = static_dir / "architecture.png"
+        target_file.write_bytes(b"png")
+
+        doc_file = rfc_dir / "rfc-001-test.md"
+        content = """---
+id: "rfc-001"
+title: "Test RFC"
+status: Draft
+created: 2025-10-13
+authors: Team
+tags: ["test"]
+project_id: "test-project"
+doc_uuid: "8b063564-82a5-4a21-943f-e868388d36b9"
+---
+
+![Architecture](../static/rfc-001/architecture.png)
+"""
+        doc_file.write_text(content)
+
+        validator = DocValidator(repo_root=docs_root, verbose=False)
+        validator.scan_documents()
+        validator.extract_links()
+        validator.validate_links()
+
+        rfc_doc = [doc for doc in validator.documents if "rfc-001" in str(doc.file_path)][0]
+        assert len(rfc_doc.links) == 1
+        assert rfc_doc.links[0].is_valid is True
+        assert not rfc_doc.links[0].error_message.endswith(".png.md")
+
     def test_link_with_anchor_validates_base_file(self, tmp_path):
         """Test that links with anchors validate the base file."""
         docs_root = tmp_path / "repo"

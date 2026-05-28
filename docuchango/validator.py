@@ -669,7 +669,7 @@ class DocValidator:
             source_dir = link.source_doc.parent
             target_path = (source_dir / target).resolve()
 
-            if not target.endswith(".md"):
+            if not target_path.suffix:
                 target_path = Path(str(target_path) + ".md")
 
             if target_path.exists():
