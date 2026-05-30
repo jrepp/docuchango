@@ -1,0 +1,32 @@
+# yaml-language-server: $schema=../docuchango/templates/docs-project.schema.json
+version: "1"
+docuchango_version: "1.18.1"
+
+project:
+  id: docuchango
+  name: Docuchango
+  description: Product documentation hub for docuchango itself
+
+structure:
+  adr_dir: adr
+  rfc_dir: rfcs
+  memo_dir: memos
+  prd_dir: prd
+  template_dir: templates
+  document_folders:
+    - adr
+    - rfcs
+    - memos
+    - prd
+
+security:
+  allow_external_paths: false
+
+metadata:
+  created: "2026-05-30"
+  maintainers:
+    - Engineering Team
+  purpose: Durable documentation for docuchango architecture, proposals, product requirements, and maintenance knowledge
+
+readability:
+  enabled: false
