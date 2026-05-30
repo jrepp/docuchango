@@ -1,10 +1,13 @@
-name: Publish Schema
+name: Publish Static Assets
 
 on:
   push:
     branches: [main]
     paths:
       - docuchango/templates/docs-project.schema.json
+      - docuchango/templates/**
+      - templates/**
+      - docuchango/schemas.py
       - .github/workflows/publish-schema.yml
   workflow_dispatch:
 
@@ -19,24 +22,59 @@ concurrency:
 
 jobs:
   publish:
-    name: Publish docs-project schema
+    name: Publish schemas and templates
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}schemas/docs-project.schema.json
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v6.0.2
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+
+      - name: Set up Python
+        run: uv python install 3.12
+
       - name: Validate schema JSON
         run: python -m json.tool docuchango/templates/docs-project.schema.json > /dev/null
 
-      - name: Build Pages artifact
+      - name: Generate security audit report
         run: |
-          mkdir -p site/schemas
-          cp docuchango/templates/docs-project.schema.json site/schemas/docs-project.schema.json
-          touch site/.nojekyll
+          uv export --python 3.12 --all-extras --no-emit-project --format requirements-txt --no-hashes --output-file requirements-audit.txt
+          set +e
+          uv tool run --python 3.12 pip-audit --requirement requirements-audit.txt --no-deps --disable-pip --format json --output security-report.json
+          audit_status=$?
+          set -e
+          printf '%s\n' "$audit_status" > security-audit-exit-code.txt
+          if [ ! -s security-report.json ]; then
+            printf '{"dependencies": [], "audit_error": "pip-audit did not produce a report", "audit_exit_code": %s}\n' "$audit_status" > security-report.json
+          else
+            uv run --python 3.12 python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("security-report.json")
+          report = json.loads(path.read_text(encoding="utf-8"))
+          report["audit_exit_code"] = int(Path("security-audit-exit-code.txt").read_text(encoding="utf-8"))
+          path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+          PY
+          fi
+
+      - name: Build static site
+        run: uv run --python 3.12 python scripts/build_static_site.py
+
+      - name: Validate generated frontmatter schemas
+        run: python -m json.tool site/schemas/frontmatter/adr.schema.json > /dev/null
+
+      - name: Validate site metadata
+        run: |
+          python -m json.tool site/version.json > /dev/null
+          python -m json.tool site/reports/python-conformance.json > /dev/null
+          python -m json.tool site/reports/security-summary.json > /dev/null
+          python -m xml.etree.ElementTree site/sitemap.xml > /dev/null
 
       - name: Configure Pages
         uses: actions/configure-pages@v6.0.0
