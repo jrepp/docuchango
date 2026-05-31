@@ -28,19 +28,23 @@ This guide shows you how to bootstrap a working `docs-cms` system for agent-driv
 
 ## Quick Start
 
-### 1. Bootstrap the Structure
+### 1. Initialize docs-cms
 
-Create the core `docs-cms` directory structure:
+Use the CLI to create the project structure, configuration, schema, and templates:
 
 ```bash
-mkdir -p docs-cms/{adr,rfcs,memos,templates}
+docuchango init --project-id my-project --project-name "My Project"
 ```
 
-### 2. Create Configuration
+For an existing repository, inspect `docs-cms/` first and avoid overwriting human-authored documents. If the project already has a `docs-cms` directory, add only missing configuration or guidance files.
 
-Create `docs-cms/docs-project.yaml`:
+### 2. Review Configuration
+
+Review `docs-cms/docs-project.yaml` and keep project-specific values accurate:
 
 ```yaml
+# yaml-language-server: $schema=./docs-project.schema.json
+version: "1"
 project:
   id: my-project
   name: My Project
@@ -50,106 +54,31 @@ structure:
   adr_dir: adr
   rfc_dir: rfcs
   memo_dir: memos
+  prd_dir: prd
   template_dir: templates
+  document_folders:
+    - adr
+    - rfcs
+    - memos
+    - prd
 ```
 
-### 3. Copy Templates
+Use the local `docs-cms/docs-project.schema.json` file as the config reference. If it is unavailable, use the stable schema URL: `https://jrepp.github.io/docuchango/schemas/docs-project.schema.json`.
 
-Copy templates from docuchango:
+### 3. Add Agent Instructions
 
-```bash
-# ADR Template
-cat > docs-cms/templates/adr-template.md << 'EOF'
----
-id: adr-NNN
-title: Brief decision title
-status: Proposed
-date: YYYY-MM-DD
-tags: [architecture, decision]
-project_id: my-project
-doc_uuid: generate-uuid-v4-here
----
+Create or update a repository-level `AGENTS.md` file so coding agents know that `docs-cms` is the durable project memory:
 
-# ADR-NNN: Brief Decision Title
+```markdown
+# Agent Instructions
 
-## Status
-Proposed | Accepted | Deprecated | Superseded
+Use `docs-cms/` as durable project memory. Before changing architecture, workflows, documentation policy, validation behavior, templates, or release process, search and read relevant ADRs, RFCs, PRDs, and memos.
 
-## Context
-What is the issue we're facing? What constraints exist?
+When new durable knowledge is created, add or update a `docs-cms` document instead of leaving root-level working notes. Use ADRs for accepted decisions, RFCs for proposals, PRDs for product requirements, and memos for durable findings or plans.
 
-## Decision
-What did we decide to do?
+For this repository itself, remember that docuchango maintains docuchango's own docs-cms. Avoid circular wording such as "the tool validates itself" unless the exact scope is clear: changes to docuchango's product behavior belong in `docs-cms/`, while generated examples under `examples/docs-cms/` remain sample content.
 
-## Consequences
-What are the positive and negative outcomes?
-
-## Alternatives Considered
-- Alternative 1: Why not chosen
-- Alternative 2: Why not chosen
-EOF
-
-# RFC Template
-cat > docs-cms/templates/rfc-template.md << 'EOF'
----
-id: rfc-NNN
-title: Proposal title
-status: Draft
-date: YYYY-MM-DD
-author: Your Name
-tags: [rfc, proposal]
-project_id: my-project
-doc_uuid: generate-uuid-v4-here
----
-
-# RFC-NNN: Proposal Title
-
-## Summary
-Brief 2-3 sentence overview
-
-## Motivation
-Why are we doing this? What problem does it solve?
-
-## Proposed Solution
-Detailed explanation of the proposal
-
-## Implementation
-How will this be implemented?
-
-## Alternatives
-What other approaches were considered?
-
-## Open Questions
-- Question 1?
-- Question 2?
-EOF
-
-# Memo Template
-cat > docs-cms/templates/memo-template.md << 'EOF'
----
-id: memo-NNN
-title: Memo title
-date: YYYY-MM-DD
-author: Your Name
-tags: [memo]
-project_id: my-project
-doc_uuid: generate-uuid-v4-here
----
-
-# Memo: Title
-
-## Purpose
-Why this memo exists
-
-## Key Points
-- Point 1
-- Point 2
-- Point 3
-
-## Next Actions
-- [ ] Action 1
-- [ ] Action 2
-EOF
+Run `docuchango validate --dry-run` before applying automatic documentation fixes, then run `docuchango validate` and summarize any remaining manual issues.
 ```
 
 ### 4. Install docuchango
@@ -161,51 +90,11 @@ pip install docuchango
 ### 5. Create Your First Document
 
 ```bash
-# Generate a UUID
+cp docs-cms/templates/adr-000-template.md docs-cms/adr/adr-001-adopt-docs-cms.md
 uuidgen | tr '[:upper:]' '[:lower:]'
-# Output: 550e8400-e29b-41d4-a716-446655440000
-
-# Create first ADR
-cat > docs-cms/adr/adr-001-adopt-docs-cms.md << 'EOF'
----
-id: adr-001
-title: Adopt docs-cms for Documentation
-status: Accepted
-date: 2025-10-27
-tags: [architecture, documentation]
-project_id: my-project
-doc_uuid: 550e8400-e29b-41d4-a716-446655440000
----
-
-# ADR-001: Adopt docs-cms for Documentation
-
-## Status
-Accepted
-
-## Context
-We need a structured way to document architectural decisions and collaborate with AI agents on documentation.
-
-## Decision
-Adopt docs-cms as our documentation framework with docuchango validation.
-
-## Consequences
-
-**Positive:**
-- Consistent documentation structure
-- Automated validation
-- Version controlled in git
-- Agent-friendly format
-
-**Negative:**
-- Requires learning frontmatter schema
-- Need to install docuchango tooling
-
-## Alternatives Considered
-- Wiki: Too unstructured, hard to validate
-- Confluence: Not in version control, not agent-friendly
-- Plain markdown: No validation, no consistency
-EOF
 ```
+
+Then fill all placeholder frontmatter fields, update the heading and body, and validate before committing.
 
 ### 6. Validate Your Documentation
 
@@ -299,13 +188,14 @@ All documents require these fields:
 ---
 id: doc-NNN                    # Unique identifier (e.g., adr-001)
 title: Brief title             # Human-readable title
-status: Draft                  # Status (varies by type)
-date: 2025-10-27              # Creation/update date
+created: 2026-05-30           # Creation date or timestamp
 tags: [tag1, tag2]            # Categorization tags
 project_id: my-project        # Project identifier
 doc_uuid: uuid-v4-here        # Unique UUID v4
 ---
 ```
+
+Some document types require additional fields. For example, ADRs require `status` and `deciders`, RFCs require `status` and `author`, PRDs require `status`, `author`, and `target_release`, and memos require `author`.
 
 ### Generating UUIDs
 
@@ -390,19 +280,19 @@ docuchango validate
 **ADR Status Flow:**
 ```
 Proposed → Accepted → Implemented
-        → Rejected
+        → Deprecated
         → Superseded (by adr-XXX)
 ```
 
 **RFC Status Flow:**
 ```
-Draft → In Review → Approved → Implemented
-      → Rejected
-      → Withdrawn
+Draft → Proposed → Accepted → Implemented
+      → Deprecated
+      → Superseded
 ```
 
 **Memo Status:**
-Memos typically don't have status (informational only)
+Memos do not require a status. Use them for durable findings, plans, or informational context.
 
 ## Integration with CI/CD
 
@@ -431,10 +321,11 @@ jobs:
 
 ## Next Steps
 
-1. **Read the Agent Guide**: See `docs/AGENT_GUIDE.md` for instructions on how agents should interact with docs-cms
-2. **Review Examples**: Check `examples/docs-cms/` for sample documents
-3. **Set up CI**: Add validation to your CI/CD pipeline
-4. **Write Your First ADR**: Document why you adopted docs-cms!
+1. **Add agent instructions**: Create or update `AGENTS.md` with the repository-specific docs-cms guidance above
+2. **Read the Agent Guide**: See `docs/AGENT_GUIDE.md` for instructions on how agents should interact with docs-cms
+3. **Review Examples**: Check `examples/docs-cms/` for sample documents
+4. **Set up CI**: Add validation to your CI/CD pipeline
+5. **Write Your First ADR**: Document why you adopted docs-cms!
 
 ## Troubleshooting
 
@@ -460,7 +351,7 @@ Fix: Update link to point to existing file or create the target
 
 **Invalid Status Value**
 ```
-Error: status must be one of: Proposed, Accepted, Rejected, Superseded
+Error: status must be one of the valid values for that document type
 Fix: Use a valid status value from the schema
 ```
 
