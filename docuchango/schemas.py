@@ -4,14 +4,34 @@
 These schemas enforce consistent metadata across ADRs, RFCs, and Memos.
 """
 
-from __future__ import annotations
-
 import datetime
+import inspect
 import re
+import typing
+from collections.abc import Callable
 from importlib.metadata import PackageNotFoundError, version
-from typing import Literal
+from typing import Any, Literal, cast
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+_eval_type_candidate = getattr(typing, "_eval_type", None)
+_eval_type_parameters = inspect.signature(_eval_type_candidate).parameters if _eval_type_candidate is not None else {}
+if "type_params" in _eval_type_parameters and "prefer_fwd_module" not in _eval_type_parameters:
+    _eval_type = cast(Callable[..., Any], _eval_type_candidate)
+
+    def _eval_type_compat(
+        t: Any,
+        globalns: dict[str, Any] | None,
+        localns: dict[str, Any] | None,
+        type_params: Any = None,
+        *,
+        prefer_fwd_module: bool = False,
+        **kwargs: Any,
+    ) -> Any:
+        _ = prefer_fwd_module
+        return _eval_type(t, globalns, localns, type_params, **kwargs)
+
+    typing._eval_type = _eval_type_compat  # type: ignore[attr-defined]
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator  # noqa: E402
 
 try:
     CURRENT_DOCUCHANGO_VERSION = version("docuchango")

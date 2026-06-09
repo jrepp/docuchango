@@ -36,23 +36,23 @@ jobs:
         uses: astral-sh/setup-uv@v8.1.0
 
       - name: Set up Python
-        run: uv python install 3.12
+        run: uv python install 3.14
 
       - name: Validate schema JSON
         run: python -m json.tool docuchango/templates/docs-project.schema.json > /dev/null
 
       - name: Generate security audit report
         run: |
-          uv export --python 3.12 --all-extras --no-emit-project --format requirements-txt --no-hashes --output-file requirements-audit.txt
+          uv export --python 3.14 --all-extras --no-emit-project --format requirements-txt --no-hashes --output-file requirements-audit.txt
           set +e
-          uv tool run --python 3.12 pip-audit --requirement requirements-audit.txt --no-deps --disable-pip --format json --output security-report.json
+          uv tool run --python 3.14 pip-audit --requirement requirements-audit.txt --no-deps --disable-pip --format json --output security-report.json
           audit_status=$?
           set -e
           printf '%s\n' "$audit_status" > security-audit-exit-code.txt
           if [ ! -s security-report.json ]; then
             printf '{"dependencies": [], "audit_error": "pip-audit did not produce a report", "audit_exit_code": %s}\n' "$audit_status" > security-report.json
           else
-            uv run --python 3.12 python - <<'PY'
+            uv run --python 3.14 python - <<'PY'
           import json
           from pathlib import Path
 
@@ -64,7 +64,7 @@ jobs:
           fi
 
       - name: Build static site
-        run: uv run --python 3.12 python scripts/build_static_site.py
+        run: uv run --python 3.14 python scripts/build_static_site.py
 
       - name: Validate generated frontmatter schemas
         run: python -m json.tool site/schemas/frontmatter/adr.schema.json > /dev/null
