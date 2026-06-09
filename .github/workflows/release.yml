@@ -31,7 +31,7 @@ jobs:
         uses: astral-sh/setup-uv@v8.1.0
 
       - name: Set up Python
-        run: uv python install 3.12
+        run: uv python install 3.14
 
       - name: Python Semantic Release
         id: release

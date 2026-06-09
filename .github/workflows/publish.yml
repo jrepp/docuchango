@@ -41,7 +41,7 @@ jobs:
           version: "0.11.16"
 
       - name: Set up Python
-        run: uv python install 3.12
+        run: uv python install 3.14
 
       - name: Build package
         run: uv build
@@ -136,7 +136,7 @@ jobs:
         env:
           PYAPP_PROJECT_NAME: docuchango
           PYAPP_EXEC_MODULE: docuchango.cli:main
-          PYAPP_PYTHON_VERSION: "3.12"
+          PYAPP_PYTHON_VERSION: "3.14"
         run: |
           # Strip 'v' prefix from version tag
           VERSION="${{ github.ref_name }}"
