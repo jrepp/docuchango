@@ -923,14 +923,74 @@ class DocValidator:
     # flagged (e.g. '<a href=...>', '<br/>', '<sup>', '<div>').
     _KNOWN_HTML_TAGS = frozenset(
         {
-            "a", "abbr", "address", "article", "aside", "b", "blockquote", "br",
-            "button", "caption", "cite", "code", "col", "colgroup", "dd", "del",
-            "details", "dfn", "div", "dl", "dt", "em", "figcaption", "figure",
-            "footer", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hr", "i",
-            "img", "input", "ins", "kbd", "label", "li", "main", "mark", "nav",
-            "ol", "p", "pre", "q", "s", "samp", "section", "small", "span",
-            "strong", "sub", "summary", "sup", "table", "tbody", "td", "tfoot",
-            "th", "thead", "tr", "u", "ul", "var", "video", "source",
+            "a",
+            "abbr",
+            "address",
+            "article",
+            "aside",
+            "b",
+            "blockquote",
+            "br",
+            "button",
+            "caption",
+            "cite",
+            "code",
+            "col",
+            "colgroup",
+            "dd",
+            "del",
+            "details",
+            "dfn",
+            "div",
+            "dl",
+            "dt",
+            "em",
+            "figcaption",
+            "figure",
+            "footer",
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "h5",
+            "h6",
+            "header",
+            "hr",
+            "i",
+            "img",
+            "input",
+            "ins",
+            "kbd",
+            "label",
+            "li",
+            "main",
+            "mark",
+            "nav",
+            "ol",
+            "p",
+            "pre",
+            "q",
+            "s",
+            "samp",
+            "section",
+            "small",
+            "span",
+            "strong",
+            "sub",
+            "summary",
+            "sup",
+            "table",
+            "tbody",
+            "td",
+            "tfoot",
+            "th",
+            "thead",
+            "tr",
+            "u",
+            "ul",
+            "var",
+            "video",
+            "source",
         }
     )
 
@@ -959,10 +1019,7 @@ class DocValidator:
             return True
 
         # Self-closing tag with valid structure, e.g. '<thing />'.
-        if re.match(r"<[A-Za-z][A-Za-z0-9]*\s*/>", tag_text):
-            return True
-
-        return False
+        return bool(re.match(r"<[A-Za-z][A-Za-z0-9]*\s*/>", tag_text))
 
     @staticmethod
     def _mask_code(content: str) -> list[str]:

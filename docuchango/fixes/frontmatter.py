@@ -417,7 +417,7 @@ def _fix_date_metadata(metadata: dict[str, Any], content: str) -> str | None:
 
     date_value = metadata[date_field]
 
-    if isinstance(date_value, (datetime, date)):
+    if isinstance(date_value, datetime | date):
         raw_lines = content.split("---")[1].strip().splitlines() if "---" in content else []
         raw_value = None
         for line in raw_lines:

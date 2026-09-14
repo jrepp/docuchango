@@ -77,7 +77,7 @@ def _represent_list(dumper: yaml.Dumper, data: list) -> yaml.SequenceNode:  # ty
     Keeps tags: [architecture, design] instead of expanding to block style.
     Falls back to block style for long lists or lists containing complex values.
     """
-    use_flow = len(data) <= 10 and all(isinstance(item, (str, int, float, bool)) for item in data)
+    use_flow = len(data) <= 10 and all(isinstance(item, str | int | float | bool) for item in data)
     return dumper.represent_sequence("tag:yaml.org,2002:seq", data, flow_style=use_flow)
 
 

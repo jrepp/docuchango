@@ -70,7 +70,9 @@ class TestMdxEscapingFalsePositives:
 
     def test_jsx_like_tag_is_flagged(self, tmp_path):
         errors = self._run_mdx_check(tmp_path, "The <agentName> placeholder is used here.")
-        assert any("agentName" in e and "JSX tag" in e for e in errors), f"'<agentName>' should be flagged, got: {errors}"
+        assert any("agentName" in e and "JSX tag" in e for e in errors), (
+            f"'<agentName>' should be flagged, got: {errors}"
+        )
 
     def test_placeholder_lowercase_is_flagged(self, tmp_path):
         errors = self._run_mdx_check(tmp_path, "Send the <token> to the endpoint.")
@@ -291,4 +293,3 @@ class TestLinksEscapingRepo:
         body = "```\n[x](../../../outside/factory.go)\n```"
         errors = self._run(tmp_path, body, repo_root=repo)
         assert not any("points outside the repository" in e for e in errors), errors
-
