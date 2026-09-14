@@ -1,18 +1,20 @@
-name: Publish to PyPI
+name: Publish to PyPI (manual)
 
-# Triggered when:
-# 1. A new release is published on GitHub (creates PyApp binaries + publishes to PyPI)
-# 2. Manual dispatch for testing (can publish to TestPyPI or PyPI)
+# Manual, out-of-band publishing. Normal releases are fully automated by
+# .github/workflows/release.yml (semantic-release on `main` and `next`), which
+# also builds PyApp binaries and signs the distributions. See PUBLISHING.md.
 #
-# To trigger a release:
-# 1. Create and push a new tag: git tag v0.1.0 && git push origin v0.1.0
-# 2. Go to GitHub → Releases → Draft a new release
-# 3. Select the tag, add release notes, and publish
-# 4. This workflow will automatically build binaries and publish to PyPI
+# Use this workflow to:
+# 1. Smoke-test packaging against TestPyPI from any branch
+#    (Actions -> "Publish to PyPI (manual)" -> Run workflow -> environment: testpypi)
+# 2. Re-publish an existing tag to PyPI if the automated publish step failed
+#    (run it against the tag; environment: pypi)
+#
+# Note: a `release: published` trigger does NOT work here. Releases are created
+# by release.yml with GITHUB_TOKEN, and events produced by GITHUB_TOKEN never
+# trigger other workflows.
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       environment:
@@ -58,7 +60,7 @@ jobs:
 
   publish-to-pypi:
     name: Publish to PyPI
-    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'pypi')
+    if: github.event.inputs.environment == 'pypi'
     needs:
       - build
     runs-on: ubuntu-latest
@@ -80,7 +82,7 @@ jobs:
 
   publish-to-testpypi:
     name: Publish to TestPyPI
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'testpypi'
+    if: github.event.inputs.environment == 'testpypi'
     needs:
       - build
     runs-on: ubuntu-latest
@@ -101,106 +103,3 @@ jobs:
         uses: pypa/gh-action-pypi-publish@v1.14.0
         with:
           repository-url: https://test.pypi.org/legacy/
-
-  build-pyapp-binaries:
-    name: Build PyApp binaries
-    if: github.event_name == 'release'
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            artifact_name: docuchango-linux-x86_64
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            artifact_name: docuchango-macos-aarch64
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            artifact_name: docuchango-windows-x86_64.exe
-
-    steps:
-      - uses: actions/checkout@v6.0.2
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - name: Download PyApp
-        run: |
-          git clone --depth 1 --branch v0.29.0 https://github.com/ofek/pyapp.git pyapp-src
-        shell: bash
-
-      - name: Build PyApp binary
-        env:
-          PYAPP_PROJECT_NAME: docuchango
-          PYAPP_EXEC_MODULE: docuchango.cli:main
-          PYAPP_PYTHON_VERSION: "3.14"
-        run: |
-          # Strip 'v' prefix from version tag
-          VERSION="${{ github.ref_name }}"
-          VERSION="${VERSION#v}"
-          export PYAPP_PROJECT_VERSION="$VERSION"
-          cd pyapp-src
-          cargo build --release --target ${{ matrix.target }}
-        shell: bash
-
-      - name: Rename binary
-        run: |
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            mv pyapp-src/target/${{ matrix.target }}/release/pyapp.exe ${{ matrix.artifact_name }}
-          else
-            mv pyapp-src/target/${{ matrix.target }}/release/pyapp ${{ matrix.artifact_name }}
-          fi
-        shell: bash
-
-      - name: Upload binary artifact
-        uses: actions/upload-artifact@v7.0.1
-        with:
-          name: pyapp-binary-${{ matrix.os }}
-          path: ${{ matrix.artifact_name }}
-
-  github-release:
-    name: Create GitHub Release with packages
-    if: github.event_name == 'release'
-    needs:
-      - publish-to-pypi
-      - build-pyapp-binaries
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write  # IMPORTANT: mandatory for making GitHub Releases
-      id-token: write  # IMPORTANT: mandatory for sigstore
-
-    steps:
-      - name: Download all the dists
-        uses: actions/download-artifact@v8.0.1
-        with:
-          name: python-package-distributions
-          path: dist/
-
-      - name: Download PyApp binaries
-        uses: actions/download-artifact@v8.0.1
-        with:
-          pattern: pyapp-binary-*
-          path: binaries/
-          merge-multiple: true
-
-      - name: Sign the dists with Sigstore
-        uses: sigstore/gh-action-sigstore-python@v3.3.0
-        with:
-          inputs: >-
-            ./dist/*.tar.gz
-            ./dist/*.whl
-
-      - name: Upload artifact signatures to GitHub Release
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        # Upload to GitHub Release using the `gh` CLI.
-        # `dist/` contains the built packages, and the
-        # sigstore-produced signatures and certificates.
-        # Use --clobber to replace existing assets
-        run: >-
-          gh release upload
-          '${{ github.ref_name }}' dist/** binaries/* --clobber
-          --repo '${{ github.repository }}'
