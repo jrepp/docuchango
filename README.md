@@ -3,269 +3,186 @@
 [![PyPI version](https://badge.fury.io/py/docuchango.svg)](https://pypi.org/project/docuchango/)
 [![CI](https://github.com/jrepp/docuchango/workflows/CI/badge.svg)](https://github.com/jrepp/docuchango/actions)
 [![codecov](https://codecov.io/gh/jrepp/docuchango/branch/main/graph/badge.svg)](https://codecov.io/gh/jrepp/docuchango)
-[![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14%20%7C%203.15-blue)](https://www.python.org/downloads/)
+[![Python Version](https://img.shields.io/badge/python-3.10%E2%80%933.15-blue)](https://www.python.org/downloads/)
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
-
-[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
-[![Type checked: mypy](https://img.shields.io/badge/type%20checked-mypy-blue.svg)](http://mypy-lang.org/)
-[![Code quality: strict](https://img.shields.io/badge/code%20quality-strict-brightgreen.svg)](pyproject.toml)
-[![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/jrepp/docuchango/graphs/commit-activity)
-[![Development Status](https://img.shields.io/badge/status-beta-orange.svg)](https://github.com/jrepp/docuchango)
 
 ![Docuchango logo](docs-cms/imgs/docuchango.png)
 
-A command-line tool to validate and automatically fix Docusaurus documentation, ensuring frontmatter, links, code blocks, and formatting meet quality standards.
+Docuchango keeps a folder of engineering documents valid. Give it a `docs-cms/`
+directory of ADRs, RFCs, memos and PRDs, and it checks the frontmatter against
+a schema, verifies every link, cleans up the Markdown, and fixes what it can
+without asking. It is built for repositories where humans and coding agents
+write documentation together and need it to stay trustworthy.
 
-## Why Docuchango?
+- **Structured by default.** Every document has an id, a status, tags and a
+  UUID, enforced by Pydantic schemas per document type.
+- **Fixes, not just findings.** Whitespace, code fences, dates, tags and
+  missing fields are repaired in place. What it cannot fix, it reports.
+- **Agent-ready.** Ships a guide that tells coding agents how to read,
+  cite and extend the docs. Point `AGENTS.md` at it and you are done.
+- **Fast and CI-friendly.** A hundred documents validate in under a second,
+  with exit codes that work in pre-commit hooks and pull request checks.
 
-- **Automated fixes** - Don't just find errors, fix them automatically (whitespace, code blocks, frontmatter)
-- **Docusaurus-specific** - Purpose-built for docs-cms projects with ADR, RFC, Memo, and PRD templates
-- **Strict validation** - Enforces consistent frontmatter schemas with Pydantic, catches issues before build time
-- **Fast & CI-ready** - Processes 100+ docs in under a second, perfect for pre-commit hooks and CI pipelines
+## Two-minute start
 
-## Installation
-
-```bash
-# Install from PyPI (latest version)
-pip install docuchango
-
-# Or use uvx to run without installing
-uvx docuchango --help
-
-# Or use the install script (includes uv)
-curl -sSL https://raw.githubusercontent.com/jrepp/docuchango/main/install.sh | bash
-```
-
-## Quick Start
+You need Python 3.10 or newer. With [uv](https://docs.astral.sh/uv/) nothing
+else has to be installed:
 
 ```bash
-# Initialize a new docs-cms project with templates and structure
-docuchango init
+# 1. Create the folder structure, config and templates
+uvx docuchango init --project-id my-app --project-name "My App"
 
-# Validate your documentation and auto-fix issues where possible
-docuchango validate
+# 2. Write your first decision record from the template
+cp docs-cms/templates/adr-000-template.md docs-cms/adr/adr-001-adopt-docs-cms.md
+#    ...edit the frontmatter and body...
 
-# Preview issues without changing files
-docuchango validate --dry-run
+# 3. Check it, then let it repair what it can
+uvx docuchango validate --dry-run
+uvx docuchango validate
 ```
 
-```mermaid
-flowchart LR
-    A[docs-cms/] --> B{docuchango}
-    B -->|validate --dry-run| C[✓ Report issues]
-    B -->|validate| D[✓ Fix what it can]
-    D --> E[Docusaurus]
-    E -->|build| F[📚 Static site]
+Prefer a permanent install? `pip install docuchango` or
+`uv tool install docuchango` gives you the `docuchango` command directly.
 
-    style A fill:#f9f,stroke:#333
-    style B fill:#bbf,stroke:#333
-    style C fill:#bfb,stroke:#333
-    style D fill:#bfb,stroke:#333
-    style E fill:#feb,stroke:#333
-    style F fill:#bfb,stroke:#333
-```
-
-## Usage Examples
-
-### Validation Commands
-
-```bash
-# Run validation with verbose output
-$ docuchango validate --verbose
-
-📂 Scanning documents...
-   Found 23 documents
-
-✓ Validating links...
-   Found 47 total links
-
-❌ DOCUMENTS WITH ERRORS (2):
-   adr/adr-001.md:
-   ✗ Missing field: 'deciders'
-   ✗ Invalid status: 'Draft'
-
-# Validate everything (default)
-docuchango validate
-
-# Skip slow build checks
-docuchango validate --skip-build
-```
-
-### Repair & Bulk Commands
-
-```bash
-# Validate and auto-fix common issues
-docuchango validate
-
-# Preview fixes without changing files
-docuchango validate --dry-run --verbose
-
-# Derive immutable created timestamps from git history
-docuchango bulk timestamps --dry-run
-
-# Bulk update frontmatter fields
-docuchango bulk update --type adr --set status=Accepted --dry-run
-
-# Migrate legacy frontmatter to the current schema
-docuchango migrate --project-id my-project --dry-run
-```
-
-### Mixed-Schema Monorepos
-
-`docs-project.yaml` can map multiple document lanes in one repository with
-different schemas, naming rules, and roots. Generic lanes stay strict by
-default, but you can opt specific folders into plain Markdown when frontmatter
-is not a project goal.
-
-```yaml
-# yaml-language-server: $schema=./docs-project.schema.json
-version: "1"
-docuchango_version: "1.15.0"
-
-structure:
-  docs_roots: [docs]
-  doc_types:
-    adr:
-      schema: adr
-      folders: [adr]
-      filename_pattern: "^(adr)-(\\d{3})-(.+)\\.md$"
-      enforce_filename_pattern: true
-    design-notes:
-      schema: generic
-      folders: [design]
-      filename_pattern: ".+\\.md$"
-      enforce_filename_pattern: false
-      require_frontmatter: false
-```
-
-Parent repositories can also reference configs owned by sub-projects or git
-submodules, avoiding one giant root config:
-
-```yaml
-subprojects:
-  - vendor/service-a
-  - vendor/service-b/docs-project.yaml
-```
-
-Configured paths are contained to the directory that owns each
-`docs-project.yaml` by default. If a docs project lives in `./docs`, its
-`docs_roots`, folders, indexes, and subproject references cannot escape
-`./docs` with `../` paths. Use `subprojects` from a parent config to include
-other docs roots, or set `security.allow_external_paths: true` only for a
-trusted legacy layout that intentionally crosses that boundary.
-
-Generated projects include `docs-project.schema.json` next to
-`docs-project.yaml` for editor validation and prompt-based config authoring.
-The same schema is published at
-`https://jrepp.github.io/docuchango/schemas/docs-project.schema.json`.
-
-### Bootstrap & Guides
-
-```bash
-# View agent integration guides
-docuchango bootstrap --guide agent
-docuchango bootstrap --guide best-practices
-```
-
-### CLI Shortcuts
-
-```bash
-dcc-validate        # Same as docuchango validate
-```
-
-## CMS Folder Structure
+`init` creates this layout:
 
 ```text
 docs-cms/
-├── adr/              # Architecture Decision Records
-│   ├── adr-001-*.md
-│   └── adr-002-*.md
-├── rfcs/             # Request for Comments
-│   └── rfc-001-*.md
-├── memos/            # Technical memos
-│   └── memo-001-*.md
-└── prd/              # Product requirements
-    └── prd-001-*.md
+├── docs-project.yaml         # project config (id, folders, rules)
+├── docs-project.schema.json  # editor validation for the config
+├── README.md
+├── adr/                      # Architecture Decision Records
+├── rfcs/                     # Requests for Comments
+├── memos/                    # Findings, plans, status notes
+├── prd/                      # Product Requirements Documents
+└── templates/                # adr-000, rfc-000, memo-000, prd-000
 ```
 
-### Document Schema (frontmatter)
+A validation run looks like this:
 
-Each document requires structured frontmatter. Here's an example with field descriptions:
+```text
+$ docuchango validate --dry-run
+
+🔍 Validating Documentation
+DRY RUN - No changes will be made
+
+Scanned 12 files
+
+✗ Remaining issues: 2
+  docs-cms/adr/adr-004-event-bus.md
+    • ID mismatch: frontmatter has 'adr-003' but filename suggests 'adr-004'
+    • Line 53: Broken link './adr-002-example.md' - File not found
+
+❌ Validation failed
+```
+
+Run it again without `--dry-run` and the fixable problems disappear. The two
+above need a human, so they stay in the report.
+
+## What a document looks like
+
+Every file is Markdown with a YAML frontmatter block. This is a complete ADR
+header:
 
 ```yaml
 ---
-# Unique identifier matching the filename (e.g., "adr-001", "rfc-042")
-id: "adr-001"
-
-# Human-readable title for the document
-title: "Use Click for CLI Framework"
-
-# Current status - valid values depend on doc type
-# ADR: Proposed, Accepted, Deprecated, Superseded
-# RFC: Draft, In Review, Accepted, Rejected, Implemented
-# Memo: Draft, Published, Archived
-status: Accepted
-
-# ISO 8601 date (YYYY-MM-DD) when the document was created
-date: 2025-01-26
-
-# Who made or approved this decision (ADR-specific field)
-deciders: Engineering Team
-
-# Categorization tags for search and filtering
-tags: ["cli", "framework", "tooling"]
-
-# Project identifier for organizing docs across multiple projects
-project_id: "my-project"
-
-# Auto-generated UUID for tracking and references (generate once, never change)
-doc_uuid: "550e8400-e29b-41d4-a716-446655440000"
+id: adr-001                 # lowercase, matches the filename
+title: Adopt docs-cms
+status: Accepted            # ADR: Proposed, Accepted, Implemented, Deprecated, Superseded
+created: 2026-09-14
+deciders: Platform Team
+tags: [documentation, process]
+project_id: my-app          # from docs-project.yaml
+doc_uuid: 7c9e6679-7425-40de-944b-e07fc1f90ae7   # generate once, never change
 ---
 ```
 
-**Note**: Different document types (ADR, RFC, Memo, PRD) have slightly different required fields. Use `docuchango bootstrap` to see templates for each type.
+Each type adds a field or two:
 
-### Schema Structure
+| Type | Folder | Extra required fields | Status values |
+|------|--------|----------------------|---------------|
+| ADR  | `adr/`   | `deciders` | Proposed, Accepted, Implemented, Deprecated, Superseded |
+| RFC  | `rfcs/`  | `author`   | Draft, Proposed, Accepted, Implemented, Deprecated, Superseded |
+| Memo | `memos/` | `author`   | none required |
+| PRD  | `prd/`   | `author`, `target_release` | Draft, In Review, Approved, In Progress, Completed, Cancelled |
 
-```mermaid
-graph TD
-    A[Document] --> B[Frontmatter]
-    A --> C[Content]
+Generate a UUID with `uuidgen | tr '[:upper:]' '[:lower:]'` or
+`python -c "import uuid; print(uuid.uuid4())"`.
 
-    B --> D[Required Fields]
-    B --> E[Optional Fields]
+## Everyday commands
 
-    D --> F[id: adr-001]
-    D --> G[title: string]
-    D --> H[status: Literal]
-    D --> I[date/created]
-    D --> J[tags: list]
-    D --> K[project_id]
-    D --> L[doc_uuid: UUID]
+| Command | What it does |
+|---------|--------------|
+| `docuchango init` | Create `docs-cms/` with config, schema and templates |
+| `docuchango validate` | Check every document and fix what can be fixed |
+| `docuchango validate --dry-run` | Report only, change nothing |
+| `docuchango validate --verbose` | Show every check, useful in CI logs |
+| `docuchango bulk update --type adr --set status=Accepted` | Change a frontmatter field across many documents |
+| `docuchango bulk timestamps` | Derive `created` dates from git history |
+| `docuchango migrate --project-id my-app` | Upgrade legacy frontmatter to the current schema |
+| `docuchango bootstrap` | Print the setup guide; `--guide agent` prints the agent guide |
 
-    C --> M[Markdown Body]
-    C --> N[Code Blocks]
-    C --> O[Links]
+Every command that changes files accepts `--dry-run`. `dcc-validate` is a
+short alias for `docuchango validate`.
 
-    style A fill:#bbf,stroke:#333
-    style B fill:#feb,stroke:#333
-    style C fill:#bfb,stroke:#333
-    style D fill:#fbb,stroke:#333
+## Working with coding agents
+
+Docuchango treats `docs-cms/` as the project's durable memory. Tell your
+agents the same thing by adding an `AGENTS.md` at the repository root:
+
+```markdown
+# Agent Instructions
+
+Use `docs-cms/` as durable project memory. Read the relevant ADRs, RFCs,
+PRDs and memos before changing architecture, schemas or process.
+
+Record new durable knowledge as a docs-cms document, not as loose notes.
+ADRs for decisions, RFCs for proposals, PRDs for requirements, memos for
+findings. Do not mark an agent-authored decision `Accepted` without explicit
+human approval; use `Proposed` or write a memo.
+
+After editing docs-cms, run `docuchango validate` and report anything it
+could not fix.
 ```
 
-**Templates & Docs:**
-- [ADR Template](templates/adr-template.md) | [RFC Template](templates/rfc-template.md) | [Memo Template](templates/memo-template.md)
-- [Schema Docs](docuchango/schemas.py) | [ADR-001](docs-cms/adr/adr-001-pydantic-schema-validation.md)
+The full agent guide covers searching, citing and proposing documents. Print
+it with `docuchango bootstrap --guide agent`, or read
+[docs/AGENT_GUIDE.md](docs/AGENT_GUIDE.md).
 
-## Features
+## Validate in CI
 
-- **Validates** frontmatter (required fields, valid formats)
-- **Checks links** (internal, relative, broken refs)
-- **Fixes automatically** (whitespace, code blocks, frontmatter, timestamps)
-- **Bulk operations** (set, add, remove, rename frontmatter fields across all docs)
-- **Git-aware** (updates timestamps from commit history)
-- **Fast** (100 docs in < 1s)
-- **CI-ready** (exit codes, clear errors)
+```yaml
+name: Validate docs
+on:
+  pull_request:
+    paths: ['docs-cms/**']
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # git history lets docuchango derive timestamps
+      - uses: astral-sh/setup-uv@v8
+      - run: uvx docuchango validate --dry-run --verbose
+```
+
+Use `--dry-run` in CI so a pull request fails on problems instead of being
+silently rewritten. Run the fixing form locally or in a pre-commit hook.
+
+## Going further
+
+- [Bootstrap guide](docs/BOOTSTRAP_GUIDE.md): step-by-step setup for a new or
+  existing repository, document types, status flows, troubleshooting.
+- [Configuration](docs/CONFIGURATION.md): monorepos, multiple doc roots,
+  mixed schemas, naming standards, index files, readability thresholds.
+- [Validation reference](docs/VALIDATION_REFERENCE.md): everything docuchango
+  detects, what it fixes automatically, and what it leaves to you.
+- [Agent guide](docs/AGENT_GUIDE.md) and
+  [Best practices](docs/BEST_PRACTICES.md): how agents should read, cite and
+  extend a docs-cms.
+- [Templates](templates/) and a complete [example docs-cms](examples/docs-cms/).
+- [Docuchango's own docs-cms](docs-cms/): the decisions behind the tool.
 
 ## Python API
 
@@ -273,203 +190,37 @@ graph TD
 from docuchango.validator import DocValidator
 from docuchango.schemas import ADRFrontmatter
 
-# Validate
 validator = DocValidator(repo_root=".", verbose=True)
 validator.scan_documents()
 validator.check_code_blocks()
 validator.check_formatting()
 
-# Use schemas
 adr = ADRFrontmatter(**frontmatter_data)
 ```
 
 ## Development
 
 ```bash
-# Setup
-uv sync
-pip install -e ".[dev]"
-
-# Test
-pytest                      # Run all tests (628 tests)
-pytest --cov=docuchango     # With coverage report
-pytest -n auto              # Parallel execution
-pytest -v                   # Verbose output
-
-# Test Statistics
-# • 628 passing tests (with textstat installed)
-# • 569 core tests + 59 readability tests
-# • Zero flaky or xfail tests
-# • Full Python 3.10-3.15 compatibility
-# • Comprehensive edge case coverage (frontmatter, links, timestamps, bulk updates)
-
-# Lint
-ruff format .
-ruff check .
-mypy docuchango tests
-actionlint  # Lint GitHub Actions workflows
-
-# Build
+uv sync                      # install with dev dependencies
+uv run pytest                # tests
+uv run pytest --cov=docuchango
+uv run ruff format . && uv run ruff check .
+uv run mypy docuchango tests
+actionlint                   # GitHub Actions workflows
 uv build
 ```
 
-## Documentation
-
-- [Templates](templates/) - Starter files for ADR, RFC, Memo, PRD
-- [ADRs](docs-cms/adr/) - Architecture decisions
-- [RFCs](docs-cms/rfcs/) - Technical proposals
+Releases are automated from conventional commits. See
+[PUBLISHING.md](PUBLISHING.md).
 
 ## Requirements
 
-- Python 3.10+
-- Works on macOS, Linux, Windows
+- Python 3.10 to 3.15
+- macOS, Linux or Windows
 
 ## License
 
-Mozilla Public License Version 2.0 (MPL-2.0) - See [LICENSE](LICENSE) file
-
-This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
-## Glossary: Issues Detected and Fixed
-
-This comprehensive reference lists all documentation issues that docuchango can detect and automatically fix.
-
-### Frontmatter Issues
-
-**Detected:**
-- Missing YAML frontmatter
-- Missing required fields (`id`, `title`, `status`, `date`, `tags`, `project_id`, `doc_uuid`)
-- Invalid field types or formats
-- Invalid status values for document type (e.g., "Draft" instead of "Proposed" for ADRs)
-- Missing document-type-specific fields (e.g., `deciders` for ADRs)
-- Invalid date formats (must be ISO 8601: YYYY-MM-DD)
-- Malformed UUID values
-- ID/filename mismatches (frontmatter `id` doesn't match filename)
-- ID/title mismatches (frontmatter `id` doesn't match title number)
-- Duplicate IDs across documents
-- Duplicate UUIDs across documents
-
-**Auto-Fixed:**
-- ✓ Generates missing frontmatter blocks with sensible defaults
-- ✓ Adds missing required fields (id, title, status, date, tags, project_id, doc_uuid)
-- ✓ Fixes invalid status values (maps common variations to valid values by doc type)
-  - Handles empty strings, special characters, and whitespace
-  - Supports fuzzy matching for common misspellings
-- ✓ Converts invalid date formats to ISO 8601 (YYYY-MM-DD)
-  - Supports multiple input formats (slash, dot, long month names)
-  - Converts datetime objects to ISO 8601 strings
-- ✓ Normalizes tags (converts to arrays, lowercase-with-dashes, removes duplicates, sorts)
-- ✓ Trims whitespace from all string values
-- ✓ Removes empty strings and null values
-- ✓ Updates timestamps from git history (created/updated fields)
-  - Automatically adds missing `created` or `updated` fields
-  - Migrates legacy `date` field to `created`/`updated` pair
-  - Works without `status` field requirement
-- ✓ Handles empty frontmatter blocks (initializes with empty metadata)
-- ✓ Validates operation types with clear error messages
-- ✓ Detects and reports binary files (non-UTF-8 content)
-
-**Requires Manual Fix:**
-- Missing YAML frontmatter (complex cases)
-- Invalid field types or formats
-- Missing document-type-specific fields (e.g., `deciders` for ADRs)
-- Malformed UUID values
-- ID/filename mismatches (frontmatter `id` doesn't match filename)
-- ID/title mismatches (frontmatter `id` doesn't match title number)
-- Duplicate IDs across documents
-- Duplicate UUIDs across documents
-
-### Code Block Issues
-
-**Detected:**
-- Opening code fences without language specification (bare \`\`\`)
-- Closing code fences with language/text (should be bare \`\`\`)
-- Unclosed code blocks (missing closing fence)
-- Missing blank line before opening fence
-- Missing blank line after closing fence
-- Unbalanced code fences
-
-**Auto-Fixed:**
-- ✓ Adds "text" language to bare opening fences
-- ✓ Removes language from closing fences
-- ✓ Adds missing closing fences
-- ✓ Inserts blank lines before/after fences
-
-### Link Issues
-
-**Detected:**
-- Broken internal document links (file not found)
-- Invalid relative paths (`./path` or `../path` pointing to non-existent files)
-- Ambiguous link formats
-- Problematic cross-plugin links (multiple `../` levels)
-- Broken ADR/RFC cross-references
-
-**Auto-Fixed:**
-- ✓ Updates broken internal links to correct paths
-- ✓ Converts problematic cross-plugin links to absolute GitHub URLs
-- ✓ Fixes document link formats
-
-### MDX Compatibility Issues
-
-**Detected:**
-- Unescaped `<` before numbers (e.g., "< 10")
-- Unescaped `>` before numbers (e.g., "> 5")
-- MDX compilation errors
-- JSX syntax incompatibilities
-- Special characters that break MDX parsing
-
-**Auto-Fixed:**
-- ✓ Escapes special MDX characters (`&lt;`, `&gt;`)
-- ✓ Fixes MDX syntax issues
-- ✓ Corrects JSX-incompatible markdown
-
-### Formatting Issues
-
-**Detected:**
-- Trailing whitespace on lines
-- More than 2 consecutive blank lines
-- Inconsistent line endings
-
-**Auto-Fixed:**
-- ✓ Removes trailing whitespace
-- ✓ Normalizes multiple blank lines
-
-### Filename & Naming Issues
-
-**Detected:**
-- Invalid filename patterns (must be: `type-NNN-slug.md`)
-- Uppercase in filenames (deprecated, must be lowercase)
-- Inconsistent ADR/RFC/Memo numbering
-
-**Requires Manual Fix:** Flagged for user intervention
-
-### Build & Compilation Issues
-
-**Detected:**
-- TypeScript compilation errors in Docusaurus config
-- Full Docusaurus build failures
-- MDX compilation failures via @mdx-js/mdx
-- Build warnings
-
-**Requires Manual Fix:** Reported for debugging and manual resolution
-
-### Migration & Import Issues
-
-**Auto-Fixed:**
-- ✓ Proto import syntax issues
-- ✓ Migration syntax corrections
-
----
-
-**Issue Categories:**
-1. **Frontmatter** - Schema validation, required fields, format checking
-2. **Code Blocks** - Fence formatting, language labels, balance
-3. **Links** - Broken links, cross-references, path resolution
-4. **MDX** - Compilation, special character escaping, JSX compatibility
-5. **Formatting** - Whitespace, blank lines
-6. **Identifiers** - IDs, UUIDs, filename consistency
-7. **Build** - TypeScript, Docusaurus compilation
-8. **Migration** - Import syntax, migration corrections
+Mozilla Public License 2.0. See [LICENSE](LICENSE).
 
 ## Links
 
