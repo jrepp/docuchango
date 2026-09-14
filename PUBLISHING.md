@@ -1,23 +1,29 @@
 # Publishing docuchango to PyPI
 
-Releases are fully automated. You do not bump versions, tag, or run `uv build`
-by hand. You write [Conventional Commits](https://www.conventionalcommits.org/)
-and push to a release branch.
+Releases are automated. You do not bump versions, tag, or run `uv build` by
+hand. You write [Conventional Commits](https://www.conventionalcommits.org/),
+merge to `main`, and press one button when you want a stable release.
 
 ## Overview
 
-| Branch | Channel | Example tag | PyPI version | GitHub release |
-|--------|---------|-------------|--------------|----------------|
-| `main` | stable  | `v1.19.0`   | `1.19.0`     | latest         |
-| `next` | release candidate | `v1.19.0-rc.1` | `1.19.0rc1` | pre-release |
+| Trigger | Channel | Example tag | PyPI version | GitHub release |
+|---------|---------|-------------|--------------|----------------|
+| push to `main` | release candidate | `v1.19.0-rc.1` | `1.19.0rc1` | pre-release |
+| Actions → Release → Run workflow | stable | `v1.19.0` | `1.19.0` | latest |
 
-On every push to either branch, `.github/workflows/release.yml`:
+There is one branch. Every merge to `main` that contains a releasable commit
+publishes a release candidate. A stable release is a deliberate manual step
+that re-releases the current rc series under the clean version number.
+
+On every run, `.github/workflows/release.yml`:
 
 1. Runs `python-semantic-release`, which reads the conventional commits since
    the last release, bumps `project.version` in `pyproject.toml`, updates
    `CHANGELOG.md`, commits `chore(release): X.Y.Z`, and tags.
-2. Creates the GitHub release from the changelog section
-   (`--latest` on `main`, `--prerelease` on `next`).
+2. Creates the GitHub release. The notes are the changelog section for the
+   version, followed by GitHub's generated "What's Changed" list of merged PRs.
+   For a stable release the notes roll up every rc section since the previous
+   stable release.
 3. Builds the sdist and wheel with `uv build`, checks them with `twine`, and
    publishes to PyPI with **trusted publishing** (OIDC, no tokens).
 4. Builds PyApp binaries for Linux, macOS (arm64) and Windows.
@@ -33,21 +39,19 @@ Version bumps follow `pyproject.toml` `[tool.semantic_release]`:
 - `fix:`, `perf:` → patch
 - `BREAKING CHANGE:` footer or `!` → major
 
-## Stable releases (`main`)
+## Release candidates (every merge to `main`)
 
-Merge a PR to `main`. That is the whole process. Watch the
+Merge a PR to `main`. If it contains a `feat:`, `fix:` or `perf:` commit, the
 [Release workflow](https://github.com/jrepp/docuchango/actions/workflows/release.yml)
-and verify:
+publishes the next rc: `v1.19.0-rc.1`, `v1.19.0-rc.2`, and so on. After a
+stable release the series restarts from the new base, so a `fix:` after
+`v1.19.0` produces `v1.19.1-rc.1`.
 
-```bash
-uv tool run --from docuchango docuchango --version
-gh release view v1.19.0 --json assets --jq '.assets[].name'
-```
+### Landing a PR without publishing anything
 
-## Release candidates (`next`)
-
-Use the `next` branch to ship a pre-release that downstream projects can test
-before it becomes a stable release.
+Use a non-releasing commit type: `docs`, `chore`, `ci`, `refactor`, `test`,
+`build`, `style`. Semantic-release ignores them and no version is cut. The
+changes still ship with the next rc that a `feat:` or `fix:` triggers.
 
 ### Why real PyPI and not TestPyPI
 
@@ -57,20 +61,6 @@ invisible to every existing `docuchango>=X` pin and to unpinned `uvx --from
 docuchango` invocations. Consumers get a real installable wheel from the real
 index with real dependency resolution. TestPyPI needs `--extra-index-url`
 tricks and cannot be expressed cleanly in a `uv.lock`.
-
-### Cutting an rc
-
-```bash
-# Start (or refresh) next from main
-git checkout main && git pull
-git checkout -B next main
-# Merge or cherry-pick the work you want to test
-git merge --no-ff feature/my-change
-git push origin next
-```
-
-Every push to `next` that contains a `feat:`/`fix:` since the last stable
-release produces the next rc: `v1.19.0-rc.1`, `v1.19.0-rc.2`, and so on.
 
 ### Testing an rc downstream
 
@@ -93,19 +83,39 @@ pip install --pre "docuchango>=1.19.0rc1"
 Put this in a non-blocking CI job in the downstream repo so it reports without
 gating merges.
 
-### Promoting an rc to stable
+## Stable releases (promote)
 
-Merge `next` into `main` (a PR is fine). Semantic-release on `main` computes
-the stable version from the same commits (`1.19.0`), ignoring the rc tags and
-the `chore(release)` commits. Then fast-forward `next` so it does not drift:
+When the current rc is good:
+
+1. Open [Actions → Release](https://github.com/jrepp/docuchango/actions/workflows/release.yml).
+2. **Run workflow**, branch `main`, leave **Promote to stable** ticked, run.
+
+Or from the CLI:
 
 ```bash
-git checkout next && git merge --ff-only main && git push origin next
+gh workflow run release.yml --ref main -f promote=true
+gh run watch
 ```
 
-If `next` has diverged and cannot fast-forward, reset it: `git checkout -B next
-main && git push --force-with-lease origin next`. Nothing on `next` is
-precious; it is a staging branch.
+The same commits are released as `v1.19.0`, marked **latest** on GitHub, and
+published to PyPI as `1.19.0`. Running promote when nothing new has landed
+since the last stable release is a no-op.
+
+Verify:
+
+```bash
+uv tool run --from docuchango docuchango --version
+gh release view v1.19.0 --json assets --jq '.assets[].name'
+```
+
+### How promote works
+
+Semantic-release chooses the channel by the name of the branch it runs on.
+`pyproject.toml` maps `main` to the rc channel and a branch named `stable` to
+the full-release channel. The promote run checks out `main`'s HEAD under the
+local name `stable`, runs semantic-release there, and pushes the resulting
+release commit and tag back to `main`. No `stable` branch exists on the
+remote.
 
 ## One-time setup
 
@@ -127,9 +137,8 @@ environment `testpypi`.
 
 Settings → Environments:
 
-- `pypi`: used by `release.yml` on `main` and `next`, and by `publish.yml`
-  manual dispatch. Do **not** restrict deployment branches to `main` only, or
-  `next` releases will fail to publish. Restricting to `main` and `next` is
+- `pypi`: used by `release.yml` on `main` (push and manual dispatch) and by
+  `publish.yml` manual dispatch. Restricting deployment branches to `main` is
   fine.
 - `testpypi`: unrestricted, used only by manual dispatch.
 
@@ -164,9 +173,24 @@ unzip -l dist/docuchango-*.whl   # docs/, templates/, examples/ must be present
 `feat`/`fix`/`perf`/breaking type. Check `git log $(git describe --tags
 --abbrev=0)..HEAD --oneline`.
 
-**`branch 'x' isn't in any release groups`.** Only `main` and `next` are
-configured in `[tool.semantic_release.branches.*]`. Do not point the release
-workflow at other branches.
+**`No release will be made, X.Y.Z has already been released!` but there is no
+such release.** A tag for that version exists on a commit that is not on
+`main`. This happened in May 2026 when two merges landed seconds apart: the
+first run's tag was pushed but its branch push was rejected, and every run
+afterwards refused to release. Find it with
+`git ls-remote --tags origin | grep vX.Y.Z`, confirm nothing was published
+(`gh release view vX.Y.Z`, PyPI), and delete the tag:
+`git push origin --delete refs/tags/vX.Y.Z`. The release push is now
+`--atomic`, so a rejected push no longer leaves a tag behind.
+
+**`branch 'x' isn't in any release groups`.** Only `main` (rc) and the local
+promote name `stable` are configured in `[tool.semantic_release.branches.*]`.
+Do not point the release workflow at other branches.
+
+**`InvalidDistribution: '2.5' is not a valid metadata version`.** The
+`pypa/gh-action-pypi-publish` version in use bundles a `twine` older than
+7.0.0, which cannot upload wheels built by current `hatchling`. Bump the
+action; PyPI itself accepts metadata 2.5.
 
 **Trusted publishing rejected.** The publisher on PyPI must name the workflow
 file that ran (`release.yml` or `publish.yml`) and the environment (`pypi`).
@@ -189,7 +213,8 @@ uv tool run sigstore verify github \
   docuchango-1.19.0-py3-none-any.whl
 ```
 
-For an rc, the identity ends in `@refs/heads/next`.
+Both rc and stable releases run on `main`, so the identity is the same for
+either.
 
 ## References
 

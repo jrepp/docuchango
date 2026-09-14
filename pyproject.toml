@@ -257,18 +257,23 @@ upload_to_vcs_release = true
 build_command = "uv build"
 commit_message = "chore(release): {version}"
 
+# Release channels. semantic-release picks the channel by the name of the
+# branch it runs on.
+#
+#   main   -> every releasable merge publishes a PEP 440 pre-release
+#             (v1.19.0-rc.1 -> PyPI 1.19.0rc1). Resolvers ignore pre-releases
+#             unless a consumer opts in, so existing pins are unaffected.
+#   stable -> not a real branch. The "Promote to stable" run of release.yml
+#             checks out main's HEAD under this name so the same commits are
+#             released as v1.19.0. See PUBLISHING.md.
 [tool.semantic_release.branches.main]
 match = "^main$"
-prerelease = false
-
-# Release-candidate channel. Pushes to `next` publish PEP 440 pre-releases
-# (e.g. 1.19.0rc1) to PyPI. Resolvers ignore pre-releases unless a consumer
-# opts in (`--prerelease=allow`, `--pre`, or an explicit `>=1.19.0rc1` pin),
-# so existing downstream pins are unaffected. See PUBLISHING.md.
-[tool.semantic_release.branches.next]
-match = "^next$"
 prerelease = true
 prerelease_token = "rc"
+
+[tool.semantic_release.branches.stable]
+match = "^stable$"
+prerelease = false
 
 [tool.semantic_release.changelog]
 exclude_commit_patterns = [
