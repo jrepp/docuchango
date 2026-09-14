@@ -258,8 +258,17 @@ build_command = "uv build"
 commit_message = "chore(release): {version}"
 
 [tool.semantic_release.branches.main]
-match = "main"
+match = "^main$"
 prerelease = false
+
+# Release-candidate channel. Pushes to `next` publish PEP 440 pre-releases
+# (e.g. 1.19.0rc1) to PyPI. Resolvers ignore pre-releases unless a consumer
+# opts in (`--prerelease=allow`, `--pre`, or an explicit `>=1.19.0rc1` pin),
+# so existing downstream pins are unaffected. See PUBLISHING.md.
+[tool.semantic_release.branches.next]
+match = "^next$"
+prerelease = true
+prerelease_token = "rc"
 
 [tool.semantic_release.changelog]
 exclude_commit_patterns = [

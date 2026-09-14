@@ -431,16 +431,22 @@ References: RFC-018, ADR-015
 
 #### Semantic Release Workflow
 
-When commits are pushed to `main`:
+When commits are pushed to `main` (stable) or `next` (release candidate):
 
 1. **Analysis**: `python-semantic-release` analyzes all commits since last release
 2. **Version Bump**: Determines next version based on commit types:
    - `feat:` → MINOR bump (0.1.0 → 0.2.0)
    - `fix:` or `perf:` → PATCH bump (0.1.0 → 0.1.1)
    - `BREAKING CHANGE` → MAJOR bump (0.1.0 → 1.0.0)
+   - On `next` the same bump is published as a pre-release: `0.2.0rc1`, `0.2.0rc2`, ...
 3. **Changelog**: Automatically generates `CHANGELOG.md` from commit messages
-4. **Release**: Creates GitHub release with generated notes
-5. **Publish**: Triggers PyPI publication and binary builds
+4. **Release**: Creates GitHub release with generated notes (`--prerelease` on `next`)
+5. **Publish**: Publishes to PyPI via trusted publishing, builds PyApp binaries, signs with Sigstore
+
+Release candidates on `next` let downstream projects test a change before it
+lands on `main`. Resolvers ignore pre-releases unless the consumer opts in, so
+an rc never reaches existing `docuchango>=X` pins. See `PUBLISHING.md` for
+how to cut, test, and promote an rc.
 
 **Important for agents:**
 - Use `feat:` for new features (even documentation of new features)
