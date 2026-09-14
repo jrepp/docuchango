@@ -293,3 +293,116 @@ class TestLinksEscapingRepo:
         body = "```\n[x](../../../outside/factory.go)\n```"
         errors = self._run(tmp_path, body, repo_root=repo)
         assert not any("points outside the repository" in e for e in errors), errors
+
+    def test_deep_traversal_escaping_repo_is_flagged(self, tmp_path):
+        # Parent traversal that appears later in the path still escapes the repo.
+        repo = tmp_path / "myrepo"
+        errors = self._run(tmp_path, "See [x](sub/../../../../outside/secret.md).", repo_root=repo)
+        assert any("points outside the repository" in e for e in errors), errors
+
+    def test_multiline_link_escaping_repo_is_flagged(self, tmp_path):
+        # A Markdown link whose label/target wrap across a newline is detected.
+        repo = tmp_path / "myrepo"
+        body = "See [long label\ntext](../../../outside/secret.md) here."
+        errors = self._run(tmp_path, body, repo_root=repo)
+        assert any("points outside the repository" in e for e in errors), errors
+
+
+class TestReviewNuances:
+    """Regression tests for PR review follow-ups."""
+
+    def _mdx_errors(self, tmp_path: Path, body: str, title: str = "Example ADR Title"):
+        adr = tmp_path / "docs-cms" / "adr" / "adr-001-example.md"
+        _write(adr, ADR_FRONTMATTER.format(title=title, doc_id="adr-001", body=body))
+        v = DocValidator(repo_root=tmp_path, verbose=False)
+        v.scan_documents()
+        v.check_mdx_compatibility()
+        errors: list[str] = []
+        for doc in v.documents:
+            errors.extend(doc.errors)
+        return errors
+
+    # --- filename scanning: nested file that MATCHES the pattern ---
+    def test_nested_file_matching_pattern_is_skipped(self, tmp_path):
+        top = tmp_path / "docs-cms" / "prd" / "prd-001-example.md"
+        _write(
+            top,
+            "---\ntitle: Example PRD Title\nstatus: Draft\nauthor: Team\ncreated: 2025-01-01\n"
+            "tags: [t]\nid: prd-001\nproject_id: test-project\n"
+            "doc_uuid: 8b063564-82a5-4a21-943f-e868388d36b9\ntarget_release: v1\n---\n\nBody.\n",
+        )
+        # Nested file whose NAME matches prd-NNN but has no valid frontmatter.
+        nested = tmp_path / "docs-cms" / "prd" / "testing" / "prd-002-sample.md"
+        _write(nested, "# just a sample\n\nno frontmatter\n")
+
+        v = DocValidator(repo_root=tmp_path, verbose=False)
+        v.scan_documents()
+        scanned = {d.file_path.name for d in v.documents}
+        assert "prd-002-sample.md" not in scanned, "nested pattern-matching file must still be skipped"
+        assert not any("prd-002" in e for e in v.errors), v.errors
+
+    # --- fence delimiter tracking ---
+    def test_nested_triple_fence_inside_quad_fence_is_masked(self, tmp_path):
+        body = "````markdown\n```\n<token> example\n```\n````\n"
+        errors = self._mdx_errors(tmp_path, body)
+        assert errors == [], f"content inside a ```` block must stay masked, got: {errors}"
+
+    def test_tilde_and_backtick_fences_do_not_cross_close(self, tmp_path):
+        body = "~~~\n<token>\n```\nstill inside\n~~~\n"
+        errors = self._mdx_errors(tmp_path, body)
+        assert errors == [], f"a ``` must not close a ~~~ block, got: {errors}"
+
+    # --- expanded HTML allowlist ---
+    def test_extended_html_tags_not_flagged(self, tmp_path):
+        body = "Uses <time>, <form>, <select>, <textarea>, <canvas>, <svg>, <iframe>, <meta>, <link>, <audio>."
+        errors = self._mdx_errors(tmp_path, body)
+        assert errors == [], f"extended HTML tags should be safe, got: {errors}"
+
+    # --- frontmatter masking ---
+    def test_frontmatter_title_with_tag_not_flagged(self, tmp_path):
+        # A '<token>' in the frontmatter title must not be flagged as MDX prose.
+        errors = self._mdx_errors(tmp_path, "Body text.", title="Handling <token> in Requests")
+        assert errors == [], f"frontmatter should be masked, got: {errors}"
+
+    # --- single-char and underscore placeholders ---
+    def test_single_char_placeholder_is_flagged(self, tmp_path):
+        errors = self._mdx_errors(tmp_path, "Replace <x> with a value.")
+        assert any("<x>" in e for e in errors), errors
+
+    def test_underscore_placeholder_is_flagged(self, tmp_path):
+        errors = self._mdx_errors(tmp_path, "Send the <api_key> value.")
+        assert any("api_key" in e for e in errors), errors
+
+    # --- improved guidance message ---
+    def test_message_shows_backtick_and_entity_guidance(self, tmp_path):
+        errors = self._mdx_errors(tmp_path, "The <token> value.")
+        assert any("`<token>`" in e and "&lt;token&gt;" in e for e in errors), errors
+
+    # --- link classification: bare suffixless / directory links resolve ---
+    def test_bare_suffixless_link_resolves(self, tmp_path):
+        src = tmp_path / "docs-cms" / "adr" / "adr-001-example.md"
+        _write(src, ADR_FRONTMATTER.format(title="Example ADR Title", doc_id="adr-001", body="See [x](other-doc)."))
+        _write(tmp_path / "docs-cms" / "adr" / "other-doc.md", "stub")
+        v = DocValidator(repo_root=tmp_path, verbose=False)
+        v.scan_documents()
+        v.extract_links()
+        v.validate_links()
+        assert not any(link.link_type == LinkType.UNKNOWN for link in v.all_links), [
+            link.target for link in v.all_links if link.link_type == LinkType.UNKNOWN
+        ]
+        assert all(link.is_valid for link in v.all_links), [str(link) for link in v.all_links if not link.is_valid]
+
+    def test_bare_directory_link_resolves(self, tmp_path):
+        src = tmp_path / "docs-cms" / "rfcs" / "rfc-001-example.md"
+        _write(
+            src,
+            "---\ntitle: Example RFC Title\nstatus: Draft\nauthor: Team\ncreated: 2025-01-01\n"
+            "tags: [t]\nid: rfc-001\nproject_id: test-project\n"
+            "doc_uuid: 8b063564-82a5-4a21-943f-e868388d36b9\n---\n\nSee [all](../adr/).\n",
+        )
+        _write(tmp_path / "docs-cms" / "adr" / "adr-001-x.md", "stub")
+        v = DocValidator(repo_root=tmp_path, verbose=False)
+        v.scan_documents()
+        v.extract_links()
+        v.validate_links()
+        assert all(link.is_valid for link in v.all_links), [str(link) for link in v.all_links if not link.is_valid]
