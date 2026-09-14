@@ -1,7 +1,8 @@
 name: Publish to PyPI (manual)
 
 # Manual, out-of-band publishing. Normal releases are fully automated by
-# .github/workflows/release.yml (semantic-release on `main` and `next`), which
+# .github/workflows/release.yml (semantic-release on `main`, promoted to stable
+# by manual dispatch), which
 # also builds PyApp binaries and signs the distributions. See PUBLISHING.md.
 #
 # Use this workflow to:
@@ -78,7 +79,7 @@ jobs:
           path: dist/
 
       - name: Publish distribution to PyPI
-        uses: pypa/gh-action-pypi-publish@v1.14.0
+        uses: pypa/gh-action-pypi-publish@v1.14.2
 
   publish-to-testpypi:
     name: Publish to TestPyPI
@@ -100,6 +101,6 @@ jobs:
           path: dist/
 
       - name: Publish distribution to TestPyPI
-        uses: pypa/gh-action-pypi-publish@v1.14.0
+        uses: pypa/gh-action-pypi-publish@v1.14.2
         with:
           repository-url: https://test.pypi.org/legacy/
