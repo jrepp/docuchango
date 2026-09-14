@@ -2,6 +2,49 @@
 
 <!-- version list -->
 
+## v1.19.0-rc.1 (2026-09-14)
+
+### Bug Fixes
+
+- Preserve static asset link extensions
+  ([`362c7ec`](https://github.com/jrepp/docuchango/commit/362c7ec4c543731ea913d8ee35d97e598bb8298e))
+
+### Continuous Integration
+
+- Add Python 3.15 support
+  ([`4fe7fe7`](https://github.com/jrepp/docuchango/commit/4fe7fe7170ee13e21cd306e91169201cdb32e992))
+
+- Add rc release channel and restore release assets
+  ([`d74a07e`](https://github.com/jrepp/docuchango/commit/d74a07e4044976864a3ed003eaaaf841af51d1c1))
+
+- Make main the rc channel and promote to stable by dispatch
+  ([`56ea487`](https://github.com/jrepp/docuchango/commit/56ea4870c6dbba8a1ea8f14ec0666f07ae295ed1))
+
+### Documentation
+
+- Add docuchango docs-cms content
+  ([`fe07fff`](https://github.com/jrepp/docuchango/commit/fe07ffffd9a8cc2a657c31027f250d8b0eea875e))
+
+### Features
+
+- Contain docs project config paths
+  ([`1d59938`](https://github.com/jrepp/docuchango/commit/1d5993865a9c09a36ad6db05124512e58f1a9e5e))
+
+- Publish indexed static asset site
+  ([`e9d32b0`](https://github.com/jrepp/docuchango/commit/e9d32b0f4d07485f33bab9c1bc4ea3c775845be3))
+
+### Testing
+
+- Cover local link target edge cases
+  ([`918abf2`](https://github.com/jrepp/docuchango/commit/918abf2d4794ffbcb8ea46b8971d67935faee0e2))
+
+- Cover quality pass edge cases
+  ([`b140b4a`](https://github.com/jrepp/docuchango/commit/b140b4aa4e431d7af2ba1e1df3b1de6f0228255e))
+
+- Enable readability paragraph extraction coverage
+  ([`6efc857`](https://github.com/jrepp/docuchango/commit/6efc857ea405eadb8cff3d300313457b82ef9a26))
+
+
 ## v1.18.1 (2026-05-27)
 
 ### Chores
