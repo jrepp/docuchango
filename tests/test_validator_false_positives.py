@@ -352,6 +352,41 @@ class TestReviewNuances:
         errors = self._mdx_errors(tmp_path, body)
         assert errors == [], f"a ``` must not close a ~~~ block, got: {errors}"
 
+    def test_info_string_fence_does_not_close_block(self, tmp_path):
+        # A '```go' line carries an info string and can only OPEN a block, never
+        # close one - so a placeholder after it stays masked.
+        body = "```\n<token>\n```go\nstill inside <secret>\n```\n"
+        errors = self._mdx_errors(tmp_path, body)
+        assert errors == [], f"'```go' must not close a block, got: {errors}"
+
+    def test_opening_info_string_fence_masks_content(self, tmp_path):
+        # A normal '```go' fenced block masks its contents.
+        body = "```go\nvar x = <token>\n```\n"
+        errors = self._mdx_errors(tmp_path, body)
+        assert errors == [], f"content in a ```go block should be masked, got: {errors}"
+
+    # --- self-closing tags with attributes ---
+    def test_self_closing_lowercase_tag_with_attributes_not_flagged(self, tmp_path):
+        errors = self._mdx_errors(tmp_path, 'Render <widget role="img" data-x="1" /> here.')
+        assert errors == [], f"self-closing tag with attributes should be safe, got: {errors}"
+
+    # --- amendment id conversion is ADR-only ---
+    def test_amendment_conversion_is_adr_only(self, tmp_path):
+        # An RFC amendment-style filename must NOT get an '-aNN' expected id,
+        # since that convention is ADR-only.
+        rfc = tmp_path / "docs-cms" / "rfcs" / "rfc-043-amendment-01-followup.md"
+        _write(
+            rfc,
+            "---\ntitle: RFC 043 Amendment Follow-up\nstatus: Draft\nauthor: Team\ncreated: 2025-01-01\n"
+            "tags: [t]\nid: rfc-043\nproject_id: test-project\n"
+            "doc_uuid: 8b063564-82a5-4a21-943f-e868388d36b9\n---\n\nBody.\n",
+        )
+        v = DocValidator(repo_root=tmp_path, verbose=False)
+        v.scan_documents()
+        for doc in v.documents:
+            if doc.file_path.name == "rfc-043-amendment-01-followup.md":
+                assert doc.expected_id == "rfc-043", doc.expected_id
+
     # --- expanded HTML allowlist ---
     def test_extended_html_tags_not_flagged(self, tmp_path):
         body = "Uses <time>, <form>, <select>, <textarea>, <canvas>, <svg>, <iframe>, <meta>, <link>, <audio>."

@@ -482,14 +482,15 @@ class DocValidator:
                 if isinstance(prefix, str) and isinstance(num, str) and prefix.lower() == doc_type and num.isdigit():
                     expected_id = f"{doc_type}-{num}"
                     # Amendment files (e.g. 'adr-043-amendment-01-...md') use the
-                    # amendment id form 'adr-043-a1'. Detect the amendment marker
-                    # in the remaining filename and adjust the expected id so the
-                    # ID check does not report a false mismatch.
-                    rest = match.groups()[2] if len(match.groups()) >= 3 else ""
-                    if isinstance(rest, str):
-                        amendment_match = re.match(r"amendment-0*(\d+)\b", rest)
-                        if amendment_match:
-                            expected_id = f"{doc_type}-{num}-a{amendment_match.group(1)}"
+                    # amendment id form 'adr-043-a1'. This '-aNN' convention is
+                    # ADR-only, so the conversion is restricted to ADRs to avoid
+                    # inventing false expected ids for other doc types.
+                    if doc_type == "adr":
+                        rest = match.groups()[2] if len(match.groups()) >= 3 else ""
+                        if isinstance(rest, str):
+                            amendment_match = re.match(r"amendment-0*(\d+)\b", rest)
+                            if amendment_match:
+                                expected_id = f"{doc_type}-{num}-a{amendment_match.group(1)}"
 
             doc = self._parse_document(
                 md_file, doc_type, require_frontmatter=require_frontmatter, expected_id=expected_id
@@ -1077,8 +1078,10 @@ class DocValidator:
         if name[0].isupper():
             return True
 
-        # Self-closing tag with valid structure, e.g. '<thing />'.
-        return bool(re.match(r"<[A-Za-z][A-Za-z0-9_]*\s*/>", tag_text))
+        # Self-closing tag with valid structure, with or without attributes,
+        # e.g. '<thing />' or '<widget role="img" />'. Any explicitly
+        # self-closed tag is safe MDX regardless of the element name.
+        return bool(re.match(r"<[A-Za-z][A-Za-z0-9_]*(\s[^<>]*)?/>", tag_text))
 
     @staticmethod
     def _mask_code(content: str, strip_frontmatter: bool = False) -> list[str]:
@@ -1114,28 +1117,37 @@ class DocValidator:
                 i += 1
             start = i
 
-        fence_re = re.compile(r"^(\s*)(`{3,}|~{3,})")
+        fence_re = re.compile(r"^(\s*)(`{3,}|~{3,})(.*)$")
         fence_char: str | None = None
         fence_len = 0
         for line in lines[start:]:
             m = fence_re.match(line)
             if m:
                 marker = m.group(2)
+                rest = m.group(3)
                 char = marker[0]
                 length = len(marker)
                 if fence_char is None:
-                    # Opening fence.
+                    # Opening fence. May carry an info string (e.g. ```go).
+                    # Backtick fences may not contain a backtick in the info
+                    # string; if they do, this is not a valid opening fence.
+                    if char == "`" and "`" in rest:
+                        out.append(line)
+                        continue
                     fence_char = char
                     fence_len = length
                     out.append("")
                     continue
-                if char == fence_char and length >= fence_len:
-                    # Matching closing fence.
+                # A closing fence must use the same character, be at least as
+                # long, and (per CommonMark) carry no info string - only
+                # trailing whitespace is allowed.
+                if char == fence_char and length >= fence_len and rest.strip() == "":
                     fence_char = None
                     fence_len = 0
                     out.append("")
                     continue
-                # A different/shorter fence inside a block is just content.
+                # Anything else inside a block (a shorter/other fence, or a
+                # fence with an info string like ```go) is just content.
                 out.append("")
                 continue
             if fence_char is not None:
