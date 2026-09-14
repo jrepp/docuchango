@@ -399,7 +399,11 @@ class ADRFrontmatter(BaseModel):
     )
     status: Literal["Proposed", "Accepted", "Rejected", "Implemented", "Deprecated", "Superseded"] = Field(
         ...,
-        description="Decision status. Use 'Proposed' for drafts, 'Accepted' for approved, 'Rejected' for declined, 'Implemented' for completed",
+        description=(
+            "Decision status. One of: Proposed (draft), Accepted (approved), "
+            "Rejected (declined), Implemented (completed), Deprecated (no longer "
+            "recommended), Superseded (replaced by another ADR)"
+        ),
     )
     created: datetime.datetime | datetime.date | str = Field(
         ...,
@@ -489,7 +493,12 @@ class RFCFrontmatter(BaseModel):
         description="RFC title without prefix (e.g., 'Plugin Architecture'). The ID prefix is in the 'id' field and displayed by sidebar.",
     )
     status: Literal["Draft", "Proposed", "Accepted", "Rejected", "Implemented", "Deprecated", "Superseded"] = Field(
-        ..., description="RFC status. Use 'Draft' for work-in-progress, 'Proposed' for review, 'Accepted' for approved"
+        ...,
+        description=(
+            "RFC status. One of: Draft (work-in-progress), Proposed (ready for review), "
+            "Accepted (approved), Rejected (declined), Implemented (completed), "
+            "Deprecated (no longer recommended), Superseded (replaced by another RFC)"
+        ),
     )
     author: str = Field(
         ..., description="RFC author. Use person name or team name (e.g., 'Platform Team', 'John Smith')"

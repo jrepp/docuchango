@@ -4,7 +4,7 @@ id: "adr-NNN-aNN"  # Amendment format: "adr-NNN-aNN" where NNN is the parent ADR
                    # and NN is the amendment sequence (e.g., "adr-026-a1", "adr-026-a2")
 slug: adr-NNN-amendment-NN-brief-description  # URL-friendly slug (lowercase-with-dashes)
 title: "ADR-NNN Amendment NN: Brief Title"  # (e.g., "ADR-026 Amendment 01: Raise Table Cap to 8")
-status: Proposed  # Valid values: Proposed, Accepted, Deprecated, Superseded, Implemented
+status: Proposed  # Valid values: Proposed, Accepted, Rejected, Implemented, Deprecated, Superseded
 created: YYYY-MM-DD  # ISO 8601 format - date amendment was first created, DO NOT CHANGE after initial creation
                      # Generate: date +%Y-%m-%d  OR  python -c "from datetime import date; print(date.today())"
 author: Your Name  # Person or team who wrote this amendment

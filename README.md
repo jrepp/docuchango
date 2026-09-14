@@ -201,8 +201,8 @@ id: "adr-001"
 title: "Use Click for CLI Framework"
 
 # Current status - valid values depend on doc type
-# ADR: Proposed, Accepted, Deprecated, Superseded
-# RFC: Draft, In Review, Accepted, Rejected, Implemented
+# ADR: Proposed, Accepted, Rejected, Implemented, Deprecated, Superseded
+# RFC: Draft, Proposed, Accepted, Rejected, Implemented, Deprecated, Superseded
 # Memo: Draft, Published, Archived
 status: Accepted
 
