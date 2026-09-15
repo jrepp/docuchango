@@ -14,7 +14,9 @@ document types. This page covers everything beyond that.
 ```yaml
 # yaml-language-server: $schema=./docs-project.schema.json
 version: "1"
-docuchango_version: "1.19.0"
+docuchango_version: "1.19.0"  # written automatically by 'docuchango init';
+                               # it records the version that generated this
+                               # file, not one you need to match by hand
 
 project:
   id: my-app
@@ -33,15 +35,18 @@ structure:
 `project.id` is the value to copy into each document's `project_id` field.
 The match is a convention: `project_id` is required on every document, but
 docuchango never compares it against `project.id`. `document_folders` lists
-the folders that are scanned; anything outside them is ignored.
+the typed folders (ADR, RFC, memo, PRD) that are scanned; it is not the whole
+story, though - a top-level `*.md` file directly under a configured docs root
+(anything other than `README.md` or `docs-project.yaml`) is still scanned as
+a generic document, whether or not its folder is listed.
 
 ## Several documentation roots
 
 A monorepo can keep documents in more than one place. `docs_roots` lists the
-directories to scan, relative to the config file. It only takes effect
-takes effect for the standard document folders only together with `doc_types`
-below: with the plain `adr_dir`/`rfc_dir`/`memo_dir`/`prd_dir` layout, those
-folders resolve against the config's own directory, and `docs_roots` is ignored.
+directories to scan, relative to the config file. It only takes effect for
+the standard document folders together with `doc_types` below: with the
+plain `adr_dir`/`rfc_dir`/`memo_dir`/`prd_dir` layout, those folders resolve
+against the config's own directory, and `docs_roots` is ignored.
 
 ```yaml
 structure:
@@ -74,7 +79,9 @@ subprojects:
 ```
 
 Each sub-project is validated with its own config, its own `project.id`, and
-its own rules.
+its own document structure and index rules. Readability is the one exception:
+it is currently read from the top-level config only, so a sub-project's own
+`readability` block has no effect.
 
 ## Path containment
 
@@ -121,11 +128,11 @@ structure:
 
 | Key | Meaning |
 |-----|---------|
-| `schema` | `adr`, `rfc`, `memo`, `prd`, or `generic`. Generic requires only the common fields. |
+| `schema` | `adr`, `rfc`, `memo`, `prd`, or `generic`. `generic` requires only `title`, `project_id` and `doc_uuid`; `id` and `tags` are optional and there is no `created` or `status`. |
 | `folders` | Folders (relative to each docs root) holding this type. |
 | `filename_pattern` | Regex a filename must match. |
 | `enforce_filename_pattern` | Report a mismatch as an error (`true`) or ignore it (`false`). |
-| `require_frontmatter` | Set `false` to allow plain Markdown files with no frontmatter block. |
+| `require_frontmatter` | Set `false` to allow plain Markdown files with no frontmatter block - but only for `schema: generic`. An `adr`, `rfc`, `memo` or `prd` lane still reports a missing block regardless of this setting. |
 | `naming_standard` | A named filename rule instead of `filename_pattern`; see below. |
 
 ## Naming standards
@@ -176,7 +183,11 @@ structure:
 An index is a Markdown file that is supposed to link to a set of other files,
 such as a design index or release notes. Index rules are stricter than normal
 validation: targets can be required, extra links forbidden, and entries can be
-required under time-bucket headings.
+required under time-bucket headings. `path` and `targets` are resolved
+relative to the `docs-project.yaml` that declares them - typically
+`docs-cms/`, so with the layout used throughout this page these examples
+would live under `docs-cms/docs/...`; adjust the paths (for example
+`design/**/*.md`) to match whatever you are actually indexing.
 
 ```yaml
 indexes:
@@ -185,7 +196,9 @@ indexes:
     targets:
       - docs/design/**/*.md
     require_all_targets: true    # every target must be linked
-    require_entries: true        # the index cannot be empty
+    require_entries: true        # requires at least one link, but only once
+                                  # a target actually matches something - an
+                                  # empty target glob is not an error
     allow_extra_links: true      # links to non-targets are fine
 
   - name: Weekly Release Notes
@@ -210,9 +223,11 @@ indexes:
 
 ## Readability
 
-When the optional `textstat` dependency is installed, paragraphs longer than
-`min_paragraph_length` are scored and reported against these thresholds.
-Disable the whole check with `enabled: false`.
+When the optional `textstat` dependency is installed, paragraphs at least
+`min_paragraph_length` characters long are scored and reported against these
+thresholds. Disable the whole check with `enabled: false`. Only the
+top-level config's `readability` settings are used, even in a monorepo with
+`subprojects` (see above).
 
 ```yaml
 readability:
@@ -248,8 +263,10 @@ metadata:
    `--force` makes it overwrite the files it generates, so pointing it at a
    populated docs folder is not a safe way to add the config in place.
 2. Map your existing folders with `doc_types`. Start with
-   `enforce_filename_pattern: false` and `require_frontmatter: false` on
-   folders that are not ready, then tighten one folder at a time.
+   `enforce_filename_pattern: false` on folders that are not ready, and
+   `schema: generic` with `require_frontmatter: false` for folders that are
+   not yet in ADR/RFC/memo/PRD shape at all (that combination is the only one
+   that accepts plain Markdown); then tighten one folder at a time.
 3. Run `docuchango migrate --project-id <id> --dry-run` to see what legacy
    frontmatter would be upgraded, then run it for real.
 4. Run `docuchango validate --dry-run`, fix or accept what remains, and add
