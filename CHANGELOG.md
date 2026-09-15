@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.19.0-rc.7 (2026-09-15)
+
+### Bug Fixes
+
+- **fixes**: Replace whole block scalar when updating frontmatter fields
+  ([#81](https://github.com/jrepp/docuchango/pull/81),
+  [`769348a`](https://github.com/jrepp/docuchango/commit/769348a13fe5abec06140da995c0813eb923a454))
+
+- **validate**: Exit nonzero when no documents are scanned
+  ([#87](https://github.com/jrepp/docuchango/pull/87),
+  [`2434dbe`](https://github.com/jrepp/docuchango/commit/2434dbebbc7ba4ed63036b9fdbe50ba77eec5ee2))
+
+
 ## v1.19.0-rc.6 (2026-09-15)
 
 
