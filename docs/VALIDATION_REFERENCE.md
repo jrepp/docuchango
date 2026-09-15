@@ -9,7 +9,7 @@ what is detected, what is repaired automatically when you run without
 **Detected**
 
 - Missing YAML frontmatter block
-- Missing required fields (`id`, `title`, `created`, `tags`, `project_id`, `doc_uuid`, plus per-type fields such as `status`, `deciders`, `author`, `target_release`)
+- Missing required fields for the selected schema: ADR, RFC, Memo and PRD require `title`, `created`, `id`, `project_id`, `doc_uuid` and their per-type fields; generic documents require only `title`, `project_id` and `doc_uuid`.
 - Wrong field types or formats
 - Status values not valid for the document type
 - Malformed UUIDs
