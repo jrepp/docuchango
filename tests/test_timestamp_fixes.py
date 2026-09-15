@@ -198,12 +198,10 @@ id: "test-001"
         # Should return unchanged content
         assert updated == content
 
-    def test_multiline_block_scalar_replace_leaves_dangling_continuation_lines(self):
-        """update_frontmatter_field only rewrites the field's own line, so a YAML block
-        scalar ('|') keeps its indented continuation lines. They fold into the new
-        plain-scalar value on the next parse instead of being removed. This documents
-        a real sharp edge (not a fix): callers must not use this helper on multiline
-        fields, since the resulting value is corrupted rather than cleanly replaced.
+    def test_multiline_block_scalar_is_replaced_whole(self):
+        """A YAML block scalar ('|') is replaced in full: its indented continuation
+        lines are consumed along with the key line, so nothing dangles behind to fold
+        into the new plain-scalar value on the next parse.
         """
         content = """---
 id: test
@@ -217,9 +215,112 @@ description: |
         updated = update_frontmatter_field(content, "description", "new-value")
 
         assert "description: new-value" in updated
+        assert "  Long" not in updated
         post = frontmatter.loads(updated)
-        # The dangling continuation lines fold into the value instead of disappearing.
-        assert post.metadata["description"] == "new-value Long multiline value"
+        assert post.metadata["description"] == "new-value"
+        assert post.metadata["id"] == "test"
+
+    def test_folded_block_scalar_is_replaced_whole(self):
+        """A folded block scalar ('>') is consumed the same way as a literal one."""
+        content = """---
+id: test
+description: >
+  folded
+  value
+updated: 2021-01-01
+---
+# Test
+"""
+        updated = update_frontmatter_field(content, "description", "new-value")
+
+        assert "  folded" not in updated
+        # Untouched neighbours stay byte-identical.
+        assert "id: test\n" in updated
+        assert "updated: 2021-01-01\n" in updated
+        post = frontmatter.loads(updated)
+        assert post.metadata["description"] == "new-value"
+
+    def test_block_scalar_as_last_field_before_closing_delimiter(self):
+        """A block scalar that runs right up to the closing '---' is fully replaced
+        without swallowing the delimiter or any body content.
+        """
+        content = """---
+id: test
+description: |
+  Long
+  multiline
+---
+
+# Test
+
+  indented body line
+"""
+        updated = update_frontmatter_field(content, "description", "new-value")
+
+        assert (
+            updated
+            == """---
+id: test
+description: new-value
+---
+
+# Test
+
+  indented body line
+"""
+        )
+
+    def test_multiline_block_scalar_with_blank_lines_is_replaced_whole(self):
+        """Blank lines inside a block scalar belong to the value and are consumed."""
+        content = """---
+id: test
+description: |
+  first
+
+  second
+status: Draft
+---
+# Test
+"""
+        updated = update_frontmatter_field(content, "description", "new-value")
+
+        assert "  first" not in updated
+        assert "  second" not in updated
+        post = frontmatter.loads(updated)
+        assert post.metadata["description"] == "new-value"
+        assert post.metadata["status"] == "Draft"
+
+    def test_block_sequence_value_is_replaced_whole(self):
+        """A block-style sequence value is consumed along with its key line."""
+        content = """---
+id: test
+tags:
+  - alpha
+  - beta
+status: Draft
+---
+# Test
+"""
+        updated = update_frontmatter_field(content, "tags", "[gamma]")
+
+        post = frontmatter.loads(updated)
+        assert post.metadata["tags"] == ["gamma"]
+        assert post.metadata["status"] == "Draft"
+
+    def test_body_occurrences_are_not_touched(self):
+        """Only frontmatter fields are rewritten; a look-alike line in the body stays."""
+        content = """---
+id: test
+created: 2020-01-01
+---
+# Test
+
+created: 2020-01-01
+"""
+        updated = update_frontmatter_field(content, "created", "2022-01-01")
+
+        assert updated.count("created: 2022-01-01") == 1
+        assert updated.count("created: 2020-01-01") == 1
 
     def test_duplicate_yaml_key_updates_every_occurrence(self):
         """Test behavior when a key is defined twice: the regex is global, so both lines change."""
@@ -321,11 +422,9 @@ created: 2019-01-01
         assert result.count("created:") == 1
         assert "created: 2019-01-01" in result
 
-    def test_migrate_multiline_date_value_leaves_dangling_continuation_line(self):
-        """migrate_date_to_created's regex targets a single-line 'date:' field. A
-        multiline date value leaves its indented continuation line behind, dangling
-        under the newly-inserted 'created:' line. This documents current behavior,
-        not a guarantee that multiline dates migrate cleanly.
+    def test_migrate_multiline_date_value_removes_continuation_lines(self):
+        """A multiline 'date:' value is removed in full, continuation lines included,
+        so nothing dangles under the newly-inserted 'created:' line.
         """
         content = """---
 id: test
@@ -337,8 +436,56 @@ date:
 """
         result = migrate_date_to_created(content, "2021-01-01")
 
-        assert "created: 2021-01-01" in result
-        assert "  2020-01-01" in result
+        assert (
+            result
+            == """---
+id: test
+status: Accepted
+created: 2021-01-01
+---
+# Test
+"""
+        )
+        post = frontmatter.loads(result)
+        assert "date" not in post.metadata
+        assert str(post.metadata["created"]) == "2021-01-01"
+
+    def test_migrate_block_scalar_date_value_removes_continuation_lines(self):
+        """A block-scalar 'date:' field is removed whole, including a folded ('>')
+        body that runs right up to the closing '---'.
+        """
+        content = """---
+id: test
+status: Accepted
+date: >
+  2020-01-01
+  is the day
+---
+# Test
+"""
+        result = migrate_date_to_created(content, "2021-01-01")
+
+        assert "is the day" not in result
+        post = frontmatter.loads(result)
+        assert "date" not in post.metadata
+        assert str(post.metadata["created"]) == "2021-01-01"
+
+    def test_migrate_preserves_comments_and_quoting_on_other_fields(self):
+        """Migration is line-oriented, so untouched fields keep their exact bytes."""
+        content = """---
+id: "adr-001"
+status: Accepted  # decided
+deciders: 'Team'
+date: 2020-01-01
+---
+# Test
+"""
+        result = migrate_date_to_created(content, "2021-01-01")
+
+        assert 'id: "adr-001"\n' in result
+        assert "status: Accepted  # decided\n" in result
+        assert "deciders: 'Team'\n" in result
+        assert "date:" not in result
 
 
 class TestUpdateDocumentTimestamps:

@@ -45,6 +45,7 @@ try:
     from docuchango.schemas import (
         ADRFrontmatter,
         DocsProjectConfig,
+        DocsProjectReadability,
         GenericDocFrontmatter,
         MemoFrontmatter,
         PRDFrontmatter,
@@ -142,6 +143,7 @@ class ProjectConfigContext:
 
     config: DocsProjectConfig
     path: Path
+    parent: "ProjectConfigContext | None" = None
 
     @property
     def base_dir(self) -> Path:
@@ -168,6 +170,7 @@ class DocValidator:
         self.project_config_path: Path | None = None
         self.project_config = self._load_project_config()
         self.project_configs = self._load_project_config_contexts()
+        self._ownership_roots: list[tuple[Path, ProjectConfigContext]] | None = None
 
     def _load_project_config(self) -> DocsProjectConfig | None:
         """Load docs-project.yaml configuration"""
@@ -257,7 +260,7 @@ class DocValidator:
                 if not sub_config:
                     continue
 
-                context = ProjectConfigContext(sub_config, sub_path)
+                context = ProjectConfigContext(sub_config, sub_path, parent=parent)
                 contexts.append(context)
                 pending.append(context)
 
@@ -295,6 +298,56 @@ class DocValidator:
         if resolved is None:
             self._add_path_escape_error(context, path_value, purpose, boundary.resolve())
         return resolved
+
+    def _config_ownership_roots(self) -> list[tuple[Path, ProjectConfigContext]]:
+        """Directories owned by each loaded config, deepest first.
+
+        A config owns the directory that holds it plus every docs root it
+        configures, so a document can be mapped back to the (sub-)project
+        whose settings apply to it.
+        """
+        if self._ownership_roots is None:
+            roots: list[tuple[Path, ProjectConfigContext]] = []
+            for context in self.project_configs:
+                owned = {context.base_dir.resolve()}
+                for path_value in context.config.structure.docs_roots:
+                    resolved = resolve_config_path(
+                        context.base_dir, path_value, context.base_dir, context.allow_external_paths
+                    )
+                    if resolved:
+                        owned.add(resolved)
+                roots.extend((path, context) for path in owned)
+            roots.sort(key=lambda item: len(item[0].parts), reverse=True)
+            self._ownership_roots = roots
+        return self._ownership_roots
+
+    def _config_context_for_path(self, file_path: Path) -> ProjectConfigContext | None:
+        """Return the loaded config that owns a document path.
+
+        The deepest owning directory wins, so a document inside a sub-project
+        resolves to that sub-project rather than to the root config.
+        """
+        if not self.project_configs:
+            return None
+        resolved = file_path.resolve()
+        for root, context in self._config_ownership_roots():
+            if is_within_path(resolved, root):
+                return context
+        return self.project_configs[0]
+
+    def _readability_config_for(self, file_path: Path) -> "DocsProjectReadability | None":
+        """Resolve the readability settings that apply to one document.
+
+        The owning (sub-)project's `readability` block wins as a whole. A
+        config that does not declare the block inherits its parent's block,
+        up to the root config; nothing is merged key by key.
+        """
+        context = self._config_context_for_path(file_path)
+        while context is not None:
+            if "readability" in context.config.model_fields_set:
+                return context.config.readability
+            context = context.parent
+        return self.project_config.readability if self.project_config else None
 
     def log(self, message: str, force: bool = False):
         """Log if verbose or forced"""
@@ -1933,23 +1986,43 @@ class DocValidator:
                 doc.errors.append(f"Error checking formatting: {e}")
 
     def check_readability(self):
-        """Check document readability using textstat metrics."""
+        """Check document readability using textstat metrics (RD-001).
+
+        Settings are resolved per document from the (sub-)project that owns
+        it, so a sub-project can enable, disable or tune readability on its
+        own.
+        """
         if not TEXTSTAT_AVAILABLE:
             self.log("\n📖 Readability checking skipped (textstat not installed)")
             return
 
-        if not self.project_config or not self.project_config.readability.enabled:
+        if not self.project_config:
+            self.log("\n📖 Readability checking disabled")
+            return
+
+        # Each document is scored with the settings of the config that owns
+        # it; identical settings share one scorer.
+        enabled_docs: list[tuple[Document, DocsProjectReadability]] = []
+        for doc in self.documents:
+            settings = self._readability_config_for(doc.file_path)
+            if settings and settings.enabled:
+                enabled_docs.append((doc, settings))
+
+        if not enabled_docs:
             self.log("\n📖 Readability checking disabled")
             return
 
         self.log("\n📖 Checking readability...")
 
-        # Convert project config to ReadabilityConfig
-        config = self.project_config.readability.to_readability_config()
+        scorers: dict[str, ReadabilityScorer] = {}
 
-        scorer = ReadabilityScorer(config)
+        for doc, settings in enabled_docs:
+            scorer_key = settings.model_dump_json()
+            scorer = scorers.get(scorer_key)
+            if scorer is None:
+                scorer = ReadabilityScorer(settings.to_readability_config())
+                scorers[scorer_key] = scorer
 
-        for doc in self.documents:
             try:
                 content = doc.get_content()
                 report = scorer.analyze_document(content, file_path=str(doc.file_path.relative_to(self.repo_root)))
