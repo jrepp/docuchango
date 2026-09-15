@@ -992,8 +992,9 @@ class TestProjectIdPlaceholderFix:
         return doc
 
     @staticmethod
-    def _project_id(doc: Path) -> str | None:
-        return frontmatter.loads(doc.read_text(encoding="utf-8")).metadata.get("project_id")
+    def _project_id(doc: Path) -> object:
+        metadata: dict[str, object] = frontmatter.loads(doc.read_text(encoding="utf-8")).metadata
+        return metadata.get("project_id")
 
     def test_placeholder_is_replaced_with_the_governing_id(self, tmp_path):
         """`my-project` is the init placeholder and is always safe to rewrite."""
