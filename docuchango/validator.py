@@ -28,10 +28,8 @@ import sys
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from enum import Enum
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, cast
-from urllib.parse import unquote
 
 try:
     import frontmatter
@@ -76,11 +74,25 @@ except ImportError as e:
 
 
 from docuchango.config_paths import is_within_path, resolve_config_path
+from docuchango.links import (
+    LINK_PATTERN,
+    NON_PATH_PREFIXES,
+    RESOLVED_LINK_TYPES,
+    classify_link,
+    document_index,
+    link_candidates,
+    link_path_target,
+    relative_link,
+    resolve_internal_link,
+    resolve_link_target,
+)
+from docuchango.links import (
+    LinkType as LinkType,  # re-exported: `from docuchango.validator import LinkType` predates links.py
+)
 from docuchango.markdown import (
     blank_line_finding_message,
     blank_line_runs,
-    fence_mask,
-    frontmatter_span,
+    mask_code,
 )
 from docuchango.text_io import (
     FMT_012_FINDING_MESSAGE,
@@ -89,10 +101,6 @@ from docuchango.text_io import (
     line_ending_finding_message,
     read_text,
 )
-
-# A link target that starts with a URI scheme ("mailto:", "tel:", "ftp://",
-# ...) is never a filesystem path and must not be resolved as one.
-_URI_SCHEME_PATTERN = re.compile(r"[A-Za-z][A-Za-z0-9+.\-]*:")
 
 #: Frontmatter fields FM-011 checks. The legacy ``date`` field is excluded:
 #: Phase 1 migrates it to ``created`` before Phase 2 could report it.
@@ -165,18 +173,6 @@ def frontmatter_date_source(content: str, metadata: dict[str, Any]) -> dict[str,
             continue
         source[key_node.value] = value_node.value
     return source
-
-
-class LinkType(Enum):
-    """Types of links in markdown documents"""
-
-    INTERNAL_DOC = "internal_doc"  # ./relative.md or /docs/path.md
-    INTERNAL_ADR = "internal_adr"  # ADR cross-references
-    INTERNAL_RFC = "internal_rfc"  # RFC cross-references
-    DOCUSAURUS_PLUGIN = "docusaurus_plugin"  # Cross-plugin links (e.g., /prism-data-layer/netflix/...)
-    EXTERNAL = "external"  # http(s)://
-    ANCHOR = "anchor"  # #section
-    UNKNOWN = "unknown"
 
 
 @dataclass
@@ -258,6 +254,9 @@ class DocValidator:
         self.file_to_doc: dict[Path, Document] = {}
         self.all_links: list[Link] = []
         self.errors: list[str] = []
+        # Filename -> scanned documents, built lazily for the LNK-001 candidate
+        # list (see _link_candidates).
+        self._document_index: dict[str, list[Path]] | None = None
 
         # Load project configuration
         self.project_config_path: Path | None = None
@@ -449,22 +448,12 @@ class DocValidator:
 
     @staticmethod
     def _link_path_target(target: str) -> str:
-        """Return the filesystem path portion of a Markdown link target.
+        """The filesystem path portion of a Markdown link target.
 
-        Strips the optional CommonMark link title ('path "Title"'), the
-        angle-bracket destination form ('<path>'), and any query/anchor
-        suffix, then percent-decodes what is left.
+        Lives in :mod:`docuchango.links` so the LNK-010 fixer strips titles,
+        anchors and percent-escapes exactly the way this check does.
         """
-        target = target.strip()
-        # Optional link title: a destination followed by whitespace and a
-        # quoted or parenthesized title.
-        title_match = re.match(r"^(.*?)\s+(?:\"[^\"]*\"|'[^']*'|\([^()]*\))\s*$", target, flags=re.DOTALL)
-        if title_match:
-            target = title_match.group(1).strip()
-        # Angle-bracket destination form: <path with spaces>
-        if target.startswith("<") and target.endswith(">"):
-            target = target[1:-1]
-        return unquote(re.split(r"[?#]", target, maxsplit=1)[0])
+        return link_path_target(target)
 
     def _get_folder_config(self) -> dict[str, str]:
         """Get folder configuration from project config or use defaults"""
@@ -917,14 +906,12 @@ class DocValidator:
             # then reported as broken). Line numbers are preserved by the mask.
             lines = self._mask_code(doc.get_content(), strip_frontmatter=True)
 
-            link_pattern = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
-
             for line_num, line in enumerate(lines, start=1):
-                for match in link_pattern.finditer(line):
+                for match in LINK_PATTERN.finditer(line):
                     link_target = match.group(2)
 
                     # Skip mailto and data links
-                    if link_target.startswith(("mailto:", "data:")):
+                    if link_target.startswith(NON_PATH_PREFIXES):
                         continue
 
                     link_type = self._classify_link(link_target, doc.file_path)
@@ -938,32 +925,8 @@ class DocValidator:
         return links
 
     def _classify_link(self, target: str, source_path: Path) -> LinkType:
-        """Classify link by target"""
-        if target.startswith(("http://", "https://")):
-            return LinkType.EXTERNAL
-        if target.startswith("#"):
-            return LinkType.ANCHOR
-        if target.startswith("/prism-data-layer/"):
-            # Docusaurus cross-plugin links (e.g., /prism-data-layer/netflix/scale)
-            return LinkType.DOCUSAURUS_PLUGIN
-        if target.startswith(("/adr/", "/rfc/", "/memos/", "/docs/", "/netflix/")):
-            # Docusaurus plugin routes (e.g., /adr/ADR-046, /rfc/RFC-001, /memos/MEMO-003)
-            return LinkType.DOCUSAURUS_PLUGIN
-        if "adr/" in target or (target.startswith("./") and "docs/adr" in str(source_path)):
-            return LinkType.INTERNAL_ADR
-        if "rfc" in target.lower() or (target.startswith("./") and "docs/rfcs" in str(source_path)):
-            return LinkType.INTERNAL_RFC
-        if target.endswith(".md") or target.startswith(("./", "../")):
-            return LinkType.INTERNAL_DOC
-        # Any remaining target that is not root-relative and carries no URI
-        # scheme is a bare relative reference (e.g. 'other-doc', 'guide/').
-        # Treat it as an internal doc link so it is resolved against the source
-        # directory instead of being reported as an unknown link type. Targets
-        # with a scheme ('mailto:', 'tel:', 'ftp://', ...) stay UNKNOWN so they
-        # are reported as such rather than as a nonsensical missing file.
-        if not target.startswith("/") and not _URI_SCHEME_PATTERN.match(target):
-            return LinkType.INTERNAL_DOC
-        return LinkType.UNKNOWN
+        """Classify link by target (see :func:`docuchango.links.classify_link`)."""
+        return classify_link(target, source_path)
 
     def validate_links(self):
         """Validate all links"""
@@ -983,7 +946,7 @@ class DocValidator:
                 link.is_valid = True
                 continue
 
-            if link.link_type in [LinkType.INTERNAL_DOC, LinkType.INTERNAL_ADR, LinkType.INTERNAL_RFC]:
+            if link.link_type in RESOLVED_LINK_TYPES:
                 self._validate_internal_link(link)
             else:
                 link.is_valid = False
@@ -993,55 +956,53 @@ class DocValidator:
     def _resolve_link_target(base_dir: Path, target: str) -> tuple[Path, bool]:
         """Resolve a link target against base_dir and report existence.
 
-        Handles three cases without producing false negatives:
-        - An existing file (with or without suffix).
-        - An existing directory (e.g. a link to '../adr/'), which markdown and
-          Docusaurus treat as a valid folder link and must NOT get '.md'
-          appended.
-        - A suffix-less document reference (e.g. './other-doc'), for which we
-          try the '.md' extension.
+        Lives in :mod:`docuchango.links`; see
+        :func:`docuchango.links.resolve_link_target`.
         """
-        resolved = (base_dir / target).resolve()
+        return resolve_link_target(base_dir, target)
 
-        # Directory or exact file already exists -> valid as-is.
-        if resolved.exists():
-            return resolved, True
+    def _validate_internal_link(self, link: Link) -> None:
+        """Validate one internal document link (LNK-001).
 
-        # Suffix-less reference to a markdown doc: try appending '.md'.
-        if not resolved.suffix:
-            with_md = Path(str(resolved) + ".md")
-            if with_md.exists():
-                return with_md, True
-            return with_md, False
+        Resolution lives in :func:`docuchango.links.resolve_internal_link`, so
+        the LNK-010 fixer decides a link is broken on exactly the same terms
+        this check does: a site-root target against the repository root, and
+        './x', '../x' and the bare relative 'adr/x.md' against the linking
+        document's own folder.
 
-        return resolved, False
+        When the target does not exist, the message names the documents in the
+        scanned set that carry that filename. One such candidate is the
+        LNK-010 case and Phase 1 has already rewritten the link, so only the
+        ambiguous case reaches here with candidates to list; naming them turns
+        "file not found" into the choice the author actually has to make.
+        """
+        target_path, exists = resolve_internal_link(link.source_doc, self.repo_root, link.target)
+        link.is_valid = exists
+        if exists:
+            return
 
-    def _validate_internal_link(self, link: Link):
-        """Validate internal document link"""
-        target = self._link_path_target(link.target)
+        link.error_message = f"File not found: {target_path}"
+        candidates = self._link_candidates(link)
+        if len(candidates) < 2:
+            return
+        shown = ", ".join(relative_link(link.source_doc, candidate) for candidate in candidates)
+        link.error_message += (
+            f"; {len(candidates)} scanned documents are named "
+            f"'{PurePosixPath(self._link_path_target(link.target)).name}': {shown}. "
+            "LNK-010 rewrites a broken link only when exactly one document matches, "
+            "so pick one and write the path out."
+        )
 
-        # Handle relative paths
-        if target.startswith(("./", "../")):
-            target_path, exists = self._resolve_link_target(link.source_doc.parent, target)
-            link.is_valid = exists
-            if not exists:
-                link.error_message = f"File not found: {target_path}"
+    def _link_candidates(self, link: Link) -> list[Path]:
+        """Scanned documents whose filename matches a broken link's target.
 
-        # Handle absolute paths
-        elif target.startswith("/"):
-            target_path, exists = self._resolve_link_target(self.repo_root, target.lstrip("/"))
-            link.is_valid = exists
-            if not exists:
-                link.error_message = f"File not found: {target_path}"
-
-        # Handle bare relative paths (no leading ./, ../ or /), e.g.
-        # 'adr/adr-012-...md' or 'other-doc.md'. These are valid relative links
-        # that markdown/Docusaurus resolve against the source document's dir.
-        else:
-            target_path, exists = self._resolve_link_target(link.source_doc.parent, target)
-            link.is_valid = exists
-            if not exists:
-                link.error_message = f"File not found: {target_path}"
+        The index is built once per run and kept on the validator, because
+        ``validate_links`` walks every link in the tree and each ambiguous one
+        would otherwise rescan the whole document set.
+        """
+        if self._document_index is None:
+            self._document_index = document_index(doc.file_path for doc in self.documents)
+        return link_candidates(link.target, self._document_index)
 
     def check_mdx_compilation(self):
         """Check MDX compilation using @mdx-js/mdx compiler"""
@@ -1308,49 +1269,11 @@ class DocValidator:
     def _mask_code(content: str, strip_frontmatter: bool = False) -> list[str]:
         """Return the document's lines with code masked out, line numbers kept.
 
-        Masks fenced code blocks (``` / ~~~) and inline code spans (backticks),
-        including inline spans that wrap across multiple lines. Masked regions
-        are replaced with spaces so column/line positions are preserved but the
-        content is not matched by prose checks (MDX tags, links, etc.).
-
-        Fenced blocks track the opening delimiter's character and length: a
-        block is only closed by a fence of the same character that is at least
-        as long. This means an outer ```` ```` block may contain an inner
-        ``` example without prematurely closing.
-
-        When ``strip_frontmatter`` is True, a leading YAML frontmatter block
-        (delimited by '---') is masked as well, since frontmatter is not
-        compiled as MDX and its values must not be treated as prose.
+        Lives in :mod:`docuchango.markdown` as :func:`~docuchango.markdown.mask_code`
+        so the LNK-010 fixer skips the same fenced blocks and inline spans this
+        check does.
         """
-        lines = content.split("\n")
-
-        # Optionally mask a leading YAML frontmatter block.
-        start = frontmatter_span(lines) if strip_frontmatter else 0
-        out: list[str] = [""] * start
-
-        # Fence tracking is shared with the blank-line helpers, so FMT-002 and
-        # FMT-011 agree with the prose checks about where code begins and ends.
-        for line, masked in zip(lines[start:], fence_mask(lines[start:]), strict=True):
-            out.append("" if masked else line)
-
-        # Now mask inline code spans across the (non-fenced) joined text so that
-        # spans spanning multiple lines are handled. We rebuild line by line.
-        joined = "\n".join(out)
-
-        def _blank(match: re.Match[str]) -> str:
-            # Preserve newlines so line numbering is unaffected.
-            return "".join("\n" if ch == "\n" else " " for ch in match.group(0))
-
-        # Backtick spans: two-backtick then single-backtick delimiters, matched
-        # non-greedily, allowing newlines (multi-line inline spans).
-        # A code span may wrap across lines but, per CommonMark, never across a
-        # blank line. Bounding the span that way stops a single stray backtick
-        # in prose from masking (and silencing the checks on) the rest of the
-        # document.
-        joined = re.sub(r"``(?:[^\n]|\n(?!\s*\n))+?``", _blank, joined)
-        joined = re.sub(r"`(?:[^`\n]|\n(?!\s*\n))+?`", _blank, joined)
-
-        return joined.split("\n")
+        return mask_code(content, strip_frontmatter=strip_frontmatter)
 
     def check_mdx_compatibility(self):
         """Check for MDX parsing issues (unescaped special characters)"""

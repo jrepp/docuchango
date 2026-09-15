@@ -1,9 +1,18 @@
 """Test suite for link validation functionality."""
 
+import re
 import time
 
+from click.testing import CliRunner
+
+from docuchango.cli import validate
 from docuchango.fixes.mdx_syntax import fix_mdx_issues
 from docuchango.validator import DocValidator, LinkType
+
+
+def _flat(text: str) -> str:
+    """Collapse whitespace so Rich's console wrapping cannot break matching."""
+    return re.sub(r"\s+", " ", text)
 
 
 class TestLinkExtraction:
@@ -810,6 +819,178 @@ Supersedes [ADR 001](./adr-001-first.md) and [broken link](./missing.md).
         assert len(valid_links) == 4  # All internal links except the broken one
         assert len(invalid_links) == 1  # Only the missing.md link
         assert invalid_links[0].target == "./missing.md"
+
+
+class TestLnk010EndToEnd:
+    """LNK-010 through the real ``validate`` command.
+
+    The fixer and the LNK-001 report resolve links with the same code in
+    ``docuchango.links``, so these cases check the pairing that matters: a
+    single candidate is rewritten and leaves nothing to report, several
+    candidates are left alone and named in the report, and a link inside a
+    code fence is invisible to both.
+    """
+
+    CONFIG = """version: "1"
+project:
+  id: fixture-project
+  name: Fixture Project
+  description: Synthetic project
+structure:
+  adr_dir: adr
+  rfc_dir: rfcs
+  doc_types:
+    adr:
+      schema: adr
+      folders: [adr]
+    rfc:
+      schema: rfc
+      folders: [rfcs]
+    guide:
+      schema: generic
+      folders: [guides, handbook]
+security:
+  allow_external_paths: false
+readability:
+  enabled: false
+"""
+
+    RFC = """---
+id: "rfc-001"
+title: "RFC-001: Links Out"
+status: Draft
+created: 2026-01-02
+author: Team
+tags: ["test"]
+project_id: "fixture-project"
+doc_uuid: "8b063564-82a5-4a21-943f-e868388d36b9"
+---
+
+# RFC-001: Links Out
+
+{body}
+"""
+
+    ADR = """---
+id: "adr-002"
+title: "ADR-002: Target"
+status: Accepted
+created: 2026-01-02
+deciders: Team
+tags: ["test"]
+project_id: "fixture-project"
+doc_uuid: "9b063564-82a5-4a21-943f-e868388d36b9"
+---
+
+# ADR-002: Target
+
+The document the link is meant to reach.
+"""
+
+    GUIDE = """---
+title: "Setup, the {folder} copy"
+tags: ["test"]
+project_id: "fixture-project"
+doc_uuid: "{uuid}"
+---
+
+# Setup
+
+One of two documents named `setup.md`.
+"""
+
+    def _repo(self, tmp_path, body):
+        """A repo whose RFC-001 body is ``body``; returns (root, rfc path)."""
+        root = tmp_path / "repo"
+        (root / "docs-cms").mkdir(parents=True)
+        (root / "docs-cms" / "docs-project.yaml").write_text(self.CONFIG)
+        (root / "docs-cms" / "rfcs").mkdir()
+        rfc = root / "docs-cms" / "rfcs" / "rfc-001-links-out.md"
+        rfc.write_text(self.RFC.format(body=body))
+        return root, rfc
+
+    def _adr(self, root):
+        (root / "docs-cms" / "adr").mkdir(parents=True, exist_ok=True)
+        (root / "docs-cms" / "adr" / "adr-002-target.md").write_text(self.ADR)
+
+    def _guides(self, root):
+        """Two `setup.md` documents in generic lanes, so the shared filename
+        is an LNK-010 ambiguity and not also an ID or UUID duplicate."""
+        for folder, uuid in (
+            ("guides", "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+            ("handbook", "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+        ):
+            path = root / "docs-cms" / folder
+            path.mkdir(parents=True, exist_ok=True)
+            (path / "setup.md").write_text(self.GUIDE.format(folder=folder, uuid=uuid))
+
+    def _run(self, root, *extra):
+        args = ["--repo-root", str(root), "--skip-build", *extra]
+        return CliRunner().invoke(validate, args, env={"COLUMNS": "200"}, catch_exceptions=False)
+
+    def test_unique_candidate_is_rewritten_and_nothing_is_reported(self, tmp_path):
+        root, rfc = self._repo(tmp_path, "See [the decision](./adr-002-target.md#context).")
+        self._adr(root)
+
+        result = self._run(root)
+
+        assert result.exit_code == 0, result.output
+        assert (
+            "LNK-010: Line 14: Rewrote link './adr-002-target.md#context' to '../adr/adr-002-target.md#context'"
+            in _flat(result.output)
+        )
+        assert "(../adr/adr-002-target.md#context)" in rfc.read_text()
+
+    def test_second_run_reports_and_changes_nothing(self, tmp_path):
+        root, rfc = self._repo(tmp_path, "See [the decision](./adr-002-target.md).")
+        self._adr(root)
+
+        self._run(root)
+        after_first = rfc.read_text()
+        result = self._run(root)
+
+        assert result.exit_code == 0, result.output
+        assert "LNK-010" not in result.output
+        assert rfc.read_text() == after_first
+
+    def test_ambiguous_candidates_are_left_alone_and_listed(self, tmp_path):
+        root, rfc = self._repo(tmp_path, "Follow [the setup guide](./setup.md).")
+        self._guides(root)
+        before = rfc.read_text()
+
+        result = self._run(root, "--dry-run")
+        flat = _flat(result.output)
+
+        assert result.exit_code == 1
+        assert "LNK-001: Line 14: Broken link './setup.md'" in flat
+        assert "2 scanned documents are named 'setup.md'" in flat
+        assert "../guides/setup.md, ../handbook/setup.md" in flat
+        assert "Rewrote link" not in flat
+        assert rfc.read_text() == before
+
+    def test_link_in_a_code_fence_is_neither_reported_nor_rewritten(self, tmp_path):
+        root, rfc = self._repo(tmp_path, "```markdown\nSee [the decision](./adr-002-target.md).\n```")
+        self._adr(root)
+        before = rfc.read_text()
+
+        result = self._run(root, "--dry-run")
+
+        assert result.exit_code == 0, result.output
+        assert "LNK-001" not in result.output
+        assert "LNK-010" not in result.output
+        assert rfc.read_text() == before
+
+    def test_no_candidate_stays_a_plain_report(self, tmp_path):
+        root, rfc = self._repo(tmp_path, "See [the decision](./adr-999-missing.md).")
+        before = rfc.read_text()
+
+        result = self._run(root, "--dry-run")
+        flat = _flat(result.output)
+
+        assert result.exit_code == 1
+        assert "LNK-001: Line 14: Broken link './adr-999-missing.md'" in flat
+        assert "scanned documents are named" not in flat
+        assert rfc.read_text() == before
 
 
 class TestMdxDurationPatternBacktrackingSafety:

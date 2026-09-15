@@ -4,8 +4,8 @@ Two regions of a Markdown document are content rather than prose, and every
 check and fix that walks lines has to agree on where they are: the leading YAML
 frontmatter block, and fenced code blocks. :func:`frontmatter_span` and
 :func:`fence_mask` are the single implementation of both, used by
-``DocValidator._mask_code`` (which masks code before the prose checks) and by
-the blank-line helpers below.
+:func:`mask_code` (which blanks code before the prose checks and before the
+LNK-010 link rewrite) and by the blank-line helpers below.
 
 Blank lines are the reason this module exists. ``FMT-002`` reports a run of
 more than two blank lines and ``FMT-011`` collapses it back to two; see the
@@ -199,3 +199,63 @@ def _scan_blank_lines(content: str) -> tuple[str, list[BlankLineRun]]:
     flush(run_start)
 
     return "\n".join(out), runs
+
+
+def mask_code(content: str, strip_frontmatter: bool = False) -> list[str]:
+    """Return the document's lines with code masked out, line numbers kept.
+
+    Masks fenced code blocks (``` / ~~~) and inline code spans (backticks),
+    including inline spans that wrap across multiple lines. Masked regions are
+    replaced with spaces so column positions are preserved but the content is
+    not matched by prose checks (MDX tags, links, ...); a line inside a fence
+    is emptied outright, so a check that walks the masked lines finds nothing
+    on it at all.
+
+    Fenced blocks track the opening delimiter's character and length via
+    :func:`fence_mask`: a block is only closed by a fence of the same character
+    that is at least as long, so an outer ```` ```` block may contain an inner
+    ``` example without prematurely closing.
+
+    Every prose check and every fixer that walks links or tags masks with this
+    one function, so none of them can disagree about where code begins: a link
+    LNK-001 ignored because it sits in a code fence must be a link LNK-010
+    leaves alone too.
+
+    Args:
+        content: The whole document, frontmatter included.
+        strip_frontmatter: Also mask a leading YAML frontmatter block, since
+            frontmatter is not compiled as MDX and its values must not be
+            treated as prose.
+
+    Returns:
+        One string per input line, in order.
+    """
+    lines = content.split("\n")
+
+    # Optionally mask a leading YAML frontmatter block.
+    start = frontmatter_span(lines) if strip_frontmatter else 0
+    out: list[str] = [""] * start
+
+    # Fence tracking is shared with the blank-line helpers, so FMT-002 and
+    # FMT-011 agree with the prose checks about where code begins and ends.
+    for line, masked in zip(lines[start:], fence_mask(lines[start:]), strict=True):
+        out.append("" if masked else line)
+
+    # Now mask inline code spans across the (non-fenced) joined text so that
+    # spans spanning multiple lines are handled. We rebuild line by line.
+    joined = "\n".join(out)
+
+    def _blank(match: re.Match[str]) -> str:
+        # Preserve newlines so line numbering is unaffected.
+        return "".join("\n" if ch == "\n" else " " for ch in match.group(0))
+
+    # Backtick spans: two-backtick then single-backtick delimiters, matched
+    # non-greedily, allowing newlines (multi-line inline spans).
+    # A code span may wrap across lines but, per CommonMark, never across a
+    # blank line. Bounding the span that way stops a single stray backtick in
+    # prose from masking (and silencing the checks on) the rest of the
+    # document.
+    joined = re.sub(r"``(?:[^\n]|\n(?!\s*\n))+?``", _blank, joined)
+    joined = re.sub(r"`(?:[^`\n]|\n(?!\s*\n))+?`", _blank, joined)
+
+    return joined.split("\n")

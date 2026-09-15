@@ -7,7 +7,7 @@ This package contains modules for automatically fixing common documentation issu
 - cross_plugin_links: Fix cross-plugin link references
 - doc_links: Fix documentation link issues
 - docs: General documentation fixes (whitespace, frontmatter, etc.)
-- internal_links: Fix internal link references
+- internal_links: Rewrite broken internal links with a single matching document (LNK-010)
 - mdx_code_blocks: Fix MDX-specific code block issues
 - mdx_syntax: Fix MDX syntax issues
 - migration_syntax: Fix syntax during migrations

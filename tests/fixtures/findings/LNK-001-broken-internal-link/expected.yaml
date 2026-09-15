@@ -1,8 +1,13 @@
 summary: An ADR linking to a sibling document that does not exist.
 messages:
-  - "Broken link './adr-999-does-not-exist.md'"
+  - "LNK-001: Line 14: Broken link './adr-999-does-not-exist.md'"
   - "File not found"
-# LNK-010 (planned) would rewrite these; today validate only reports them.
+# No scanned document is named 'adr-999-does-not-exist.md', so LNK-010 has
+# nothing to rewrite the link to and there are no candidates to list. A link
+# with exactly one candidate is repaired (LNK-010-unique-target-rewritten);
+# one with several stays a report (LNK-010-ambiguous-target).
 fixed: false
+forbidden:
+  - "scanned documents are named"
 dry_run_exit_code: 1
 exit_code: 1

@@ -82,9 +82,9 @@ reported.
 | ID-004 | Duplicate `id` across documents | Implemented | report | `check_ids` |
 | ID-010 | Gap or non-contiguous numbering within a document type, opt-in per type via `structure.doc_types.<type>.report_numbering_gaps` | Implemented | report | `check_numbering_gaps`, `_numbering_gap_types`, `_format_number_ranges`, `_config_context_for_path`, `schemas.py` (`DocTypeConfig.report_numbering_gaps`) |
 | ID-011 | Validate numbered documents nested in subfolders of a document folder, opt-in via `structure.scan_subfolders` (and per-type via `structure.doc_types.<type>.scan_subfolders`) | Implemented | report | `scan_documents`, `_build_scan_entries`, `_scan_document_folder`, `schemas.py` (`DocsProjectStructure.scan_subfolders`, `DocTypeConfig.scan_subfolders`) |
-| LNK-001 | Broken internal link, including bare relative, suffix-less and directory targets | Implemented | report | `validate_links`, `_resolve_link_target` |
+| LNK-001 | Broken internal link, including bare relative, suffix-less and directory targets. LNK-010 repairs the single-candidate case in Phase 1, so what reaches the report is a target no scanned document carries, or an ambiguous one, whose candidates the message lists | Implemented | report | `validate_links`, `_validate_internal_link`, `_link_candidates`, `links.py` (`resolve_internal_link`, `link_candidates`) |
 | LNK-002 | Link that resolves outside the repository root, reported once per link with line number and target | Implemented | report | `check_cross_plugin_links` |
-| LNK-010 | Rewrite a broken internal link when the target exists elsewhere | Planned | fix | see below |
+| LNK-010 | Rewrite a broken internal link when the target exists elsewhere | Implemented | fix | `cli.validate` (Phase 1), `fixes/internal_links.py` (`build_index`, `fix_internal_links`, `fix_links_in_tree`), `links.py`, `markdown.py` (`mask_code`) |
 | LNK-011 | Rewrite cross-plugin links to absolute repository URLs | Planned | fix | see below |
 | MDX-001 | `<` that opens a JSX-shaped tag which is not a valid HTML element, PascalCase component, self-closing tag or CommonMark autolink (bare prose placeholders such as `<token>`). Comparisons such as `<5ms` or `a < b` are not findings | Implemented | report | `check_mdx_compatibility`, `_is_safe_mdx_tag`, `_mask_code` |
 | MDX-002 | MDX compilation error | Implemented | report | `check_mdx_compilation` |
@@ -298,6 +298,55 @@ both FM-006's proposed rewrite and the FM-011 finding, since nothing has been
 written, which is how FMT-012 presents the same pairing. A format FM-006
 cannot identify is an FM-011 report in either mode.
 
+**LNK-010 Internal link rewrite (shipped).** `fixes/internal_links.py`
+existed since before the validator and `validate` never called it, so every
+broken link was a report even when the file the author meant was one folder
+over. Phase 1 now runs it: when a link is broken and exactly one document in
+the scanned set carries the target's filename, the link is rewritten to the
+correct relative path from the linking document, POSIX separators, anchor and
+query kept as written. Two or more candidates are a judgement call and stay a
+report; LNK-001's message now names them, relative to the linking document, so
+the author is choosing between paths rather than searching for them. Zero
+candidates is the same report it always was.
+
+The rule is filename identity and nothing cleverer. What the module used to do
+was pattern rewriting for one migration - strip a `2025-10-13-` date prefix,
+adjust `../` depth - which could not tell a link that already resolved from one
+that did not, and happily rewrote a link to a file that existed in neither
+form. Filename identity against the scanned set is checkable: a rewritten link
+is guaranteed to resolve on the next pass, which is what makes the fix safe
+under the default atomic run, where a fix the check still reports withholds
+every fix in the tree.
+
+That guarantee comes from sharing the code rather than from agreeing by hand.
+`docuchango/links.py` now holds `LinkType`, the inline-link pattern,
+`classify_link`, `link_path_target` and `resolve_link_target` that
+`DocValidator` used to keep to itself, plus `resolve_internal_link`, which is
+the one function both LNK-001 and LNK-010 resolve a target with:
+site-root against the repository root, and `./x`, `../x` and the bare relative
+`adr/x.md` against the linking document's folder, `.md` appended to a
+suffix-less target, an existing directory left alone. `DocValidator._mask_code`
+moved to `markdown.mask_code` next to `fence_mask`, so a link inside a code
+fence or an inline span - sample Markdown in a how-to - is invisible to the
+check and to the fix alike. Reference-style links and images are not checked by
+LNK-001 and are not rewritten either; widening the fix past the report is
+exactly the drift the shared module exists to prevent.
+
+Three things are deliberately left alone. A target carrying a CommonMark link
+title, the angle-bracket destination form or percent-escapes: re-encoding those
+is guesswork. A candidate outside the repository root, which a sub-project with
+`security.allow_external_paths` can produce - rewriting a link into an LNK-002
+finding is not a repair. And a link that already resolves, so a second run is a
+no-op.
+
+The fixer runs after the per-file Phase 1 loop rather than inside it, because
+it is the first fix that needs the whole scanned set: the candidate index is
+built once from the discovered documents and then reused for every file. The
+standalone entry point survives as `python -m docuchango.fixes.internal_links
+--repo-root <path>`, discovering documents through `cli._discover_doc_files`
+instead of resolving `docs-cms` relative to the installed package, which
+pointed at site-packages for anything but a source checkout.
+
 ### Planned validators
 
 Each entry lists what it detects, what it may fix, and the constraint that
@@ -308,14 +357,6 @@ inline spans before the prose checks run, but not 4-space indented code
 blocks, so a `<token>` placeholder inside one is reported. Correct handling
 needs list-continuation context, because a 4-space indent inside a list
 item is a paragraph, not code.
-
-**LNK-010 Internal link rewrite.** Wire `fixes/internal_links.py` into the
-Phase 1 fix loop of `validate`. When a link is broken and exactly one
-document in the scanned set has the same filename, rewrite the link to the
-correct relative path. Two or more candidates stay a report (LNK-001) with
-the candidates listed. The module's `main()` currently resolves `docs-cms`
-relative to the installed package, so the entry point takes the validator's
-scanned paths instead.
 
 **LNK-011 Cross-plugin link rewrite.** Wire `fixes/cross_plugin_links.py`
 into Phase 1. Needs a repository base URL, so add `project.repository_url`

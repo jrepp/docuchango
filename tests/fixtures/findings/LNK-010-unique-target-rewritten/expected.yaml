@@ -1,0 +1,17 @@
+summary: >-
+  An RFC links to an ADR as if it were a sibling. Exactly one scanned document
+  is named `adr-003-decision.md`, so LNK-010 rewrites the link to the real
+  relative path and keeps the '#context' anchor. The identical link inside a
+  fenced code block is sample text and must stay as written.
+messages:
+  - "LNK-001: Line 14: Broken link './adr-003-decision.md#context'"
+  - "File not found"
+# One candidate, so Phase 1 rewrites the link and Phase 2 finds nothing left.
+fixed: true
+fix_messages:
+  - "[Internal links] LNK-010: Line 14: Rewrote link './adr-003-decision.md#context' to '../adr/adr-003-decision.md#context'"
+# The fenced copy of the link is never a finding and never a rewrite.
+forbidden:
+  - "Line 19"
+dry_run_exit_code: 1
+exit_code: 0

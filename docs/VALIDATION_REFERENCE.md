@@ -146,23 +146,51 @@ issue above instead of a previewed fix, then silently fixed on the real run.
 
 **Detected**
 
-- Internal links to files that do not exist
+- `LNK-001`: internal links to files that do not exist
 - Relative paths (`./x`, `../x`) that do not resolve
 - Bare relative paths (`adr/adr-012-trust.md`, `other-doc`) that do not
   resolve against the linking document's folder; a suffix-less target is
   also tried with `.md`, and a link to an existing folder (`../adr/`) is
   valid as written
 - Cross-references to ADRs or RFCs that do not exist
-- Links that resolve outside the repository root, reported one per link with
-  its line number and target. A link that points elsewhere *inside* the
-  repository, such as `../../internal/notes.md` or the repository `README.md`,
-  is legitimate and is not reported
+- `LNK-002`: links that resolve outside the repository root, reported one per
+  link with its line number and target. A link that points elsewhere *inside*
+  the repository, such as `../../internal/notes.md` or the repository
+  `README.md`, is legitimate and is not reported
+
+Links inside a code fence or an inline code span are sample text and are
+neither checked nor rewritten. Reference-style links (`[text][ref]`) and
+images are not checked.
+
+**Repaired automatically**
+
+- `LNK-010`: a broken link is rewritten to the correct relative path when
+  exactly one scanned document carries the target's filename, reported as
+  `LNK-010: Line 12: Rewrote link 'adr-003.md' to '../adr/adr-003-title.md'`
+
+This is the "the file moved, or the link was written from the wrong folder"
+case, and it is the only one that is not a guess: the rewritten path is
+checked against the same resolution `LNK-001` uses, so a repaired link is
+guaranteed to resolve. The anchor and query are kept as written. A target
+carrying a link title (`path "Title"`), the angle-bracket form (`<path>`) or
+percent-escapes is left alone, and so is a candidate that lives outside the
+repository root, since linking to it would only trade `LNK-001` for `LNK-002`.
 
 **Left to you**
 
-Link findings are reported, never rewritten: `docuchango validate` checks
-links but does not touch them, because the right target is a judgement call.
-Fix them by hand, or with your own tooling, and validate again.
+A broken link that no scanned document matches, and one that several match,
+stay reports: which document was meant is a judgement call. When there are
+several, the `LNK-001` message lists them relative to the linking document,
+so the choice is between named paths:
+
+```text
+LNK-001: Line 14: Broken link './setup.md' - File not found: .../adr/setup.md;
+2 scanned documents are named 'setup.md': ../guides/setup.md, ../handbook/setup.md.
+LNK-010 rewrites a broken link only when exactly one document matches, so pick
+one and write the path out.
+```
+
+`LNK-002` is reported only. Fix those by hand and validate again.
 
 ## MDX compatibility
 
