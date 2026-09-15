@@ -47,6 +47,7 @@ be read at a glance. IDs are never reused or renumbered once a check ships.
 
 | Prefix | Area |
 |--------|------|
+| `SCAN` | Scan coverage |
 | `FM` | Frontmatter and schema |
 | `ID` | Identifiers and filenames |
 | `LNK` | Links |
@@ -66,6 +67,7 @@ reported.
 
 | ID | Check | Status | Mode | Where |
 |----|-------|--------|------|-------|
+| SCAN-001 | The run scanned no documents at all, so nothing was validated (wrong `--repo-root`, missing `docs-project.yaml`, uninitialized `docs-cms/`). `--allow-empty` accepts the empty scan and exits 0 | Implemented | report | `cli.validate`, `_empty_scan_message` |
 | FM-001 | Missing YAML frontmatter block | Implemented | fix/report | `DocValidator.scan_documents`, `fixes/frontmatter.py` (`add_missing_frontmatter`, `resolve_doc_type`) |
 | FM-002 | Frontmatter fails the per-type Pydantic schema (required fields, types, status values) | Implemented | fix/report | `scan_documents`, `schemas.py` (`Literal` types and `VALID_*_STATUSES`), `fixes/frontmatter.py` (`VALID_STATUSES`, `STATUS_MAPPINGS` and `resolve_doc_type`) |
 | FM-003 | Malformed `doc_uuid` | Implemented | report | `schemas.py` validators |
@@ -92,11 +94,27 @@ reported.
 | FMT-002 | More than two consecutive blank lines | Implemented | report | `check_formatting` |
 | FMT-010 | CRLF or mixed line endings | Planned | fix | see below |
 | FMT-011 | Collapse runs of blank lines | Planned | fix | see below |
+| FMT-012 | UTF-8 byte-order mark before the frontmatter | Implemented | fix | `check_formatting`, `text_io.py`, `fixes/frontmatter.py`, `fixes/whitespace.py` |
 | CB-001 | Code fence without a language, or unclosed fence | Implemented | fix/report | `check_code_blocks`, `fixes/code_blocks.py` |
 | IDX-001 | Document index missing, unlinked, or missing bucket headings | Implemented | report | `check_document_indexes` |
-| RD-001 | Paragraph outside the configured readability thresholds | Implemented | report | `check_readability` |
+| RD-001 | Paragraph outside the readability thresholds of the (sub-)project that owns the document | Implemented | report | `check_readability`, `_readability_config_for`, `_config_context_for_path` |
 | BLD-001 | TypeScript config error | Implemented | report | `check_typescript_config` |
 | BLD-002 | Docusaurus build error | Implemented | report | `check_docusaurus_build` |
+
+**SCAN-001 Empty scan (shipped).** `validate` exited 0 and printed
+`All documents valid` whenever discovery turned up nothing, so a typo in
+`--repo-root`, a checkout without the documentation tree, or a repository
+that never ran `docuchango init` passed CI without validating a single
+document (issue #87). A run that validated nothing now reports SCAN-001 and
+exits 1, naming the likeliest cause: no `docs-project.yaml` was found, the
+one found could not be loaded, or its document folders are empty. The check
+looks at both the CLI's own discovery and `DocValidator.documents`, because
+the validator also picks up plain Markdown at the configured `docs_roots`
+that `_discover_doc_files` does not walk. `--allow-empty` restores the
+exit-0 behaviour for a repository that legitimately has no documents yet,
+and says so in the summary instead of claiming a clean validation. Neither
+`--dry-run` nor `--skip-build` suppresses it. Report only: there is nothing
+to repair.
 
 **ID-011 Nested documents (shipped).** Documents inside subfolders of a
 document folder (`adr/archive/`, `rfcs/2024/`) were treated as support
@@ -107,6 +125,30 @@ scanning nested files with the same id/uuid/link/filename rules as top-level
 files, matched against the file name and not the subfolder path.
 `structure.doc_types.<type>.scan_subfolders` overrides the structure default
 for one document type. Report only.
+
+**FMT-012 UTF-8 byte-order mark (shipped).** `python-frontmatter` wants the
+opening `---` at byte zero, so a BOM in front of it made a perfectly good
+document look like it had no frontmatter at all: every Phase 1 fixer bailed
+out with "No frontmatter found" and Phase 2 reported FM-001 for a document
+that has frontmatter. Every document and config read now goes through
+`docuchango/text_io.py`, which drops a leading BOM the way `utf-8-sig` does,
+and every write stays plain UTF-8. `check_formatting` reports
+`FMT-012: UTF-8 byte-order mark at start of file` from the bytes on disk,
+which is what a `--dry-run` shows; a fixing run removes the mark in Phase 1
+and reports `FMT-012: Removed UTF-8 byte-order mark`. The BOM is the only
+thing removed: when no other fix applies, the original text is rewritten
+verbatim rather than re-serialized.
+
+**RD-001 Sub-project readability (shipped).** `check_readability` read the
+root config only, so a sub-project could not enable, disable or tune
+readability even though its schema, folder and index rules were honored.
+Settings are now resolved per document: `_config_context_for_path` maps a
+file to the deepest config whose directory or `docs_roots` contain it, and
+`_readability_config_for` returns that config's `readability` block, or the
+nearest declared block up the `subprojects` chain when it has none. The block
+is taken whole and never merged key by key, so a sub-project that declares
+one gets schema defaults for the keys it omits. Documents that resolve to
+different settings are scored by separate scorers in one pass. Report only.
 
 ### Planned validators
 

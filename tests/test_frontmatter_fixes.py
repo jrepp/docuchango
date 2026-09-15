@@ -889,3 +889,79 @@ date: 2025/01/26
             assert len(messages) == 0 or any("error" in msg.lower() for msg in messages)
         finally:
             os.chmod(doc, stat.S_IWUSR | stat.S_IRUSR)
+
+
+class TestUtf8ByteOrderMark:
+    """FMT-012: a UTF-8 BOM must not hide the frontmatter from the parser."""
+
+    BOM = b"\xef\xbb\xbf"
+
+    def test_bom_is_removed_and_frontmatter_is_still_fixed(self, tmp_path):
+        """The BOM goes and the frontmatter behind it is repaired in the same pass."""
+        doc = tmp_path / "adr" / "adr-001-test.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_bytes(self.BOM + b'---\nid: "adr-001"\nstatus: draft\n---\n# Test\n')
+
+        changed, messages = fix_frontmatter_metadata(doc)
+
+        assert changed
+        assert "FMT-012: Removed UTF-8 byte-order mark" in messages
+        assert any("status" in msg.lower() for msg in messages)
+        assert not doc.read_bytes().startswith(self.BOM)
+
+        post = frontmatter.loads(doc.read_text(encoding="utf-8"))
+        assert post.metadata["status"] == "Proposed"
+
+    def test_bom_alone_is_removed_without_touching_the_rest(self, tmp_path):
+        """A document that only has a BOM wrong is rewritten byte-for-byte without it."""
+        doc = tmp_path / "adr" / "adr-001-test.md"
+        doc.parent.mkdir(parents=True)
+        body = (
+            "---\n"
+            'id: "adr-001"\n'
+            "status: Accepted\n"
+            "created: 2026-01-02\n"
+            "tags: []\n"
+            'project_id: "fixture"\n'
+            'doc_uuid: "4f2f2b3e-0e2c-4b0a-9a4f-2a8b1c9d0e11"\n'
+            "---\n"
+            "# Test\n"
+        )
+        doc.write_bytes(self.BOM + body.encode())
+
+        changed, messages = fix_frontmatter_metadata(doc)
+
+        assert changed
+        assert messages == ["FMT-012: Removed UTF-8 byte-order mark"]
+        assert doc.read_text(encoding="utf-8") == body
+
+        assert fix_frontmatter_metadata(doc) == (False, [])
+
+    def test_bom_dry_run_does_not_write(self, tmp_path):
+        """--dry-run reports the removal but leaves the bytes alone."""
+        doc = tmp_path / "adr" / "adr-001-test.md"
+        doc.parent.mkdir(parents=True)
+        raw = self.BOM + b'---\nid: "adr-001"\nstatus: draft\n---\n# Test\n'
+        doc.write_bytes(raw)
+
+        changed, messages = fix_frontmatter_metadata(doc, dry_run=True)
+
+        assert changed
+        assert "FMT-012: Removed UTF-8 byte-order mark" in messages
+        assert doc.read_bytes() == raw
+
+    def test_bom_before_plain_markdown_still_gets_frontmatter_added(self, tmp_path):
+        """A BOM in front of a document with no frontmatter reports both repairs."""
+        doc = tmp_path / "adr" / "adr-001-test.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_bytes(self.BOM + b"# Test\n\nNo frontmatter here.\n")
+
+        changed, messages = fix_frontmatter_metadata(doc)
+
+        assert changed
+        assert "FMT-012: Removed UTF-8 byte-order mark" in messages
+        assert any("Added frontmatter block" in msg for msg in messages)
+        assert not doc.read_bytes().startswith(self.BOM)
+
+        post = frontmatter.loads(doc.read_text(encoding="utf-8"))
+        assert post.metadata["id"] == "adr-001"

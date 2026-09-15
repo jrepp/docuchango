@@ -17,6 +17,7 @@ from rich.console import Console
 from docuchango import __version__
 from docuchango.config_paths import resolve_config_path
 from docuchango.schemas import DocsProjectConfig
+from docuchango.text_io import read_text
 
 console = Console()
 
@@ -37,8 +38,7 @@ def _load_docs_project_config_from_candidates(candidates: list[Path]) -> tuple[D
         if not candidate.exists():
             continue
         try:
-            with candidate.open(encoding="utf-8") as f:
-                data = yaml.safe_load(f)
+            data = yaml.safe_load(read_text(candidate))
             return DocsProjectConfig(**data), candidate
         except Exception:
             return None, candidate
@@ -157,6 +157,31 @@ def _discover_doc_files(root: Path) -> list[Path]:
     return sorted(_discover_doc_schemas(root))
 
 
+def _empty_scan_message(repo_root: Path) -> str:
+    """Build the SCAN-001 message for a run that validated nothing.
+
+    The likeliest causes are ordered by how far the run got: no config was
+    found at all, a config was found but could not be parsed, or the config
+    is fine and its document folders are simply empty. Naming the one that
+    applies is what turns "0 documents" into something actionable.
+    """
+    config, config_path = _load_docs_project_config(repo_root)
+    if config_path is None:
+        cause = "no docs-project.yaml was found at the repository root, in docs-cms/ or in docs/"
+    elif config is None:
+        cause = f"the project config at {config_path} could not be loaded"
+    else:
+        cause = f"the document folders configured in {config_path} contain no Markdown files"
+    return (
+        f"SCAN-001: No documents were found under {repo_root}, so nothing was validated "
+        f"({cause}). Check that --repo-root points at the repository that holds the "
+        "documentation, that docs-project.yaml exists at the repository root or in "
+        "docs-cms/, and that its document folders (docs-cms/adr, docs-cms/rfcs, "
+        "docs-cms/memos) contain Markdown files. Run `docuchango init` to create the "
+        "tree, or pass --allow-empty to accept an empty scan."
+    )
+
+
 def _restore_snapshot(snapshot: dict[Path, bytes | None]) -> bool:
     """Restore files to the exact bytes captured before fixes ran.
 
@@ -229,12 +254,18 @@ def main():
         "--no-atomic keeps partial fixes on disk even when issues remain."
     ),
 )
+@click.option(
+    "--allow-empty",
+    is_flag=True,
+    help="Treat a run that finds no documents as success instead of reporting SCAN-001",
+)
 def validate(
     repo_root: Path,
     verbose: bool,
     skip_build: bool,
     dry_run: bool,
     atomic: bool,
+    allow_empty: bool,
 ):
     """Validate and fix documentation files.
 
@@ -250,6 +281,11 @@ def validate(
     --no-atomic to restore the old behaviour and keep partial fixes on disk
     even when issues remain. --dry-run never writes to disk, so --atomic has
     no effect together with it.
+
+    A run that finds no documents at all is reported as SCAN-001 and exits
+    nonzero, because an empty scan is usually a wrong --repo-root or a
+    repository with no docs-cms rather than a clean bill of health. Pass
+    --allow-empty when a repository legitimately has no documents yet.
 
     Validates and fixes:
     - YAML frontmatter (status values, dates, missing fields)
@@ -339,10 +375,15 @@ def validate(
                         console.print(f"  [red]✗[/red] {rel_path}: Error in Code blocks - {e}")
 
     # Phase 2: Run validation to find remaining issues
+    documents_scanned = 0
     try:
         # Fixing is Phase 1 above; the validator only reports.
         validator = DocValidator(repo_root=repo_root, verbose=verbose)
         validator.scan_documents()
+        # The validator also picks up plain Markdown at the configured docs
+        # roots, which _discover_doc_files does not walk, so "nothing was
+        # validated" needs both counts (see SCAN-001 below).
+        documents_scanned = len(validator.documents)
         validator.extract_links()
         validator.validate_links()
         validator.check_ids()
@@ -387,6 +428,13 @@ def validate(
             traceback.print_exc()
         sys.exit(2)
 
+    # SCAN-001: a run that validated nothing is not a successful run. An
+    # empty scan is almost always a wrong --repo-root, a checkout without the
+    # documentation tree, or a repository that never ran `docuchango init`,
+    # and reporting success for it turns a CI job into a false positive.
+    if not all_files and not documents_scanned and not allow_empty:
+        remaining_issues.append((repo_root, _empty_scan_message(repo_root)))
+
     # Atomicity: if fixing still leaves issues, roll every write in this run
     # back so the tree is either fully fixed and valid, or untouched.
     withheld = False
@@ -397,7 +445,12 @@ def validate(
     if not fixes_applied and not remaining_issues:
         # Clean output when everything is valid
         console.print(f"Scanned {len(all_files)} files\n")
-        console.print("[bold green]✅ All documents valid[/bold green]")
+        if not all_files and not documents_scanned:
+            # Only reachable with --allow-empty; say so rather than claim a
+            # clean validation nobody performed.
+            console.print("[bold yellow]⚠️ No documents found; empty scan allowed by --allow-empty[/bold yellow]")
+        else:
+            console.print("[bold green]✅ All documents valid[/bold green]")
         sys.exit(0)
 
     # Show detailed output when there are fixes or issues
@@ -565,7 +618,7 @@ def init(path: Path | None, project_id: str, project_name: str, force: bool):
                 continue
 
             template_path = template_dir / template_name
-            content = template_path.read_text()
+            content = template_path.read_text(encoding="utf-8")
 
             # Customize docs-project.yaml with provided values
             # Use simultaneous replacement to prevent cascading replacement bugs
@@ -1209,7 +1262,7 @@ def migrate(
             continue
 
         try:
-            content = file_path.read_text(encoding="utf-8")
+            content = read_text(file_path)
             post = frontmatter.loads(content)
 
             if not post.metadata:

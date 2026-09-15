@@ -45,6 +45,7 @@ try:
     from docuchango.schemas import (
         ADRFrontmatter,
         DocsProjectConfig,
+        DocsProjectReadability,
         GenericDocFrontmatter,
         MemoFrontmatter,
         PRDFrontmatter,
@@ -74,6 +75,7 @@ except ImportError as e:
 
 
 from docuchango.config_paths import is_within_path, resolve_config_path
+from docuchango.text_io import FMT_012_FINDING_MESSAGE, has_bom, read_text
 
 # A link target that starts with a URI scheme ("mailto:", "tel:", "ftp://",
 # ...) is never a filesystem path and must not be resolved as one.
@@ -115,7 +117,7 @@ class Document:
     def get_content(self) -> str:
         """Get file content, using cache if available"""
         if self._content_cache is None:
-            self._content_cache = self.file_path.read_text(encoding="utf-8")
+            self._content_cache = read_text(self.file_path)
         return self._content_cache
 
 
@@ -141,6 +143,7 @@ class ProjectConfigContext:
 
     config: DocsProjectConfig
     path: Path
+    parent: "ProjectConfigContext | None" = None
 
     @property
     def base_dir(self) -> Path:
@@ -166,6 +169,7 @@ class DocValidator:
         self.project_config_path: Path | None = None
         self.project_config = self._load_project_config()
         self.project_configs = self._load_project_config_contexts()
+        self._ownership_roots: list[tuple[Path, ProjectConfigContext]] | None = None
 
     def _load_project_config(self) -> DocsProjectConfig | None:
         """Load docs-project.yaml configuration"""
@@ -180,12 +184,11 @@ class DocValidator:
                 continue
 
             try:
-                with open(config_path, encoding="utf-8") as f:
-                    config_data = yaml.safe_load(f)
-                    config = DocsProjectConfig(**config_data)
-                    self.project_config_path = config_path
-                    self.log(f"✓ Loaded project config: {config.project.id} ({config_path})")
-                    return config
+                config_data = yaml.safe_load(read_text(config_path))
+                config = DocsProjectConfig(**config_data)
+                self.project_config_path = config_path
+                self.log(f"✓ Loaded project config: {config.project.id} ({config_path})")
+                return config
             except ValidationError as e:
                 self.log(f"⚠️  Warning: Invalid project config format at {config_path}: {e}")
                 return None
@@ -206,8 +209,7 @@ class DocValidator:
             return None
 
         try:
-            with open(config_path, encoding="utf-8") as f:
-                config_data = yaml.safe_load(f)
+            config_data = yaml.safe_load(read_text(config_path))
             config = DocsProjectConfig(**config_data)
             self.log(f"✓ Loaded sub-project config: {config.project.id} ({config_path})")
             return config
@@ -257,7 +259,7 @@ class DocValidator:
                 if not sub_config:
                     continue
 
-                context = ProjectConfigContext(sub_config, sub_path)
+                context = ProjectConfigContext(sub_config, sub_path, parent=parent)
                 contexts.append(context)
                 pending.append(context)
 
@@ -295,6 +297,56 @@ class DocValidator:
         if resolved is None:
             self._add_path_escape_error(context, path_value, purpose, boundary.resolve())
         return resolved
+
+    def _config_ownership_roots(self) -> list[tuple[Path, ProjectConfigContext]]:
+        """Directories owned by each loaded config, deepest first.
+
+        A config owns the directory that holds it plus every docs root it
+        configures, so a document can be mapped back to the (sub-)project
+        whose settings apply to it.
+        """
+        if self._ownership_roots is None:
+            roots: list[tuple[Path, ProjectConfigContext]] = []
+            for context in self.project_configs:
+                owned = {context.base_dir.resolve()}
+                for path_value in context.config.structure.docs_roots:
+                    resolved = resolve_config_path(
+                        context.base_dir, path_value, context.base_dir, context.allow_external_paths
+                    )
+                    if resolved:
+                        owned.add(resolved)
+                roots.extend((path, context) for path in owned)
+            roots.sort(key=lambda item: len(item[0].parts), reverse=True)
+            self._ownership_roots = roots
+        return self._ownership_roots
+
+    def _config_context_for_path(self, file_path: Path) -> ProjectConfigContext | None:
+        """Return the loaded config that owns a document path.
+
+        The deepest owning directory wins, so a document inside a sub-project
+        resolves to that sub-project rather than to the root config.
+        """
+        if not self.project_configs:
+            return None
+        resolved = file_path.resolve()
+        for root, context in self._config_ownership_roots():
+            if is_within_path(resolved, root):
+                return context
+        return self.project_configs[0]
+
+    def _readability_config_for(self, file_path: Path) -> "DocsProjectReadability | None":
+        """Resolve the readability settings that apply to one document.
+
+        The owning (sub-)project's `readability` block wins as a whole. A
+        config that does not declare the block inherits its parent's block,
+        up to the root config; nothing is merged key by key.
+        """
+        context = self._config_context_for_path(file_path)
+        while context is not None:
+            if "readability" in context.config.model_fields_set:
+                return context.config.readability
+            context = context.parent
+        return self.project_config.readability if self.project_config else None
 
     def log(self, message: str, force: bool = False):
         """Log if verbose or forced"""
@@ -630,7 +682,7 @@ class DocValidator:
         """Parse document with python-frontmatter and pydantic validation"""
         try:
             # Read file content once and cache it
-            content = file_path.read_text(encoding="utf-8")
+            content = read_text(file_path)
 
             # Parse frontmatter from content
             post = frontmatter.loads(content)
@@ -1395,7 +1447,7 @@ class DocValidator:
 
     def _bucket_for_target(self, target_path: Path, bucket_config) -> str | None:
         """Compute the expected index bucket for a target document."""
-        post = frontmatter.loads(target_path.read_text(encoding="utf-8"))
+        post = frontmatter.loads(read_text(target_path))
 
         if bucket_config.cadence == "milestone":
             milestone = post.metadata.get(bucket_config.milestone_field)
@@ -1467,7 +1519,7 @@ class DocValidator:
                     continue
 
                 try:
-                    content = index_path.read_text(encoding="utf-8")
+                    content = read_text(index_path)
                     links = self._extract_markdown_file_links(content, index_path)
                     target_paths: set[Path] = set()
                     for target_pattern in index_config.targets:
@@ -1855,6 +1907,13 @@ class DocValidator:
                 content = doc.get_content()
                 lines = content.split("\n")
 
+                # FMT-012: a UTF-8 BOM hides the opening '---' from the
+                # frontmatter parser. Documents are read with the BOM stripped,
+                # so the file itself has to be consulted for the marker.
+                if has_bom(doc.file_path):
+                    doc.errors.append(FMT_012_FINDING_MESSAGE)
+                    self.log(f"   ✗ {doc.file_path.name}: {FMT_012_FINDING_MESSAGE}")
+
                 # Check for trailing whitespace
                 for line_num, line in enumerate(lines, start=1):
                     if line.rstrip() != line:
@@ -1874,23 +1933,43 @@ class DocValidator:
                 doc.errors.append(f"Error checking formatting: {e}")
 
     def check_readability(self):
-        """Check document readability using textstat metrics."""
+        """Check document readability using textstat metrics (RD-001).
+
+        Settings are resolved per document from the (sub-)project that owns
+        it, so a sub-project can enable, disable or tune readability on its
+        own.
+        """
         if not TEXTSTAT_AVAILABLE:
             self.log("\n📖 Readability checking skipped (textstat not installed)")
             return
 
-        if not self.project_config or not self.project_config.readability.enabled:
+        if not self.project_config:
+            self.log("\n📖 Readability checking disabled")
+            return
+
+        # Each document is scored with the settings of the config that owns
+        # it; identical settings share one scorer.
+        enabled_docs: list[tuple[Document, DocsProjectReadability]] = []
+        for doc in self.documents:
+            settings = self._readability_config_for(doc.file_path)
+            if settings and settings.enabled:
+                enabled_docs.append((doc, settings))
+
+        if not enabled_docs:
             self.log("\n📖 Readability checking disabled")
             return
 
         self.log("\n📖 Checking readability...")
 
-        # Convert project config to ReadabilityConfig
-        config = self.project_config.readability.to_readability_config()
+        scorers: dict[str, ReadabilityScorer] = {}
 
-        scorer = ReadabilityScorer(config)
+        for doc, settings in enabled_docs:
+            scorer_key = settings.model_dump_json()
+            scorer = scorers.get(scorer_key)
+            if scorer is None:
+                scorer = ReadabilityScorer(settings.to_readability_config())
+                scorers[scorer_key] = scorer
 
-        for doc in self.documents:
             try:
                 content = doc.get_content()
                 report = scorer.analyze_document(content, file_path=str(doc.file_path.relative_to(self.repo_root)))

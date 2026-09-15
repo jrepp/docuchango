@@ -10,6 +10,7 @@ from pathlib import Path
 import frontmatter
 
 from docuchango.fixes.yaml_utils import dumps as frontmatter_dumps
+from docuchango.text_io import read_text
 
 DOC_ID_RE = re.compile(r"\b(adr|rfc|memo|prd)-(\d{3})\b", re.IGNORECASE)
 FILENAME_ID_RE = re.compile(r"^(adr|rfc|memo|prd)-(\d{3})(-.+)?\.md$", re.IGNORECASE)
@@ -199,7 +200,7 @@ def _sync_frontmatter_ids(doc_files: list[Path], changes: list[DocumentIdChange]
             continue
 
         try:
-            post = frontmatter.load(file_path)
+            post = frontmatter.loads(read_text(file_path))
         except Exception:  # noqa: S112 - malformed docs are ignored by this repair pass
             continue
         if post.metadata.get("id") == filename_id:
@@ -300,7 +301,7 @@ def _document_id_for_file(file_path: Path) -> str | None:
         return filename_id
 
     try:
-        post = frontmatter.load(file_path)
+        post = frontmatter.loads(read_text(file_path))
     except Exception:
         post = None
     metadata_value = post.metadata.get("id") if post else None
@@ -320,7 +321,7 @@ def _filename_id(file_path: Path) -> str | None:
 
 
 def _set_frontmatter_id(file_path: Path, doc_id: str) -> None:
-    content = file_path.read_text(encoding="utf-8")
+    content = read_text(file_path)
     post = frontmatter.loads(content)
     post.metadata["id"] = doc_id
     file_path.write_text(frontmatter_dumps(post), encoding="utf-8")
@@ -337,6 +338,6 @@ def _iter_text_files(repo_root: Path) -> Iterator[Path]:
 
 def _read_text(file_path: Path) -> str | None:
     try:
-        return file_path.read_text(encoding="utf-8")
+        return read_text(file_path)
     except UnicodeDecodeError:
         return None

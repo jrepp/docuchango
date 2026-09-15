@@ -116,6 +116,11 @@ issues in the dry run, even though the second command fixes them silently.
 Anything left in the report after a real run, such as an `id` that does not
 match its filename or a broken link, needs a person.
 
+If either command reports `SCAN-001: No documents were found`, it validated
+nothing: check that you are in the right repository, that `docs-project.yaml`
+sits at the repository root or in `docs-cms/`, and that its document folders
+contain Markdown files. `--allow-empty` accepts an empty scan on purpose.
+
 The second command is atomic by default: if anything is still wrong once
 fixing finishes, every fix from that run is withheld and your files are left
 exactly as they were, listed in the report as "withheld" instead of
@@ -171,7 +176,10 @@ step first, or `validate` will run `npm run build` and typecheck against a
 `node_modules` that was never installed.
 
 `--dry-run` never rewrites files in CI; the job fails when an issue remains
-in the committed files, fixable or not. `fetch-depth: 0` gives docuchango the
+in the committed files, fixable or not. It also fails when the scan finds no
+documents at all (`SCAN-001`), so a wrong `--repo-root` or a checkout without
+`docs-cms/` cannot pass as a clean run; add `--allow-empty` if the repository
+legitimately has no documents yet. `fetch-depth: 0` gives docuchango the
 git history it uses for timestamps.
 
 ## Reference

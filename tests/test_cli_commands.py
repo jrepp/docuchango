@@ -22,6 +22,7 @@ class TestValidateCommand:
         assert "--verbose" in result.output
         assert "--skip-build" in result.output
         assert "--dry-run" in result.output
+        assert "--allow-empty" in result.output
 
     def test_validate_with_verbose(self, docs_repository):
         """Test validate command with verbose flag."""
@@ -527,6 +528,108 @@ Nothing here can be auto-fixed.
 
         assert result.exit_code == 0
         assert fixable_file.read_bytes() == after_first
+
+
+class TestValidateEmptyScan:
+    """SCAN-001: a run that validated nothing must not report success.
+
+    Regression tests for the bug where `validate` exited 0 with "All
+    documents valid" whenever discovery turned up no documents, so a wrong
+    --repo-root, a checkout without the documentation tree, or a repository
+    that never ran `docuchango init` passed CI without validating anything.
+    """
+
+    CLEAN_ADR = """---
+id: adr-001
+title: "ADR-001: Clean Document"
+status: Accepted
+created: 2025-01-01
+deciders: "Core Team"
+tags: [testing]
+project_id: test-project
+doc_uuid: 12345678-1234-4123-8123-123456789ccc
+---
+
+# ADR-001: Clean Document
+
+Nothing here needs fixing.
+"""
+
+    @staticmethod
+    def _run(*args):
+        # A wide console keeps Rich from hard-wrapping the finding message.
+        return CliRunner().invoke(validate, list(args), env={"COLUMNS": "200"}, catch_exceptions=False)
+
+    def test_empty_repo_root_exits_nonzero_with_scan_001(self, tmp_path):
+        """An empty repository root is a failure, not a clean validation."""
+        result = self._run("--repo-root", str(tmp_path), "--skip-build")
+
+        assert result.exit_code == 1
+        assert "SCAN-001" in result.output
+        assert "All documents valid" not in result.output
+
+    def test_scan_001_message_says_what_to_check(self, tmp_path):
+        """The message names the repo root, the config and the escape hatch."""
+        result = self._run("--repo-root", str(tmp_path), "--skip-build")
+
+        output = " ".join(result.output.split())
+        assert "No documents were found" in output
+        assert "no docs-project.yaml was found" in output
+        assert "docs-cms/adr" in output
+        assert "--allow-empty" in output
+
+    def test_dry_run_and_skip_build_do_not_hide_empty_scan(self, tmp_path):
+        """--dry-run and --skip-build must not suppress SCAN-001."""
+        for extra in ([], ["--dry-run"], ["--verbose"], ["--dry-run", "--verbose"]):
+            result = self._run("--repo-root", str(tmp_path), "--skip-build", *extra)
+            assert result.exit_code == 1, f"{extra} hid the empty scan:\n{result.output}"
+            assert "SCAN-001" in result.output, f"{extra} hid the empty scan:\n{result.output}"
+
+    def test_allow_empty_exits_zero_and_says_so(self, tmp_path):
+        """--allow-empty restores exit 0 without claiming documents were valid."""
+        result = self._run("--repo-root", str(tmp_path), "--skip-build", "--allow-empty")
+
+        assert result.exit_code == 0
+        assert "SCAN-001" not in result.output
+        assert "No documents found" in result.output
+        assert "All documents valid" not in result.output
+
+    def test_populated_tree_is_unaffected(self, tmp_path):
+        """A normal tree still exits 0 and never mentions SCAN-001."""
+        adr_dir = tmp_path / "docs-cms" / "adr"
+        adr_dir.mkdir(parents=True)
+        (adr_dir / "adr-001-clean.md").write_text(self.CLEAN_ADR, encoding="utf-8")
+
+        result = self._run("--repo-root", str(tmp_path), "--skip-build")
+
+        assert result.exit_code == 0, result.output
+        assert "SCAN-001" not in result.output
+        assert "All documents valid" in result.output
+
+    def test_documents_outside_the_doc_folders_are_not_an_empty_scan(self, tmp_path):
+        """Plain Markdown at a docs root counts even though CLI discovery misses it.
+
+        `_discover_doc_files` only walks the configured document folders,
+        while the validator also parses loose Markdown at each docs root. A
+        tree with only the latter validated one document, so SCAN-001 must
+        not fire on it.
+        """
+        docs_cms = tmp_path / "docs-cms"
+        docs_cms.mkdir()
+        (docs_cms / "docs-project.yaml").write_text(
+            'version: "1"\nproject:\n  id: test-project\n  name: Test Project\n',
+            encoding="utf-8",
+        )
+        (docs_cms / "overview.md").write_text(
+            "---\ntitle: Overview\nproject_id: test-project\n"
+            "doc_uuid: 12345678-1234-4123-8123-123456789ddd\n---\n\n# Overview\n\nA loose document.\n",
+            encoding="utf-8",
+        )
+
+        result = self._run("--repo-root", str(tmp_path), "--skip-build")
+
+        assert "SCAN-001" not in result.output, result.output
+        assert result.exit_code == 0, result.output
 
 
 class TestMainCommandGroup:

@@ -42,6 +42,12 @@ ls docs-cms/adr/  # List ADRs
 ls docs-cms/rfcs/ # List RFCs
 ```
 
+A run that finds no documents at all reports `SCAN-001: No documents were
+found` and exits 1: nothing was validated, so do not read it as a pass. You
+are usually in the wrong directory, or the repository has no
+`docs-project.yaml` and no `docs-cms/`. Only pass `--allow-empty` when the
+repository genuinely has no documents yet.
+
 ## Agent Workflow
 
 ### 1. Initial Context Gathering

@@ -17,6 +17,7 @@ import frontmatter
 from docuchango.fixes.tags import normalize_tag
 from docuchango.fixes.whitespace import ensure_required_fields, normalize_empty_values, trim_string_values
 from docuchango.fixes.yaml_utils import dumps as frontmatter_dumps
+from docuchango.text_io import FMT_012_FIX_MESSAGE, read_document, read_text
 
 # Valid status values by document type
 VALID_STATUSES = {
@@ -130,7 +131,7 @@ def fix_status_value(file_path: Path, dry_run: bool = False, schema: str | None 
         Tuple of (changed, message)
     """
     try:
-        content = file_path.read_text(encoding="utf-8")
+        content = read_text(file_path)
         post = frontmatter.loads(content)
 
         if "status" not in post.metadata:
@@ -196,7 +197,7 @@ def fix_date_format(file_path: Path, dry_run: bool = False) -> tuple[bool, str]:
         Tuple of (changed, message)
     """
     try:
-        content = file_path.read_text(encoding="utf-8")
+        content = read_text(file_path)
         post = frontmatter.loads(content)
 
         # Check for date or created field
@@ -296,7 +297,7 @@ def add_missing_frontmatter(file_path: Path, dry_run: bool = False, schema: str 
         Tuple of (changed, message)
     """
     try:
-        content = file_path.read_text(encoding="utf-8")
+        content = read_text(file_path)
 
         # Check if frontmatter already exists
         if content.strip().startswith("---"):
@@ -403,7 +404,7 @@ def fix_all_frontmatter(file_path: Path, dry_run: bool = False, schema: str | No
 
     # Check if file is readable as text
     try:
-        file_path.read_text(encoding="utf-8")
+        read_text(file_path)
     except UnicodeDecodeError as e:
         raise ValueError(f"File contains binary content: {e}") from e
 
@@ -563,7 +564,7 @@ def fix_frontmatter_metadata(
     any; it decides the document type instead of the folder-name heuristic.
     """
     try:
-        content = file_path.read_text(encoding="utf-8")
+        content, bom_removed = read_document(file_path)
     except UnicodeDecodeError as e:
         raise ValueError(f"File contains binary content: {e}") from e
     except Exception as e:
@@ -574,13 +575,23 @@ def fix_frontmatter_metadata(
     except Exception as e:
         return False, [f"Error parsing frontmatter: {e}"]
 
+    messages = []
+
+    # FMT-012: a UTF-8 BOM hides the opening '---' from python-frontmatter, so
+    # it is stripped before parsing and never written back.
+    if bom_removed:
+        messages.append(FMT_012_FIX_MESSAGE)
+
     if not post.metadata:
         changed, message = add_missing_frontmatter(file_path, dry_run=dry_run, schema=schema)
-        return (changed, [message] if changed else [])
+        if changed:
+            messages.append(message)
+        elif bom_removed and not dry_run:
+            file_path.write_text(content, encoding="utf-8")
+        return (changed or bom_removed), (messages if (changed or bom_removed) else [])
 
     metadata = post.metadata.copy()
     original_metadata = metadata.copy()
-    messages = []
 
     status_message = _fix_status_metadata(metadata, resolve_doc_type(file_path, schema))
     if status_message:
@@ -607,6 +618,12 @@ def fix_frontmatter_metadata(
         post.metadata = metadata
         if not dry_run:
             file_path.write_text(frontmatter_dumps(post), encoding="utf-8")
+        return True, messages
+
+    if bom_removed:
+        # Nothing else to repair: rewrite the original content without the BOM.
+        if not dry_run:
+            file_path.write_text(content, encoding="utf-8")
         return True, messages
 
     return False, []

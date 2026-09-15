@@ -15,6 +15,30 @@ Checks that are planned but not yet built, and the finding ID assigned to
 every check, are tracked in the
 [validator roadmap](../docs-cms/rfcs/rfc-003-validator-roadmap.md).
 
+## Scan coverage
+
+**Detected**
+
+- `SCAN-001`: the run found no documents at all, so nothing was validated
+
+A scan that turns up zero documents is reported as an issue and exits 1. It
+is almost always a wrong `--repo-root`, a checkout that does not contain the
+documentation tree, or a repository that never ran `docuchango init` - not a
+clean bill of health. The message names the likeliest cause: no
+`docs-project.yaml` was found at the repository root, in `docs-cms/` or in
+`docs/`; the one that was found could not be loaded; or the document folders
+it configures contain no Markdown files.
+
+Neither `--dry-run` nor `--skip-build` suppresses the check.
+
+**Left to you**
+
+- Point `--repo-root` at the repository that holds the documentation, create
+  the tree with `docuchango init`, or pass `--allow-empty` when a repository
+  legitimately has no documents yet. An allowed empty scan exits 0 and says
+  `No documents found; empty scan allowed by --allow-empty` rather than
+  claiming a clean validation.
+
 ## Frontmatter
 
 **Detected**
@@ -140,6 +164,9 @@ wrap the text in backticks, then validate again.
 
 - Trailing whitespace
 - More than two consecutive blank lines
+- A UTF-8 byte-order mark at the start of a file (`FMT-012`), which otherwise
+  hides the frontmatter from the parser and gets the document reported as
+  having none
 
 **Fixed automatically**
 
@@ -147,6 +174,10 @@ wrap the text in backticks, then validate again.
   fence fixes (above), this is not previewed in `--dry-run`: a trailing-space
   line shows up as a plain issue there, then disappears silently on the real
   run
+- Removes a UTF-8 byte-order mark (`FMT-012: Removed UTF-8 byte-order mark`)
+  and rewrites the file as plain UTF-8. Documents are always read with a
+  leading BOM ignored, so the frontmatter behind one is parsed and validated
+  normally instead of being reported as missing
 
 **Left to you**
 
@@ -192,12 +223,16 @@ Index findings are reported, not fixed.
 
 ## Readability
 
-When `textstat` is installed and `readability.enabled` is true in the
-top-level config, paragraphs at least as long as the configured minimum are
-scored. Paragraphs outside the thresholds are reported with the metric that
-failed. Nothing is rewritten. In a monorepo with `subprojects`, only the
-top-level `readability` settings apply; a sub-project's own settings are not
-read.
+When `textstat` is installed and `readability.enabled` is true, paragraphs at
+least as long as the configured minimum are scored. Paragraphs outside the
+thresholds are reported with the metric that failed. Nothing is rewritten.
+
+Settings are resolved per document from the config that owns it, so in a
+monorepo with `subprojects` a sub-project can enable, disable or tune
+readability on its own. A config that does not declare a `readability` block
+inherits the nearest one up the `subprojects` chain, ending at the root
+config. A declared block is used whole and is never merged key by key with its
+parent's.
 
 ## Docusaurus build
 
@@ -212,6 +247,7 @@ and in CI jobs that do not have Node installed.
 |------|---------|
 | 0 | Every document valid, or every issue fixed |
 | 1 | Issues remain after the fixes for this run were applied (or, in `--dry-run`, simulated); under the default atomic run, the fixes this run would have made were withheld and the tree is untouched |
+| 1 | Nothing was scanned at all (`SCAN-001`), unless `--allow-empty` is passed |
 | 2 | The run itself failed: the validator could not be imported or raised, or the command line was wrong (a bad `--repo-root`, an unknown option) |
 
 Treat 2 as "docuchango could not tell you anything", not as a documentation

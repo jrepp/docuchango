@@ -111,10 +111,10 @@ subprojects:
   - vendor/service-b/docs-project.yaml
 ```
 
-Each sub-project is validated with its own config, its own `project.id`, and
-its own document structure and index rules. Readability is the one exception:
-it is currently read from the top-level config only, so a sub-project's own
-`readability` block has no effect.
+Each sub-project is validated with its own config, its own `project.id`, its
+own document structure and index rules, and its own `readability` block. A
+sub-project that does not declare `readability` inherits it from the config
+that included it, up to the root (see [Readability](#readability)).
 
 ## Path containment
 
@@ -259,9 +259,21 @@ indexes:
 
 When the optional `textstat` dependency is installed, paragraphs at least
 `min_paragraph_length` characters long are scored and reported against these
-thresholds. Disable the whole check with `enabled: false`. Only the
-top-level config's `readability` settings are used, even in a monorepo with
-`subprojects` (see above).
+thresholds. Disable the whole check with `enabled: false`.
+
+Settings are resolved per document from the config that owns it, so in a
+monorepo each sub-project can enable, disable or tune readability on its own.
+The precedence is:
+
+1. The `readability` block of the config that owns the document - the deepest
+   config whose directory or `docs_roots` contain the file.
+2. Otherwise the block of the nearest config up the `subprojects` chain that
+   declares one, ending at the root config.
+
+The block is taken as a whole, never merged key by key. A sub-project that
+declares `readability: {enabled: true}` gets the schema defaults for every
+threshold it leaves out, not the root's values. To inherit the root's
+thresholds, leave the block out of the sub-project config entirely.
 
 ```yaml
 readability:

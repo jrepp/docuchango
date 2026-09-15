@@ -32,8 +32,11 @@ write documentation together and need it to stay trustworthy.
   cite and extend the docs. Point `AGENTS.md` at it and you are done.
 - **Fast and CI-friendly.** Scanning and fixing a hundred documents takes
   well under a second; exit codes work in pre-commit hooks and pull request
-  checks. A Docusaurus build, if your repo has one, is checked too unless
-  you pass `--skip-build`, and takes as long as the build does.
+  checks. A run that finds no documents at all fails with `SCAN-001` instead
+  of passing quietly, so a wrong `--repo-root` cannot turn into a green CI
+  job; pass `--allow-empty` when that is really what you want. A Docusaurus
+  build, if your repo has one, is checked too unless you pass
+  `--skip-build`, and takes as long as the build does.
 
 ## Two-minute start
 
@@ -137,6 +140,7 @@ Generate a UUID with `uuidgen | tr '[:upper:]' '[:lower:]'` or
 | `docuchango validate` | Check every document and fix what can be fixed |
 | `docuchango validate --dry-run` | Report only, change nothing |
 | `docuchango validate --verbose` | Show every check, useful in CI logs |
+| `docuchango validate --allow-empty` | Exit 0 when the scan finds no documents at all |
 | `docuchango bulk update --type adr --set status=Accepted` | Change a frontmatter field across many documents |
 | `docuchango bulk timestamps` | Derive `created` dates from git history |
 | `docuchango migrate --project-id my-app` | Upgrade legacy frontmatter to the current schema |
@@ -193,6 +197,12 @@ This example only validates the documents themselves. If your repository
 also has a `docusaurus/` directory, `validate` runs its TypeScript check and
 `npm run build` unless you pass `--skip-build`; add the site's Node setup
 (`npm ci` or equivalent) to this job before dropping the flag.
+
+The job also fails when the scan finds nothing at all: a wrong `--repo-root`,
+a checkout without the documentation tree, or a repository that never ran
+`docuchango init` reports `SCAN-001` and exits 1 rather than passing
+silently. Add `--allow-empty` only if a repository in this workflow
+legitimately has no documents yet.
 
 `--dry-run` never writes to the working tree. The job fails when an issue
 remains in the committed files, whether or not `validate` could fix it for

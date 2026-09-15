@@ -11,10 +11,12 @@ Usage:
 import re
 from pathlib import Path
 
+from docuchango.text_io import read_text
+
 
 def fix_cross_plugin_links(file_path: Path, dry_run: bool = False) -> int:
     """Fix cross-plugin links in a single file."""
-    content = file_path.read_text(encoding="utf-8")
+    content = read_text(file_path)
     original_content = content
 
     # Pattern: [text](../rfcs/RFC-XXX-name.md) -> [text](/rfc/RFC-XXX-name)

@@ -1,6 +1,7 @@
 """Tests for readability.py module."""
 
 import pytest
+import yaml
 
 from docuchango.readability import (
     TEXTSTAT_AVAILABLE,
@@ -723,3 +724,178 @@ Another short one.
             for error in score.errors:
                 # Should contain numeric threshold value
                 assert any(char.isdigit() for char in error)
+
+
+COMPLEX_TEXT = (
+    "Implementation of sophisticated multidimensional architectural methodologies "
+    "necessitates comprehensive understanding of organizational restructuring paradigms "
+    "incorporating contemporary technological advancements and interdisciplinary approaches "
+    "throughout the entire heterogeneous infrastructure provisioning lifecycle."
+)
+
+
+def _write_config(directory, project_id, readability=None, subprojects=None):
+    """Write a docs-project.yaml that scans generic Markdown under docs/."""
+    config = {
+        "version": "1",
+        "project": {"id": project_id, "name": project_id},
+        "structure": {"docs_roots": ["docs"]},
+    }
+    if readability is not None:
+        config["readability"] = readability
+    if subprojects:
+        config["subprojects"] = subprojects
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "docs-project.yaml").write_text(yaml.dump(config))
+
+
+def _write_doc(directory, name, project_id):
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / name).write_text(
+        f"""---
+title: Document {name}
+project_id: {project_id}
+doc_uuid: 11111111-1111-4111-8111-111111111111
+---
+
+# Heading
+
+{COMPLEX_TEXT}
+"""
+    )
+
+
+def _run_readability(repo_root, root_readability, sub_readability, nested_readability=None, with_nested=False):
+    """Build a monorepo tree, scan it, and return the errors check_readability added."""
+    from docuchango.validator import DocValidator
+
+    _write_config(repo_root, "root-project", readability=root_readability, subprojects=["services/service-a"])
+    _write_doc(repo_root / "docs", "root-doc.md", "root-project")
+
+    sub_dir = repo_root / "services" / "service-a"
+    _write_config(
+        sub_dir,
+        "service-a",
+        readability=sub_readability,
+        subprojects=["nested"] if with_nested else None,
+    )
+    _write_doc(sub_dir / "docs", "sub-doc.md", "service-a")
+
+    if with_nested:
+        nested_dir = sub_dir / "nested"
+        _write_config(nested_dir, "service-a-nested", readability=nested_readability)
+        _write_doc(nested_dir / "docs", "nested-doc.md", "service-a-nested")
+
+    validator = DocValidator(repo_root, verbose=False)
+    validator.scan_documents()
+    before = {doc.file_path.name: len(doc.errors) for doc in validator.documents}
+    validator.check_readability()
+    added = {doc.file_path.name: doc.errors[before[doc.file_path.name] :] for doc in validator.documents}
+    return validator, added
+
+
+class TestSubProjectReadabilityConfig:
+    """Readability settings resolve from the (sub-)project that owns a document (RD-001).
+
+    Precedence is per document and whole-block: the owning config's
+    ``readability`` block wins outright, and a config that does not declare one
+    inherits the nearest parent config that does, up to the root. Blocks are
+    never merged key by key.
+    """
+
+    def test_sub_project_enables_while_root_disables(self, tmp_path):
+        """A sub-project turns readability on even when the root config turns it off."""
+        _, errors = _run_readability(
+            tmp_path,
+            root_readability={"enabled": False},
+            sub_readability={"enabled": True, "flesch_reading_ease_min": 90.0},
+        )
+
+        assert errors["root-doc.md"] == []
+        assert errors["sub-doc.md"]
+
+    def test_sub_project_disables_while_root_enables(self, tmp_path):
+        """A sub-project turns readability off even when the root config turns it on."""
+        _, errors = _run_readability(
+            tmp_path,
+            root_readability={"enabled": True, "flesch_reading_ease_min": 90.0},
+            sub_readability={"enabled": False},
+        )
+
+        assert errors["root-doc.md"]
+        assert errors["sub-doc.md"] == []
+
+    def test_sub_project_tunes_thresholds(self, tmp_path):
+        """A sub-project scores its own documents against its own thresholds."""
+        permissive = {
+            "enabled": True,
+            "flesch_reading_ease_min": None,
+            "flesch_kincaid_grade_max": None,
+            "gunning_fog_max": None,
+            "smog_index_max": None,
+            "automated_readability_index_max": None,
+            "coleman_liau_index_max": None,
+            "dale_chall_max": None,
+        }
+        _, errors = _run_readability(
+            tmp_path,
+            root_readability=permissive,
+            sub_readability={"enabled": True, "flesch_reading_ease_min": 90.0},
+        )
+
+        assert errors["root-doc.md"] == []
+        assert any("Flesch Reading Ease" in error for error in errors["sub-doc.md"])
+
+    def test_sub_project_without_block_inherits_root_thresholds(self, tmp_path):
+        """A sub-project with no readability block is scored with the root's block."""
+        _, errors = _run_readability(
+            tmp_path / "strict",
+            root_readability={"enabled": True, "flesch_reading_ease_min": 90.0},
+            sub_readability=None,
+        )
+
+        assert errors["root-doc.md"]
+        assert errors["sub-doc.md"]
+
+    def test_sub_project_without_block_inherits_root_disabled(self, tmp_path):
+        """Inheritance covers `enabled: false` as well as the thresholds."""
+        _, errors = _run_readability(
+            tmp_path / "disabled",
+            root_readability={"enabled": False},
+            sub_readability=None,
+        )
+
+        assert errors["root-doc.md"] == []
+        assert errors["sub-doc.md"] == []
+
+    def test_sub_project_block_replaces_root_block(self, tmp_path):
+        """A declared block is used whole; the root's thresholds do not leak into it."""
+        validator, errors = _run_readability(
+            tmp_path,
+            root_readability={"enabled": True, "flesch_reading_ease_min": 90.0},
+            sub_readability={"enabled": True},
+        )
+
+        assert errors["root-doc.md"]
+
+        sub_doc = tmp_path / "services" / "service-a" / "docs" / "sub-doc.md"
+        context = validator._config_context_for_path(sub_doc)
+        assert context is not None and context.config.project.id == "service-a"
+        settings = validator._readability_config_for(sub_doc)
+        assert settings is not None
+        # Schema defaults, not the root's stricter minimum.
+        assert settings.flesch_reading_ease_min == 60.0
+
+    def test_nested_sub_project_inherits_nearest_declaring_parent(self, tmp_path):
+        """A nested sub-project inherits its parent sub-project, not the root."""
+        _, errors = _run_readability(
+            tmp_path,
+            root_readability={"enabled": False},
+            sub_readability={"enabled": True, "flesch_reading_ease_min": 90.0},
+            nested_readability=None,
+            with_nested=True,
+        )
+
+        assert errors["root-doc.md"] == []
+        assert errors["sub-doc.md"]
+        assert errors["nested-doc.md"]

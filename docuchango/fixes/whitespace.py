@@ -13,6 +13,7 @@ from pathlib import Path
 import frontmatter
 
 from docuchango.fixes.yaml_utils import dumps as frontmatter_dumps
+from docuchango.text_io import FMT_012_FIX_MESSAGE, read_document
 
 
 def trim_string_values(metadata: dict) -> tuple[dict, list[str]]:
@@ -138,12 +139,24 @@ def fix_whitespace_and_fields(file_path: Path, dry_run: bool = False) -> tuple[b
     messages = []
 
     try:
-        content = file_path.read_text(encoding="utf-8")
+        content, bom_removed = read_document(file_path)
         post = frontmatter.loads(content)
     except Exception as e:
         return False, [f"Error reading file: {e}"]
 
+    # FMT-012: a UTF-8 BOM hides the opening '---' from python-frontmatter, so
+    # it is stripped before parsing and never written back.
+    if bom_removed:
+        messages.append(FMT_012_FIX_MESSAGE)
+
     if not post.metadata:
+        if bom_removed:
+            if not dry_run:
+                try:
+                    file_path.write_text(content, encoding="utf-8")
+                except Exception as e:
+                    return False, [f"Error writing file: {e}"]
+            return True, messages
         return False, ["No frontmatter found"]
 
     original = post.metadata.copy()
@@ -176,6 +189,15 @@ def fix_whitespace_and_fields(file_path: Path, dry_run: bool = False) -> tuple[b
             except Exception as e:
                 return False, [f"Error writing file: {e}"]
 
+        return True, messages
+
+    if bom_removed:
+        # Nothing else to repair: rewrite the original content without the BOM.
+        if not dry_run:
+            try:
+                file_path.write_text(content, encoding="utf-8")
+            except Exception as e:
+                return False, [f"Error writing file: {e}"]
         return True, messages
 
     return False, []

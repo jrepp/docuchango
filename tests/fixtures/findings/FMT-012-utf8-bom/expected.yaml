@@ -1,0 +1,16 @@
+summary: >-
+  An otherwise valid ADR whose file starts with a UTF-8 byte-order mark. The
+  BOM used to hide the opening '---' from the frontmatter parser, so the
+  document was reported as having no frontmatter at all (FM-001).
+messages:
+  - "FMT-012: UTF-8 byte-order mark at start of file"
+# The frontmatter behind the BOM must be parsed, not reported as missing.
+forbidden:
+  - "Missing YAML frontmatter"
+# `validate` (without --dry-run) strips the mark and rewrites the file as
+# plain UTF-8.
+fixed: true
+fix_messages:
+  - "FMT-012: Removed UTF-8 byte-order mark"
+dry_run_exit_code: 1
+exit_code: 0
