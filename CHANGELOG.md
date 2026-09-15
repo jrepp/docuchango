@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.19.0-rc.8 (2026-09-15)
+
+### Bug Fixes
+
+- **validate**: Honor sub-project readability configuration
+  ([#82](https://github.com/jrepp/docuchango/pull/82),
+  [`46e9809`](https://github.com/jrepp/docuchango/commit/46e98094489b00e119e33b4efd3f9ebbfca184e6))
+
+
 ## v1.19.0-rc.7 (2026-09-15)
 
 ### Bug Fixes
