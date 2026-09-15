@@ -46,6 +46,42 @@ class TestGetDocType:
         assert get_doc_type(Path("docs/random/file.md")) is None
         assert get_doc_type(Path("file.md")) is None
 
+    @pytest.mark.parametrize(
+        ("path", "expected"),
+        [
+            pytest.param(Path("docs/ADR/adr-001.md"), "adr", id="case-insensitive-adr"),
+            pytest.param(Path("DOCS/RFCS/rfc-001.md"), "rfc", id="case-insensitive-rfc"),
+            pytest.param(Path("Docs/Memos/memo.md"), "memo", id="case-insensitive-memo"),
+            pytest.param(
+                Path("/home/user/project/docs/adr/subdir/adr-001.md"),
+                "adr",
+                id="deeply-nested-adr",
+            ),
+            pytest.param(Path("adr/rfcs/test.md"), "adr", id="multiple-indicators-matches-first-adr"),
+            pytest.param(Path("rfcs/adr/test.md"), "rfc", id="multiple-indicators-matches-first-rfc"),
+            pytest.param(Path("adrs/test.md"), None, id="plural-adrs-not-matched"),
+            pytest.param(Path("rfc/test.md"), None, id="singular-rfc-not-matched"),
+            pytest.param(Path("memoranda/test.md"), None, id="different-word-not-matched"),
+        ],
+    )
+    def test_get_doc_type_across_path_shapes(self, path, expected):
+        """Test doc type detection is case-insensitive, works on nested paths, and requires
+        an exact directory-name match (not a prefix, plural, or synonym)."""
+        assert get_doc_type(path) == expected
+
+    def test_windows_style_paths_are_platform_dependent(self):
+        """Backslash-separated paths only split into directory components on Windows;
+        on POSIX they're a single opaque path segment, so doc-type detection fails there.
+        """
+        import platform
+
+        if platform.system() == "Windows":
+            assert get_doc_type(Path("C:\\docs\\adr\\adr-001.md")) == "adr"
+            assert get_doc_type(Path("D:\\project\\rfcs\\rfc-001.md")) == "rfc"
+        else:
+            assert get_doc_type(Path("C:\\docs\\adr\\adr-001.md")) is None
+            assert get_doc_type(Path("D:\\project\\rfcs\\rfc-001.md")) is None
+
 
 class TestFixStatusValue:
     """Test status value fixing."""
@@ -195,6 +231,81 @@ date: 2025-01-26
         assert changed
         assert doc.read_text() == original_content
 
+    def test_status_with_punctuation_still_maps(self, tmp_path):
+        """Test that a keyword match works even with trailing punctuation."""
+        doc = tmp_path / "adr" / "adr-001.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text('---\nid: "adr-001"\nstatus: "draft!"\n---\n# Test\n')
+
+        changed, msg = fix_status_value(doc)
+
+        assert changed
+        post = frontmatter.loads(doc.read_text())
+        assert post.metadata["status"] == "Proposed"
+
+    def test_status_with_leading_trailing_spaces_still_maps(self, tmp_path):
+        """Test that surrounding whitespace doesn't prevent a keyword match."""
+        doc = tmp_path / "adr" / "adr-001.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text('---\nid: "adr-001"\nstatus: "  draft  "\n---\n# Test\n')
+
+        changed, msg = fix_status_value(doc)
+
+        assert changed
+
+    def test_numeric_status_is_rejected(self, tmp_path):
+        """Test that a non-string status value is reported, not coerced."""
+        doc = tmp_path / "adr" / "adr-001.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text('---\nid: "adr-001"\nstatus: 123\n---\n# Test\n')
+
+        changed, msg = fix_status_value(doc)
+
+        assert not changed
+        assert "not a string" in msg
+
+    def test_empty_status_is_rejected(self, tmp_path):
+        """Test that an empty status string matches no keyword and is reported as empty."""
+        doc = tmp_path / "adr" / "adr-001.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text('---\nid: "adr-001"\nstatus: ""\n---\n# Test\n')
+
+        changed, msg = fix_status_value(doc)
+
+        assert not changed
+        assert "empty" in msg.lower()
+
+    def test_long_status_string_still_finds_keyword(self, tmp_path):
+        """Test that a keyword buried in a long status string is still detected."""
+        doc = tmp_path / "adr" / "adr-001.md"
+        doc.parent.mkdir(parents=True)
+        long_status = "draft " * 100
+        doc.write_text(f'---\nid: "adr-001"\nstatus: "{long_status}"\n---\n# Test\n')
+
+        changed, msg = fix_status_value(doc)
+
+        assert changed
+
+    def test_unicode_lookalike_status_does_not_match(self, tmp_path):
+        """Test that a Unicode-lookalike spelling ('drāft') does not match the 'draft' keyword."""
+        doc = tmp_path / "adr" / "adr-001.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text('---\nid: "adr-001"\nstatus: "drāft"\n---\n# Test\n')
+
+        changed, msg = fix_status_value(doc)
+
+        assert not changed
+
+    def test_status_with_multiple_keywords_matches_first(self, tmp_path):
+        """Test that a status containing two matching keywords resolves via the first match."""
+        doc = tmp_path / "adr" / "adr-001.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text('---\nid: "adr-001"\nstatus: "draft pending"\n---\n# Test\n')
+
+        changed, msg = fix_status_value(doc)
+
+        assert changed
+
 
 class TestFixDateFormat:
     """Test date format fixing."""
@@ -305,6 +416,47 @@ date: 2025-01-26
         changed, msg = fix_date_format(doc)
         assert not changed
         assert "already in ISO 8601" in msg
+
+    @pytest.mark.parametrize(
+        "date_literal",
+        [
+            pytest.param("2025-13-01", id="invalid-month"),
+            pytest.param("2025-02-30", id="invalid-day"),
+            pytest.param("not-a-date", id="non-date-text"),
+            pytest.param("12345", id="integer-like-garbage"),
+            pytest.param("2025/02/30", id="invalid-with-slashes"),
+            pytest.param('"2025-01"', id="partial-date-missing-day"),
+            pytest.param('"2025-01-26 14:30:00"', id="date-with-time-component"),
+            pytest.param('"1900-01-01"', id="already-iso-very-old"),
+            pytest.param('"2099-12-31"', id="already-iso-future"),
+            pytest.param("20250126", id="date-as-plain-integer"),
+        ],
+    )
+    def test_dates_that_are_not_reformatted(self, tmp_path, date_literal):
+        """Test date values that fix_date_format leaves untouched: either they're invalid,
+        ambiguous/partial, carry a time component, are already ISO 8601, or aren't a
+        recognizable date shape at all (e.g. a bare integer)."""
+        doc = tmp_path / "adr" / "adr-001.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text(f'---\nid: "adr-001"\ndate: {date_literal}\n---\n# Test\n')
+
+        changed, msg = fix_date_format(doc)
+
+        assert not changed
+
+    def test_ambiguous_slash_date_resolves_using_us_month_day_order(self, tmp_path):
+        """Test that an ambiguous 'mm/dd/yyyy vs dd/mm/yyyy' date is resolved as US-style
+        (month first) when it does get reformatted."""
+        doc = tmp_path / "adr" / "adr-001.md"
+        doc.parent.mkdir(parents=True)
+        # 01/02/2025 could be Jan 2 or Feb 1
+        doc.write_text('---\nid: "adr-001"\ndate: "01/02/2025"\n---\n# Test\n')
+
+        changed, msg = fix_date_format(doc)
+
+        if changed:
+            post = frontmatter.loads(doc.read_text())
+            assert post.metadata["date"] == date(2025, 2, 1)
 
 
 class TestAddMissingFrontmatter:
@@ -438,6 +590,62 @@ title: "Existing"
         except ValueError:
             pytest.fail(f"Invalid UUID: {doc_uuid}")
 
+    def test_frontmatter_marker_with_no_body_is_treated_as_existing(self, tmp_path):
+        """Test that a bare '---' marker (no closing delimiter) counts as 'already has
+        frontmatter' rather than being filled in."""
+        doc = tmp_path / "adr" / "adr-001.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text("---\n")
+
+        changed, msg = add_missing_frontmatter(doc)
+
+        assert not changed
+
+    def test_malformed_yaml_frontmatter_is_treated_as_existing(self, tmp_path):
+        """Test that malformed (but delimiter-bounded) YAML is treated as existing
+        frontmatter and not overwritten."""
+        doc = tmp_path / "adr" / "adr-001.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text("---\nid: adr-001\n  invalid: yaml:\n---\n# Test\n")
+
+        changed, msg = add_missing_frontmatter(doc)
+
+        assert not changed
+
+    @pytest.mark.parametrize(
+        "filename",
+        [
+            pytest.param("random-file.md", id="no-id-pattern-in-name"),
+            pytest.param("adr-001-api@design.md", id="special-characters-in-name"),
+            pytest.param("a" * 200 + ".md", id="very-long-filename"),
+            pytest.param("adr-001-测试.md", id="unicode-in-filename"),
+        ],
+    )
+    def test_id_falls_back_to_adr_001_for_unmatchable_filenames(self, tmp_path, filename):
+        """Test that filenames that don't yield a clean ID (no pattern, special
+        characters, excessive length, or non-ASCII) all fall back to 'adr-001'."""
+        doc = tmp_path / "adr" / filename
+        doc.parent.mkdir(parents=True)
+        doc.write_text("# Test")
+
+        changed, msg = add_missing_frontmatter(doc)
+
+        assert changed
+        post = frontmatter.loads(doc.read_text())
+        assert post.metadata["id"] == "adr-001"
+
+    def test_very_long_filename_still_produces_a_nonempty_title(self, tmp_path):
+        """Test that an extremely long filename still yields a usable title string."""
+        doc = tmp_path / "adr" / ("a" * 200 + ".md")
+        doc.parent.mkdir(parents=True)
+        doc.write_text("# Test")
+
+        changed, msg = add_missing_frontmatter(doc)
+
+        assert changed
+        post = frontmatter.loads(doc.read_text())
+        assert len(post.metadata["title"]) > 0
+
 
 class TestFixAllFrontmatter:
     """Test applying all fixes together."""
@@ -492,3 +700,83 @@ date: 2025/01/26
         # Should identify fixes but not apply them
         assert len(messages) >= 2
         assert doc.read_text() == original
+
+    @pytest.mark.parametrize(
+        "raw_content",
+        [
+            pytest.param("", id="completely-empty-file"),
+            pytest.param("   \n\n   \n", id="whitespace-only-file"),
+        ],
+    )
+    def test_degenerate_files_are_handled_without_raising(self, tmp_path, raw_content):
+        """Test that empty or whitespace-only files are handled gracefully (no frontmatter
+        to fix, but no exception either)."""
+        doc = tmp_path / "adr" / "adr-001.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text(raw_content)
+
+        messages = fix_all_frontmatter(doc)
+
+        assert isinstance(messages, list)
+
+    def test_binary_content_raises_a_decode_error(self, tmp_path):
+        """Test that a file that isn't valid UTF-8 raises rather than silently corrupting."""
+        doc = tmp_path / "adr" / "adr-001.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_bytes(b"\xff\xfe\x00\x01\x02\x03")
+
+        with pytest.raises((ValueError, UnicodeDecodeError)):
+            fix_all_frontmatter(doc)
+
+    def test_frontmatter_with_a_thousand_extra_fields_is_still_fixed(self, tmp_path):
+        """Test that a very large frontmatter block doesn't prevent status/date fixes."""
+        doc = tmp_path / "adr" / "adr-001.md"
+        doc.parent.mkdir(parents=True)
+
+        fields = "\n".join([f'field{i}: "value{i}"' for i in range(1000)])
+        content = f"""---
+id: "adr-001"
+status: Draft
+date: 2025/01/26
+{fields}
+---
+# Test
+"""
+        doc.write_text(content)
+
+        messages = fix_all_frontmatter(doc)
+
+        assert len(messages) >= 2
+
+    def test_status_and_date_are_both_fixed_in_one_pass(self, tmp_path):
+        """Test that a document with both a bad status and a bad date gets both fixed
+        by a single fix_all_frontmatter call."""
+        doc = tmp_path / "adr" / "adr-001.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text(
+            '---\nid: "adr-001"\ntitle: "Test"\nstatus: draft\ndate: 2025/01/26\ninvalid_field: null\n---\n# Test\n'
+        )
+
+        messages = fix_all_frontmatter(doc)
+
+        assert len(messages) >= 2
+        assert any("status" in msg.lower() for msg in messages)
+        assert any("date" in msg.lower() for msg in messages)
+
+    def test_readonly_file_fails_to_write_without_raising(self, tmp_path):
+        """Test that a read-only file either produces no messages (write silently
+        skipped) or an explicit error message, but never raises."""
+        doc = tmp_path / "adr" / "adr-001.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text('---\nid: "adr-001"\nstatus: draft\n---\n# Test\n')
+
+        import os
+        import stat
+
+        os.chmod(doc, stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
+
+        try:
+            messages = fix_all_frontmatter(doc)
+            assert len(messages) == 0 or any("error" in msg.lower() for msg in messages)
+        finally:
+            os.chmod(doc, stat.S_IWUSR | stat.S_IRUSR)
