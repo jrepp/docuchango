@@ -15,6 +15,7 @@ from pathlib import Path
 import frontmatter
 
 from docuchango.fixes.yaml_utils import dumps as frontmatter_dumps
+from docuchango.text_io import read_text
 
 
 def normalize_tag(tag: str) -> str:
@@ -55,7 +56,7 @@ def fix_tags(file_path: Path, dry_run: bool = False) -> tuple[bool, list[str]]:
     messages = []
 
     try:
-        content = file_path.read_text(encoding="utf-8")
+        content = read_text(file_path)
         post = frontmatter.loads(content)
     except Exception as e:
         return False, [f"Error reading file: {e}"]

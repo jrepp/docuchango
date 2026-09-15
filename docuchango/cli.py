@@ -17,6 +17,7 @@ from rich.console import Console
 from docuchango import __version__
 from docuchango.config_paths import resolve_config_path
 from docuchango.schemas import DocsProjectConfig
+from docuchango.text_io import read_text
 
 console = Console()
 
@@ -37,8 +38,7 @@ def _load_docs_project_config_from_candidates(candidates: list[Path]) -> tuple[D
         if not candidate.exists():
             continue
         try:
-            with candidate.open(encoding="utf-8") as f:
-                data = yaml.safe_load(f)
+            data = yaml.safe_load(read_text(candidate))
             return DocsProjectConfig(**data), candidate
         except Exception:
             return None, candidate
@@ -596,7 +596,7 @@ def init(path: Path | None, project_id: str, project_name: str, force: bool):
                 continue
 
             template_path = template_dir / template_name
-            content = template_path.read_text()
+            content = template_path.read_text(encoding="utf-8")
 
             # Customize docs-project.yaml with provided values
             # Use simultaneous replacement to prevent cascading replacement bugs
@@ -1240,7 +1240,7 @@ def migrate(
             continue
 
         try:
-            content = file_path.read_text(encoding="utf-8")
+            content = read_text(file_path)
             post = frontmatter.loads(content)
 
             if not post.metadata:

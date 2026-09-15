@@ -5,6 +5,8 @@ import sys
 import uuid
 from pathlib import Path
 
+from docuchango.text_io import read_text
+
 try:
     import yaml
     from rich.console import Console
@@ -18,7 +20,7 @@ console = Console()
 
 def fix_trailing_whitespace(file_path: Path) -> int:
     """Remove trailing whitespace from a file."""
-    content = file_path.read_text()
+    content = read_text(file_path)
     lines = content.splitlines(keepends=True)
     fixed_lines = [line.rstrip() + ("\n" if line.endswith("\n") else "") for line in lines]
 
@@ -33,7 +35,7 @@ def fix_trailing_whitespace(file_path: Path) -> int:
 
 def fix_code_fence_languages(file_path: Path) -> int:
     """Add 'text' language to code fences missing language."""
-    content = file_path.read_text()
+    content = read_text(file_path)
 
     lines = content.splitlines(keepends=True)
     changes = 0
@@ -67,7 +69,7 @@ def fix_code_fence_languages(file_path: Path) -> int:
 
 def fix_blank_lines_before_fences(file_path: Path) -> int:
     """Add blank line before code fences when missing."""
-    content = file_path.read_text()
+    content = read_text(file_path)
     lines = content.splitlines(keepends=True)
 
     new_lines = []
@@ -99,7 +101,7 @@ def fix_blank_lines_before_fences(file_path: Path) -> int:
 
 def fix_blank_lines_after_fences(file_path: Path) -> int:
     """Add blank line after code fences when missing."""
-    content = file_path.read_text()
+    content = read_text(file_path)
     lines = content.splitlines(keepends=True)
 
     new_lines = []
@@ -150,7 +152,7 @@ def add_missing_frontmatter_fields(file_path: Path, project_id: str = "my-projec
     Returns:
         Number of fields added
     """
-    content = file_path.read_text()
+    content = read_text(file_path)
 
     # Check if file has frontmatter
     if not content.startswith("---\n"):
@@ -201,11 +203,10 @@ def main():
     project_config = docs_dir / "docs-project.yaml"
     if project_config.exists():
         try:
-            with project_config.open() as f:
-                config = yaml.safe_load(f)
-                if config and "project" in config and "id" in config["project"]:
-                    project_id = config["project"]["id"]
-                    console.print(f"Using project_id from config: {project_id}\n")
+            config = yaml.safe_load(read_text(project_config))
+            if config and "project" in config and "id" in config["project"]:
+                project_id = config["project"]["id"]
+                console.print(f"Using project_id from config: {project_id}\n")
         except Exception as e:
             console.print(f"[yellow]Warning: Could not load project config: {e}[/yellow]")
             console.print(f"[yellow]Using default project_id: {project_id}[/yellow]\n")

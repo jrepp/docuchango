@@ -75,6 +75,7 @@ except ImportError as e:
 
 
 from docuchango.config_paths import is_within_path, resolve_config_path
+from docuchango.text_io import FMT_012_FINDING_MESSAGE, has_bom, read_text
 
 # A link target that starts with a URI scheme ("mailto:", "tel:", "ftp://",
 # ...) is never a filesystem path and must not be resolved as one.
@@ -116,7 +117,7 @@ class Document:
     def get_content(self) -> str:
         """Get file content, using cache if available"""
         if self._content_cache is None:
-            self._content_cache = self.file_path.read_text(encoding="utf-8")
+            self._content_cache = read_text(self.file_path)
         return self._content_cache
 
 
@@ -184,12 +185,11 @@ class DocValidator:
                 continue
 
             try:
-                with open(config_path, encoding="utf-8") as f:
-                    config_data = yaml.safe_load(f)
-                    config = DocsProjectConfig(**config_data)
-                    self.project_config_path = config_path
-                    self.log(f"✓ Loaded project config: {config.project.id} ({config_path})")
-                    return config
+                config_data = yaml.safe_load(read_text(config_path))
+                config = DocsProjectConfig(**config_data)
+                self.project_config_path = config_path
+                self.log(f"✓ Loaded project config: {config.project.id} ({config_path})")
+                return config
             except ValidationError as e:
                 self.log(f"⚠️  Warning: Invalid project config format at {config_path}: {e}")
                 return None
@@ -210,8 +210,7 @@ class DocValidator:
             return None
 
         try:
-            with open(config_path, encoding="utf-8") as f:
-                config_data = yaml.safe_load(f)
+            config_data = yaml.safe_load(read_text(config_path))
             config = DocsProjectConfig(**config_data)
             self.log(f"✓ Loaded sub-project config: {config.project.id} ({config_path})")
             return config
@@ -684,7 +683,7 @@ class DocValidator:
         """Parse document with python-frontmatter and pydantic validation"""
         try:
             # Read file content once and cache it
-            content = file_path.read_text(encoding="utf-8")
+            content = read_text(file_path)
 
             # Parse frontmatter from content
             post = frontmatter.loads(content)
@@ -1449,7 +1448,7 @@ class DocValidator:
 
     def _bucket_for_target(self, target_path: Path, bucket_config) -> str | None:
         """Compute the expected index bucket for a target document."""
-        post = frontmatter.loads(target_path.read_text(encoding="utf-8"))
+        post = frontmatter.loads(read_text(target_path))
 
         if bucket_config.cadence == "milestone":
             milestone = post.metadata.get(bucket_config.milestone_field)
@@ -1521,7 +1520,7 @@ class DocValidator:
                     continue
 
                 try:
-                    content = index_path.read_text(encoding="utf-8")
+                    content = read_text(index_path)
                     links = self._extract_markdown_file_links(content, index_path)
                     target_paths: set[Path] = set()
                     for target_pattern in index_config.targets:
@@ -1960,6 +1959,13 @@ class DocValidator:
             try:
                 content = doc.get_content()
                 lines = content.split("\n")
+
+                # FMT-012: a UTF-8 BOM hides the opening '---' from the
+                # frontmatter parser. Documents are read with the BOM stripped,
+                # so the file itself has to be consulted for the marker.
+                if has_bom(doc.file_path):
+                    doc.errors.append(FMT_012_FINDING_MESSAGE)
+                    self.log(f"   ✗ {doc.file_path.name}: {FMT_012_FINDING_MESSAGE}")
 
                 # Check for trailing whitespace
                 for line_num, line in enumerate(lines, start=1):

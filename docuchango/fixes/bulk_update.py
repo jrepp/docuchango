@@ -15,6 +15,7 @@ import frontmatter
 import yaml
 
 from docuchango.fixes.yaml_utils import dumps as frontmatter_dumps
+from docuchango.text_io import read_text
 
 # Valid bulk update operations
 VALID_OPERATIONS = {"set", "add", "remove", "rename"}
@@ -181,7 +182,7 @@ def bulk_update_files(
             continue
 
         try:
-            content = file_path.read_text(encoding="utf-8")
+            content = read_text(file_path)
         except Exception as e:
             results.append((file_path, False, f"Error reading file: {e}"))
             continue

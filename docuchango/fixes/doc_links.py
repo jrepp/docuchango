@@ -23,12 +23,14 @@ import re
 import sys
 from pathlib import Path
 
+from docuchango.text_io import read_text
+
 
 def fix_links_in_file(file_path: Path) -> tuple[int, int]:
     """Fix links in a single file.
     Returns (relative_links_fixed, case_fixes_made).
     """
-    content = file_path.read_text()
+    content = read_text(file_path)
     original = content
 
     relative_count = 0

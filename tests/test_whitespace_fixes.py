@@ -535,23 +535,67 @@ title: "  Title  "
 
         assert changed
 
-    def test_file_with_utf8_bom_is_not_recognized_as_having_frontmatter(self, tmp_path):
-        """A UTF-8 BOM before the '---' marker defeats frontmatter detection.
+    def test_file_with_utf8_bom_is_recognized_as_having_frontmatter(self, tmp_path):
+        """FMT-012: a UTF-8 BOM before '---' is stripped, not treated as no frontmatter.
 
-        This documents current behavior rather than desired behavior: python-frontmatter
-        requires the delimiter at the very start of the file, so a BOM-prefixed file is
-        treated as having no frontmatter and is left untouched.
+        python-frontmatter wants the delimiter at the very start of the file, so the
+        BOM is removed before parsing and the file is rewritten without it.
         """
         doc = tmp_path / "test.md"
         content = '---\nid: " test "\n---\n# Test'
-        raw = b"\xef\xbb\xbf" + content.encode("utf-8")
-        doc.write_bytes(raw)
+        doc.write_bytes(b"\xef\xbb\xbf" + content.encode("utf-8"))
 
         changed, messages = fix_whitespace_and_fields(doc)
 
-        assert not changed
-        assert any("no frontmatter" in msg.lower() for msg in messages)
+        assert changed
+        assert "FMT-012: Removed UTF-8 byte-order mark" in messages
+        assert not any("no frontmatter" in msg.lower() for msg in messages)
+        assert not doc.read_bytes().startswith(b"\xef\xbb\xbf")
+
+        post = frontmatter.loads(doc.read_text(encoding="utf-8"))
+        assert post.metadata["id"] == "test"
+
+    def test_utf8_bom_removal_is_reported_and_not_repeated(self, tmp_path):
+        """FMT-012: a second run over the repaired file has nothing left to do."""
+        doc = tmp_path / "adr" / "test.md"
+        doc.parent.mkdir(parents=True)
+        body = "---\nid: test\ntags: []\nproject_id: fixture\ndoc_uuid: 4f2f2b3e-0e2c-4b0a-9a4f-2a8b1c9d0e11\n---\n# Test\n"
+        doc.write_bytes(b"\xef\xbb\xbf" + body.encode("utf-8"))
+
+        changed, messages = fix_whitespace_and_fields(doc)
+
+        assert changed
+        assert messages == ["FMT-012: Removed UTF-8 byte-order mark"]
+        # Only the BOM goes: the rest of the file is rewritten verbatim.
+        assert doc.read_text(encoding="utf-8") == body
+
+        changed_again, messages_again = fix_whitespace_and_fields(doc)
+
+        assert not changed_again
+        assert messages_again == []
+
+    def test_utf8_bom_dry_run_leaves_the_file_alone(self, tmp_path):
+        """FMT-012: --dry-run reports the removal without writing it."""
+        doc = tmp_path / "test.md"
+        raw = b"\xef\xbb\xbf" + b'---\nid: " test "\n---\n# Test'
+        doc.write_bytes(raw)
+
+        changed, messages = fix_whitespace_and_fields(doc, dry_run=True)
+
+        assert changed
+        assert "FMT-012: Removed UTF-8 byte-order mark" in messages
         assert doc.read_bytes() == raw
+
+    def test_utf8_bom_without_frontmatter_is_still_no_frontmatter(self, tmp_path):
+        """A BOM in front of plain Markdown does not conjure up frontmatter."""
+        doc = tmp_path / "test.md"
+        doc.write_bytes(b"\xef\xbb\xbf# Test\n\nNo frontmatter here.\n")
+
+        changed, messages = fix_whitespace_and_fields(doc)
+
+        assert changed
+        assert messages == ["FMT-012: Removed UTF-8 byte-order mark"]
+        assert doc.read_text(encoding="utf-8") == "# Test\n\nNo frontmatter here.\n"
 
     def test_very_long_field_values_are_preserved_after_trim(self, tmp_path):
         """Test that trimming a very long field value keeps its full inner content."""
