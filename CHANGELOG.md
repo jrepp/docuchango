@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.19.0-rc.13 (2026-09-15)
+
+### Bug Fixes
+
+- **release**: Refresh uv.lock in the release commit
+  ([`8178402`](https://github.com/jrepp/docuchango/commit/817840244b438174b9e2fec2bc2af28996d25bdc))
+
+
 ## v1.19.0-rc.12 (2026-09-15)
 
 ### Features
