@@ -17,18 +17,23 @@ write documentation together and need it to stay trustworthy.
 - **Structured by default.** Every document has an id, a title, a created
   date, tags, a project id and a UUID, enforced by Pydantic schemas per
   document type. ADRs, RFCs and PRDs also carry a status.
-- **Fixes, not just findings.** Whitespace, code fences, status variants,
-  recognizable date formats and tags are repaired in place, and a missing
-  `tags`, `project_id` or `doc_uuid` is filled in with a default. What it
-  cannot fill in safely, such as `title` or `deciders`, it reports.
+- **Fixes, not just findings.** Status variants, recognizable date formats,
+  whitespace and tags are repaired in place, code fences gain a language and
+  a closing fence, and a missing `tags`, `project_id` or `doc_uuid` is filled
+  in with a default - all on a real run; `--dry-run` reports these as plain
+  issues rather than previewing them. What it cannot fill in safely, such as
+  `title` or `deciders`, it reports, and extra blank lines are reported but
+  never collapsed.
 - **Agent-ready.** Ships a guide that tells coding agents how to read,
   cite and extend the docs. Point `AGENTS.md` at it and you are done.
-- **Fast and CI-friendly.** A hundred documents validate in under a second,
-  with exit codes that work in pre-commit hooks and pull request checks.
+- **Fast and CI-friendly.** Scanning and fixing a hundred documents takes
+  well under a second; exit codes work in pre-commit hooks and pull request
+  checks. A Docusaurus build, if your repo has one, is checked too unless
+  you pass `--skip-build`, and takes as long as the build does.
 
 ## Two-minute start
 
-You need Python 3.10 or newer. With [uv](https://docs.astral.sh/uv/) nothing
+You need Python 3.10 to 3.15. With [uv](https://docs.astral.sh/uv/) nothing
 else has to be installed:
 
 ```bash
@@ -37,7 +42,8 @@ uvx docuchango init --project-id my-app --project-name "My App"
 
 # 2. Write your first decision record from the template
 cp docs-cms/templates/adr-000-template.md docs-cms/adr/adr-001-adopt-docs-cms.md
-#    ...edit the frontmatter and body...
+#    ...edit the frontmatter, and replace the template's example reference
+#    link in the body or the next step will report it as broken...
 
 # 3. Check it, then let it repair what it can
 uvx docuchango validate --dry-run
@@ -61,7 +67,8 @@ docs-cms/
 └── templates/                # adr-000, rfc-000, memo-000, prd-000
 ```
 
-A validation run looks like this:
+Here is a real `--dry-run` against an example `docs-cms/` with two ADRs, one
+with a fixable date format and the other with a copy-paste mistake:
 
 ```text
 $ docuchango validate --dry-run
@@ -69,18 +76,24 @@ $ docuchango validate --dry-run
 🔍 Validating Documentation
 DRY RUN - No changes will be made
 
-Scanned 12 files
+Scanned 2 files
+
+✓ Fixes would be applied: 1
+  docs-cms/adr/adr-001-adopt-postgres.md
+    • [Frontmatter metadata] Converted created from '2026/09/01' to '2026-09-01'
 
 ✗ Remaining issues: 2
-  docs-cms/adr/adr-004-event-bus.md
-    • ID mismatch: frontmatter has 'adr-003' but filename suggests 'adr-004'
-    • Line 53: Broken link './adr-002-example.md' - File not found
+  docs-cms/adr/adr-002-event-bus.md
+    • ID mismatch: frontmatter has 'adr-003' but filename suggests 'adr-002'
+    • Line 15: Broken link './adr-005-missing.md' - File not found: /tmp/docuchango-example/docs-cms/adr/adr-005-missing.md
+
+1 fixable, 1 with issues
 
 ❌ Validation failed
 ```
 
-Run it again without `--dry-run` and the fixable problems disappear. The two
-above need a human, so they stay in the report.
+Run it again without `--dry-run` and the date format is fixed. The other two
+findings need a human, so they stay in the report either way.
 
 ## What a document looks like
 
@@ -169,11 +182,20 @@ jobs:
         with:
           fetch-depth: 0   # git history lets docuchango derive timestamps
       - uses: astral-sh/setup-uv@v8
-      - run: uvx docuchango validate --dry-run --verbose
+      - run: uvx docuchango validate --dry-run --verbose --skip-build
 ```
 
-Use `--dry-run` in CI so a pull request fails on problems instead of being
-silently rewritten. Run the fixing form locally or in a pre-commit hook.
+This example only validates the documents themselves. If your repository
+also has a `docusaurus/` directory, `validate` runs its TypeScript check and
+`npm run build` unless you pass `--skip-build`; add the site's Node setup
+(`npm ci` or equivalent) to this job before dropping the flag.
+
+`--dry-run` never writes to the working tree. The job fails when an issue
+remains in the committed files, whether or not `validate` could fix it for
+you - a bad status value fails the build even though it is auto-correctable,
+while an unusually formatted but schema-accepted date does not, because
+nothing rejects it. Run `docuchango validate` (no `--dry-run`) locally or in
+a pre-commit hook to clear fixable issues before they reach CI.
 
 ## Going further
 
