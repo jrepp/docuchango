@@ -217,6 +217,7 @@ id: adr-NNN
 title: Brief decision title
 status: Proposed | Accepted | Implemented | Deprecated | Superseded
 created: YYYY-MM-DD
+deciders: Team or person who made the decision
 tags: [architecture, decision, ...]
 project_id: project-name
 doc_uuid: uuid-v4
