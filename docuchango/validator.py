@@ -75,7 +75,13 @@ except ImportError as e:
 
 
 from docuchango.config_paths import is_within_path, resolve_config_path
-from docuchango.text_io import FMT_012_FINDING_MESSAGE, has_bom, read_text
+from docuchango.text_io import (
+    FMT_012_FINDING_MESSAGE,
+    carriage_return_lines,
+    has_bom,
+    line_ending_finding_message,
+    read_text,
+)
 
 # A link target that starts with a URI scheme ("mailto:", "tel:", "ftp://",
 # ...) is never a filesystem path and must not be resolved as one.
@@ -1913,6 +1919,15 @@ class DocValidator:
                 if has_bom(doc.file_path):
                     doc.errors.append(FMT_012_FINDING_MESSAGE)
                     self.log(f"   ✗ {doc.file_path.name}: {FMT_012_FINDING_MESSAGE}")
+
+                # FMT-010: `content` has already been through universal
+                # newlines, so a CRLF is invisible there too and the bytes on
+                # disk are the only witness. One finding per offending line,
+                # the way FMT-001 reports trailing whitespace.
+                for line_num, kind in carriage_return_lines(doc.file_path):
+                    message = line_ending_finding_message(line_num, kind)
+                    doc.errors.append(message)
+                    self.log(f"   ✗ {doc.file_path.name}: {message}")
 
                 # Check for trailing whitespace
                 for line_num, line in enumerate(lines, start=1):

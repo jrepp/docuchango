@@ -17,7 +17,14 @@ import frontmatter
 from docuchango.fixes.tags import normalize_tag
 from docuchango.fixes.whitespace import ensure_required_fields, normalize_empty_values, trim_string_values
 from docuchango.fixes.yaml_utils import dumps as frontmatter_dumps
-from docuchango.text_io import FMT_012_FIX_MESSAGE, read_document, read_text
+from docuchango.text_io import (
+    FMT_012_FIX_MESSAGE,
+    carriage_return_lines,
+    line_ending_fix_message,
+    read_document,
+    read_text,
+    write_text,
+)
 
 # Valid status values by document type
 VALID_STATUSES = {
@@ -166,7 +173,7 @@ def fix_status_value(file_path: Path, dry_run: bool = False, schema: str | None 
             post.metadata["status"] = new_status
 
             if not dry_run:
-                file_path.write_text(frontmatter_dumps(post), encoding="utf-8")
+                write_text(file_path, frontmatter_dumps(post))
 
             return True, f"Changed status from '{status}' to '{new_status}'"
 
@@ -176,7 +183,7 @@ def fix_status_value(file_path: Path, dry_run: bool = False, schema: str | None 
                 post.metadata["status"] = value
 
                 if not dry_run:
-                    file_path.write_text(frontmatter_dumps(post), encoding="utf-8")
+                    write_text(file_path, frontmatter_dumps(post))
 
                 return True, f"Changed status from '{status}' to '{value}'"
 
@@ -231,7 +238,7 @@ def fix_date_format(file_path: Path, dry_run: bool = False) -> tuple[bool, str]:
 
             # Non-canonical: re-serialize to normalize the format
             if not dry_run:
-                file_path.write_text(frontmatter_dumps(post), encoding="utf-8")
+                write_text(file_path, frontmatter_dumps(post))
 
             if isinstance(date_value, datetime):
                 normalized = (
@@ -273,7 +280,7 @@ def fix_date_format(file_path: Path, dry_run: bool = False) -> tuple[bool, str]:
                 post.metadata[date_field] = iso_date
 
                 if not dry_run:
-                    file_path.write_text(frontmatter_dumps(post), encoding="utf-8")
+                    write_text(file_path, frontmatter_dumps(post))
 
                 return True, f"Converted date from '{date_value}' to '{iso_date}'"
             except ValueError:
@@ -335,7 +342,7 @@ def add_missing_frontmatter(file_path: Path, dry_run: bool = False, schema: str 
             generic_block = "\n".join(generic_lines)
             generic_content = f"{generic_block}\n\n{content}"
             if not dry_run:
-                file_path.write_text(generic_content, encoding="utf-8")
+                write_text(file_path, generic_content)
             return True, f"Added generic frontmatter block with title '{title}'"
 
         # Extract ID from filename (e.g., "adr-001" from "adr-001-some-title.md").
@@ -377,7 +384,7 @@ def add_missing_frontmatter(file_path: Path, dry_run: bool = False, schema: str 
         new_content = f"{frontmatter_block}\n\n{content}"
 
         if not dry_run:
-            file_path.write_text(new_content, encoding="utf-8")
+            write_text(file_path, new_content)
 
         return True, f"Added frontmatter block with ID '{doc_id}'"
 
@@ -563,6 +570,11 @@ def fix_frontmatter_metadata(
     ``schema`` is the schema configured for this file in docs-project.yaml, if
     any; it decides the document type instead of the folder-name heuristic.
     """
+    # FMT-010: read the bytes for carriage returns before the text read, which
+    # translates them away. Every write below goes through `write_text`, so any
+    # rewrite at all normalizes the file to LF.
+    crlf_findings = carriage_return_lines(file_path)
+
     try:
         content, bom_removed = read_document(file_path)
     except UnicodeDecodeError as e:
@@ -582,13 +594,20 @@ def fix_frontmatter_metadata(
     if bom_removed:
         messages.append(FMT_012_FIX_MESSAGE)
 
+    if crlf_findings:
+        messages.append(line_ending_fix_message(crlf_findings))
+
+    # A BOM or a carriage return is repaired by rewriting the file at all,
+    # because `content` is already BOM-free and universal-newline normalized.
+    rewrite_only = bom_removed or bool(crlf_findings)
+
     if not post.metadata:
         changed, message = add_missing_frontmatter(file_path, dry_run=dry_run, schema=schema)
         if changed:
             messages.append(message)
-        elif bom_removed and not dry_run:
-            file_path.write_text(content, encoding="utf-8")
-        return (changed or bom_removed), (messages if (changed or bom_removed) else [])
+        elif rewrite_only and not dry_run:
+            write_text(file_path, content)
+        return (changed or rewrite_only), (messages if (changed or rewrite_only) else [])
 
     metadata = post.metadata.copy()
     original_metadata = metadata.copy()
@@ -617,13 +636,14 @@ def fix_frontmatter_metadata(
     if changed:
         post.metadata = metadata
         if not dry_run:
-            file_path.write_text(frontmatter_dumps(post), encoding="utf-8")
+            write_text(file_path, frontmatter_dumps(post))
         return True, messages
 
-    if bom_removed:
-        # Nothing else to repair: rewrite the original content without the BOM.
+    if rewrite_only:
+        # Nothing else to repair: rewrite the original content without the BOM
+        # and with LF line endings, leaving everything else byte-identical.
         if not dry_run:
-            file_path.write_text(content, encoding="utf-8")
+            write_text(file_path, content)
         return True, messages
 
     return False, []

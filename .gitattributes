@@ -1,0 +1,5 @@
+# The FMT-010 regression fixtures reproduce CRLF and mixed line endings on
+# purpose (see the finding registry in
+# docs-cms/rfcs/rfc-003-validator-roadmap.md). Git must store and check them
+# out byte for byte, whatever core.autocrlf is set to locally.
+tests/fixtures/findings/FMT-010-*/** -text

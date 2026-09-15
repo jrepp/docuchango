@@ -167,6 +167,11 @@ wrap the text in backticks, then validate again.
 - A UTF-8 byte-order mark at the start of a file (`FMT-012`), which otherwise
   hides the frontmatter from the parser and gets the document reported as
   having none
+- CRLF (`\r\n`) or bare CR (`\r`) line endings (`FMT-010`), reported one line
+  at a time as `FMT-010: Line 12: CRLF line ending`. Python reads text with
+  universal newlines, so these are invisible to every other check; the bytes on
+  disk are read separately to find them. A CRLF line is *not* also reported as
+  trailing whitespace
 
 **Fixed automatically**
 
@@ -178,6 +183,12 @@ wrap the text in backticks, then validate again.
   and rewrites the file as plain UTF-8. Documents are always read with a
   leading BOM ignored, so the frontmatter behind one is parsed and validated
   normally instead of being reported as missing
+- Rewrites the file with LF line endings
+  (`FMT-010: Converted CRLF line endings to LF`; the message names what it
+  found, so a file with both forms reads `CR and CRLF`). A mixed file is
+  converted whole rather than left half and half, and a bare `\r` is treated
+  the same as `\r\n`. Only the terminators change, so the rewrite is lossless,
+  and it runs first so every other fixer in the same run sees LF content
 
 **Left to you**
 

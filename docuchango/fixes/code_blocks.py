@@ -17,7 +17,7 @@ import re
 import sys
 from pathlib import Path
 
-from docuchango.text_io import read_text
+from docuchango.text_io import read_text, write_text
 
 
 def fix_code_blocks(file_path: Path) -> tuple[bool, list[str]]:
@@ -140,7 +140,7 @@ def fix_code_blocks(file_path: Path) -> tuple[bool, list[str]]:
         # Write back if changes were made
         if changes:
             new_content = "\n".join(fixed_lines)
-            file_path.write_text(new_content, encoding="utf-8")
+            write_text(file_path, new_content)
             return True, changes
 
         return False, []

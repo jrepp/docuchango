@@ -92,7 +92,7 @@ reported.
 | MDX-011 | Mask 4-space indented code blocks before the prose checks (only fenced blocks and inline spans are masked today) | Planned | report | see below |
 | FMT-001 | Trailing whitespace | Implemented | fix | `check_formatting`, `fixes/code_blocks.py` |
 | FMT-002 | More than two consecutive blank lines | Implemented | report | `check_formatting` |
-| FMT-010 | CRLF or mixed line endings | Planned | fix | see below |
+| FMT-010 | CRLF or mixed line endings | Implemented | fix | `check_formatting`, `text_io.py` (`find_carriage_returns`, `carriage_return_lines`, `write_text`), `fixes/frontmatter.py`, `fixes/whitespace.py` |
 | FMT-011 | Collapse runs of blank lines | Planned | fix | see below |
 | FMT-012 | UTF-8 byte-order mark before the frontmatter | Implemented | fix | `check_formatting`, `text_io.py`, `fixes/frontmatter.py`, `fixes/whitespace.py` |
 | CB-001 | Code fence without a language, or unclosed fence | Implemented | fix/report | `check_code_blocks`, `fixes/code_blocks.py` |
@@ -138,6 +138,29 @@ which is what a `--dry-run` shows; a fixing run removes the mark in Phase 1
 and reports `FMT-012: Removed UTF-8 byte-order mark`. The BOM is the only
 thing removed: when no other fix applies, the original text is rewritten
 verbatim rather than re-serialized.
+
+**FMT-010 Line endings (shipped).** A CRLF document was invisible to every
+check. `Path.read_text` and `open()` in text mode use universal newlines, so
+`\r\n` is translated to `\n` before any check sees the string, and a document
+that Windows or a copy-paste had converted passed `validate` silently while
+every downstream fixer quietly assumed `\n`. `find_carriage_returns` in
+`docuchango/text_io.py` reads the bytes on disk the way `has_bom` does and
+returns the 1-based line number and kind of every non-LF terminator;
+`check_formatting` reports one `FMT-010: Line N: CRLF line ending` per
+offending line, matching how FMT-001 reports trailing whitespace rather than
+summarizing a range. A bare `\r` is reported too, as `CR line ending`, and
+normalized alongside `\r\n`: a half-converted file is not a state worth
+preserving, and Python already treats a lone `\r` as a line terminator, so the
+line numbers agree with the rest of the checks. The repair is a rewrite and
+nothing more - the text read has already normalized the terminators, so any
+write at all fixes the file. Phase 1 reports
+`FMT-010: Converted CRLF line endings to LF` (or `CR and CRLF`, naming what it
+found). The fix runs in `fix_frontmatter_metadata`, the first Phase 1 fixer, so
+the rest of the run sees LF content. Writes in the fixers go through
+`text_io.write_text`, which pins `newline=""`: `Path.write_text` translates
+`\n` to `os.linesep` and would put the carriage returns straight back on
+Windows. The atomic snapshot is taken as bytes before Phase 1, so a withheld
+run restores a CRLF file byte for byte.
 
 **RD-001 Sub-project readability (shipped).** `check_readability` read the
 root config only, so a sub-project could not enable, disable or tune
@@ -195,10 +218,6 @@ to `docs-project.yaml`; when it is absent the check stays a report (LNK-002).
 **MDX-010 MDX escapes.** Wire `fixes/mdx_syntax.py` into Phase 1 for the
 patterns `check_mdx_compatibility` already detects. Content inside code
 fences and inline code is never touched.
-
-**FMT-010 Line endings.** Detect `\r\n` anywhere in a document and rewrite
-the file to `\n`. Fix by default: the rewrite is lossless and every other
-fixer already assumes `\n`.
 
 **FMT-011 Blank-line collapse.** Reduce runs of three or more blank lines to
 two, outside code fences. This turns the existing FMT-002 report into a fix.

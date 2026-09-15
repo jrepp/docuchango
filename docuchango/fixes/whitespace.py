@@ -13,7 +13,13 @@ from pathlib import Path
 import frontmatter
 
 from docuchango.fixes.yaml_utils import dumps as frontmatter_dumps
-from docuchango.text_io import FMT_012_FIX_MESSAGE, read_document
+from docuchango.text_io import (
+    FMT_012_FIX_MESSAGE,
+    carriage_return_lines,
+    line_ending_fix_message,
+    read_document,
+    write_text,
+)
 
 
 def trim_string_values(metadata: dict) -> tuple[dict, list[str]]:
@@ -138,6 +144,10 @@ def fix_whitespace_and_fields(file_path: Path, dry_run: bool = False) -> tuple[b
     """
     messages = []
 
+    # FMT-010: carriage returns have to be read from the bytes on disk; the
+    # text read below translates them away.
+    crlf_findings = carriage_return_lines(file_path)
+
     try:
         content, bom_removed = read_document(file_path)
         post = frontmatter.loads(content)
@@ -149,11 +159,18 @@ def fix_whitespace_and_fields(file_path: Path, dry_run: bool = False) -> tuple[b
     if bom_removed:
         messages.append(FMT_012_FIX_MESSAGE)
 
+    if crlf_findings:
+        messages.append(line_ending_fix_message(crlf_findings))
+
+    # `content` is already BOM-free and universal-newline normalized, so any
+    # rewrite at all repairs both FMT-012 and FMT-010.
+    rewrite_only = bom_removed or bool(crlf_findings)
+
     if not post.metadata:
-        if bom_removed:
+        if rewrite_only:
             if not dry_run:
                 try:
-                    file_path.write_text(content, encoding="utf-8")
+                    write_text(file_path, content)
                 except Exception as e:
                     return False, [f"Error writing file: {e}"]
             return True, messages
@@ -185,17 +202,18 @@ def fix_whitespace_and_fields(file_path: Path, dry_run: bool = False) -> tuple[b
         if not dry_run:
             try:
                 new_content = frontmatter_dumps(post)
-                file_path.write_text(new_content, encoding="utf-8")
+                write_text(file_path, new_content)
             except Exception as e:
                 return False, [f"Error writing file: {e}"]
 
         return True, messages
 
-    if bom_removed:
-        # Nothing else to repair: rewrite the original content without the BOM.
+    if rewrite_only:
+        # Nothing else to repair: rewrite the original content without the BOM
+        # and with LF line endings.
         if not dry_run:
             try:
-                file_path.write_text(content, encoding="utf-8")
+                write_text(file_path, content)
             except Exception as e:
                 return False, [f"Error writing file: {e}"]
         return True, messages
