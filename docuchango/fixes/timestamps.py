@@ -75,11 +75,103 @@ def get_git_dates(file_path: Path) -> tuple[str | None, str | None]:
         return None, None
 
 
+def _line_indent(line: str) -> int:
+    """Return the number of leading spaces on a line (YAML forbids tab indentation)."""
+    stripped = line.lstrip(" ")
+    return len(line) - len(stripped)
+
+
+def _frontmatter_bounds(lines: list[str]) -> tuple[int, int]:
+    """Return the ``[start, end)`` line range covering the frontmatter body.
+
+    Falls back to the whole document when no ``---`` delimited block is found,
+    which keeps these helpers usable on bare frontmatter snippets.
+    """
+    if lines and lines[0].rstrip("\r\n") == "---":
+        for index in range(1, len(lines)):
+            if lines[index].rstrip("\r\n") == "---":
+                return 1, index
+    return 0, len(lines)
+
+
+def _field_blocks(lines: list[str], field_name: str) -> list[tuple[int, int]]:
+    """Locate every top-level ``field_name:`` block inside the frontmatter.
+
+    A "block" is the key's own line plus any continuation lines that belong to
+    its value: block scalars (``|``/``>``), multi-line quoted or plain scalars,
+    block sequences/mappings and wrapped flow collections. All of those are
+    indented further than the key, so any following line that is indented (or a
+    blank line followed by an indented line) is part of the value.
+
+    Returns:
+        A list of ``(start, end)`` half-open line-index ranges.
+    """
+    start, end = _frontmatter_bounds(lines)
+    key_pattern = re.compile(rf"^{re.escape(field_name)}:")
+
+    blocks: list[tuple[int, int]] = []
+    index = start
+    while index < end:
+        if not key_pattern.match(lines[index]):
+            index += 1
+            continue
+
+        block_end = index + 1
+        cursor = index + 1
+        while cursor < end:
+            if not lines[cursor].strip():
+                # Blank lines only belong to the value if more indented lines follow.
+                cursor += 1
+                continue
+            if _line_indent(lines[cursor]) == 0:
+                break
+            cursor += 1
+            block_end = cursor
+
+        blocks.append((index, block_end))
+        index = block_end
+
+    return blocks
+
+
+def _split_value_and_comment(rest: str) -> str:
+    """Return the trailing comment (with its leading whitespace) from a value.
+
+    Quotes are tracked so that a ``#`` inside a quoted scalar is not mistaken
+    for a comment. Returns an empty string when there is no comment.
+    """
+    quote: str | None = None
+    index = 0
+    while index < len(rest):
+        char = rest[index]
+        if quote is not None:
+            if quote == '"' and char == "\\":
+                index += 2
+                continue
+            if char == quote:
+                quote = None
+        elif char in ('"', "'"):
+            quote = char
+        elif char == "#" and (index == 0 or rest[index - 1] in " \t"):
+            comment_start = index
+            while comment_start > 0 and rest[comment_start - 1] in " \t":
+                comment_start -= 1
+            return rest[comment_start:]
+        index += 1
+    return ""
+
+
 def update_frontmatter_field(content: str, field_name: str, new_value: str) -> str:
     """Update a specific field in YAML frontmatter.
 
-    Handles both simple fields (date: value) and fields with comments.
-    Pattern matches field name, value, and optional trailing comments.
+    Handles simple fields (``date: value``), fields with trailing comments, and
+    multi-line values. For a multi-line value (block scalar, wrapped scalar or
+    block sequence) the whole value is replaced: the continuation lines are
+    dropped instead of being left dangling under the new value.
+
+    All other lines are left byte-identical, which line-oriented editing gives
+    us and a YAML round-trip would not (it would drop comments, collapse
+    duplicate keys and renormalize quoting).
 
     Args:
         content: The full file content
@@ -89,21 +181,39 @@ def update_frontmatter_field(content: str, field_name: str, new_value: str) -> s
     Returns:
         Updated content
     """
-    pattern = rf"^({field_name}:\s*)([^\s#]+)(.*?)$"
+    lines = content.splitlines(keepends=True)
+    blocks = _field_blocks(lines, field_name)
+    if not blocks:
+        return content
 
-    def replacer(match):
-        prefix = match.group(1)  # "field: "
-        suffix = match.group(3)  # comments and whitespace
-        return f"{prefix}{new_value}{suffix}"
+    for start, end in reversed(blocks):
+        line = lines[start]
+        body = line.rstrip("\r\n")
+        line_ending = line[len(body) :]
 
-    # Update the field
-    return re.sub(pattern, replacer, content, flags=re.MULTILINE)
+        after_key = body[len(field_name) + 1 :]
+        separator = after_key[: len(after_key) - len(after_key.lstrip(" \t"))] or " "
+        comment = _split_value_and_comment(after_key.strip())
+        if comment and not comment[0].isspace():
+            # The field had no value at all, only a comment: keep them apart.
+            comment = f"  {comment}"
+
+        lines[start:end] = [f"{field_name}:{separator}{new_value}{comment}{line_ending}"]
+
+    return "".join(lines)
 
 
 def remove_frontmatter_field(content: str, field_name: str) -> str:
-    """Remove a simple single-line field from YAML frontmatter."""
-    pattern = rf"^{field_name}:.*\n"
-    return re.sub(pattern, "", content, flags=re.MULTILINE)
+    """Remove a top-level field, including any multi-line value it carries."""
+    lines = content.splitlines(keepends=True)
+    blocks = _field_blocks(lines, field_name)
+    if not blocks:
+        return content
+
+    for start, end in reversed(blocks):
+        del lines[start:end]
+
+    return "".join(lines)
 
 
 def insert_created_field(content: str, created_date: str) -> str:
