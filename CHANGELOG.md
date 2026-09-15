@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.19.0-rc.17 (2026-09-15)
+
+### Features
+
+- **validate**: Implement LNK-010 internal link rewrite
+  ([`c0c148c`](https://github.com/jrepp/docuchango/commit/c0c148ce0adb33dd71c0cc3e5edd9aa3010541fa))
+
+
 ## v1.19.0-rc.16 (2026-09-15)
 
 
