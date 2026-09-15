@@ -20,8 +20,8 @@ from docuchango.fixes.yaml_utils import dumps as frontmatter_dumps
 
 # Valid status values by document type
 VALID_STATUSES = {
-    "adr": ["Proposed", "Accepted", "Implemented", "Deprecated", "Superseded"],
-    "rfc": ["Draft", "Proposed", "Accepted", "Implemented", "Deprecated", "Superseded"],
+    "adr": ["Proposed", "Accepted", "Rejected", "Implemented", "Deprecated", "Superseded"],
+    "rfc": ["Draft", "Proposed", "Accepted", "Rejected", "Implemented", "Deprecated", "Superseded"],
     "prd": ["Draft", "In Review", "Approved", "In Progress", "Completed", "Cancelled"],
 }
 
@@ -30,6 +30,7 @@ STATUS_MAPPINGS = {
     "adr": {
         "proposed": "Proposed",
         "accepted": "Accepted",
+        "rejected": "Rejected",
         "implemented": "Implemented",
         "deprecated": "Deprecated",
         "superseded": "Superseded",
@@ -44,6 +45,7 @@ STATUS_MAPPINGS = {
         "draft": "Draft",
         "proposed": "Proposed",
         "accepted": "Accepted",
+        "rejected": "Rejected",
         "implemented": "Implemented",
         "deprecated": "Deprecated",
         "superseded": "Superseded",

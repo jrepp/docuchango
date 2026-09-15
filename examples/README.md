@@ -227,8 +227,8 @@ superseded_by: adr-042
 
 1. Create RFC with `status: Draft`
 2. Gather feedback, update RFC
-3. Change status to `In Review`
-4. After approval: `status: Approved`
+3. Change status to `Proposed`
+4. After approval: `status: Accepted`
 5. Create ADR documenting final decision
 6. Update RFC: `status: Implemented`, link to ADR
 

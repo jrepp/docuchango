@@ -64,6 +64,20 @@ class TestADRFrontmatter:
             )
         assert "status" in str(exc_info.value).lower()
 
+    def test_adr_rejected_status(self):
+        """Test that 'Rejected' is a valid ADR status (part of the decision lifecycle)."""
+        adr = ADRFrontmatter(
+            title="Adopt Redis for Caching",
+            status="Rejected",
+            created=date(2025, 10, 13),
+            deciders="Team",
+            tags=["caching"],
+            id="adr-001",
+            project_id="test-project",
+            doc_uuid="8b063564-82a5-4a21-943f-e868388d36b9",
+        )
+        assert adr.status == "Rejected"
+
     def test_adr_invalid_id_format(self):
         """Test that invalid ID format is rejected."""
         with pytest.raises(ValidationError) as exc_info:
@@ -181,6 +195,20 @@ class TestRFCFrontmatter:
         assert rfc.title == "VPC Management Gateway"
         assert rfc.status == "Proposed"
         assert rfc.id == "rfc-001"
+
+    def test_rfc_rejected_status(self):
+        """Test that 'Rejected' is a valid RFC status."""
+        rfc = RFCFrontmatter(
+            title="VPC Management Gateway",
+            status="Rejected",
+            author="Engineering Team",
+            created=date(2025, 10, 13),
+            tags=["vpc"],
+            id="rfc-001",
+            project_id="test-project",
+            doc_uuid="046aa65f-f236-4221-9c19-6bf3e1e9f0f0",
+        )
+        assert rfc.status == "Rejected"
 
     def test_rfc_missing_author(self):
         """Test that missing author raises ValidationError."""

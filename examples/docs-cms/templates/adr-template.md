@@ -12,7 +12,7 @@ doc_uuid: 00000000-0000-4000-8000-000000000000
 # ADR-NNN: Brief Decision Title
 
 ## Status
-Proposed | Accepted | Deprecated | Superseded
+Proposed | Accepted | Rejected | Implemented | Deprecated | Superseded
 
 ## Context
 What is the issue we're facing? What constraints exist?

@@ -379,7 +379,7 @@ class ADRFrontmatter(BaseModel):
 
     REQUIRED FIELDS (all must be present):
     - title: Title without ADR prefix (e.g., "Use Rust for Proxy"). ID displayed by sidebar.
-    - status: Current state (Proposed/Accepted/Implemented/Deprecated/Superseded)
+    - status: Current state (Proposed/Accepted/Rejected/Implemented/Deprecated/Superseded)
     - created: Date ADR was first created in ISO 8601 format (YYYY-MM-DD)
     - deciders: Person or team who made the decision (e.g., "Core Team", "Platform Team")
     - tags: List of lowercase hyphenated tags for categorization
@@ -397,9 +397,13 @@ class ADRFrontmatter(BaseModel):
         min_length=10,
         description="ADR title without prefix (e.g., 'Use Rust for Proxy'). The ID prefix is in the 'id' field and displayed by sidebar.",
     )
-    status: Literal["Proposed", "Accepted", "Implemented", "Deprecated", "Superseded"] = Field(
+    status: Literal["Proposed", "Accepted", "Rejected", "Implemented", "Deprecated", "Superseded"] = Field(
         ...,
-        description="Decision status. Use 'Proposed' for drafts, 'Accepted' for approved, 'Implemented' for completed",
+        description=(
+            "Decision status. One of: Proposed (draft), Accepted (approved), "
+            "Rejected (declined), Implemented (completed), Deprecated (no longer "
+            "recommended), Superseded (replaced by another ADR)"
+        ),
     )
     created: datetime.datetime | datetime.date | str = Field(
         ...,
@@ -488,8 +492,13 @@ class RFCFrontmatter(BaseModel):
         min_length=10,
         description="RFC title without prefix (e.g., 'Plugin Architecture'). The ID prefix is in the 'id' field and displayed by sidebar.",
     )
-    status: Literal["Draft", "Proposed", "Accepted", "Implemented", "Deprecated", "Superseded"] = Field(
-        ..., description="RFC status. Use 'Draft' for work-in-progress, 'Proposed' for review, 'Accepted' for approved"
+    status: Literal["Draft", "Proposed", "Accepted", "Rejected", "Implemented", "Deprecated", "Superseded"] = Field(
+        ...,
+        description=(
+            "RFC status. One of: Draft (work-in-progress), Proposed (ready for review), "
+            "Accepted (approved), Rejected (declined), Implemented (completed), "
+            "Deprecated (no longer recommended), Superseded (replaced by another RFC)"
+        ),
     )
     author: str = Field(
         ..., description="RFC author. Use person name or team name (e.g., 'Platform Team', 'John Smith')"
@@ -789,8 +798,8 @@ class GenericDocFrontmatter(BaseModel):
 
 
 # Valid status values for quick reference
-VALID_ADR_STATUSES = ["Proposed", "Accepted", "Implemented", "Deprecated", "Superseded"]
-VALID_RFC_STATUSES = ["Draft", "Proposed", "Accepted", "Implemented", "Deprecated", "Superseded"]
+VALID_ADR_STATUSES = ["Proposed", "Accepted", "Rejected", "Implemented", "Deprecated", "Superseded"]
+VALID_RFC_STATUSES = ["Draft", "Proposed", "Accepted", "Rejected", "Implemented", "Deprecated", "Superseded"]
 
 # Common tag suggestions (not enforced, just for reference)
 COMMON_TAGS = [

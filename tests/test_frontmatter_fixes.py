@@ -117,6 +117,44 @@ date: 2025-01-26
         assert not changed
         assert "already valid" in msg.lower()
 
+    def test_rejected_status_is_valid_adr(self, tmp_path):
+        """'Rejected' is a valid ADR status and must not be 'fixed'."""
+        doc = tmp_path / "adr" / "adr-001-test.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text('---\nid: "adr-001"\ntitle: "Test ADR"\nstatus: Rejected\ndate: 2025-01-26\n---\n\n# Test\n')
+        changed, msg = fix_status_value(doc)
+        assert not changed
+        assert "already valid" in msg.lower()
+
+    def test_rejected_status_is_valid_rfc(self, tmp_path):
+        """'Rejected' is a valid RFC status and must not be 'fixed'."""
+        doc = tmp_path / "rfcs" / "rfc-001-test.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text('---\nid: "rfc-001"\ntitle: "Test RFC"\nstatus: Rejected\ndate: 2025-01-26\n---\n\n# Test\n')
+        changed, msg = fix_status_value(doc)
+        assert not changed
+        assert "already valid" in msg.lower()
+
+    def test_lowercase_rejected_normalizes_adr(self, tmp_path):
+        """'rejected' normalizes to the valid 'Rejected' status for ADRs."""
+        doc = tmp_path / "adr" / "adr-001-test.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text('---\nid: "adr-001"\ntitle: "Test ADR"\nstatus: rejected\ndate: 2025-01-26\n---\n\n# Test\n')
+        changed, msg = fix_status_value(doc)
+        assert changed
+        assert "Rejected" in msg
+        assert frontmatter.loads(doc.read_text()).metadata["status"] == "Rejected"
+
+    def test_lowercase_rejected_normalizes_rfc(self, tmp_path):
+        """'rejected' normalizes to the valid 'Rejected' status for RFCs."""
+        doc = tmp_path / "rfcs" / "rfc-001-test.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text('---\nid: "rfc-001"\ntitle: "Test RFC"\nstatus: rejected\ndate: 2025-01-26\n---\n\n# Test\n')
+        changed, msg = fix_status_value(doc)
+        assert changed
+        assert "Rejected" in msg
+        assert frontmatter.loads(doc.read_text()).metadata["status"] == "Rejected"
+
     def test_no_status_field(self, tmp_path):
         """Test when status field is missing."""
         doc = tmp_path / "adr" / "adr-001-test.md"

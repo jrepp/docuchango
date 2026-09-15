@@ -29,7 +29,7 @@ Different doc types (ADR, RFC, Memo) need different required fields. Pydantic gi
 
 ```python
 class ADRFrontmatter(BaseModel):
-    status: Literal["Proposed", "Accepted", "Deprecated", "Superseded"]
+    status: Literal["Proposed", "Accepted", "Rejected", "Implemented", "Deprecated", "Superseded"]
     created: datetime.datetime  # ISO 8601 format
     deciders: str = Field(min_length=1)
 
