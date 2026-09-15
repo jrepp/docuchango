@@ -1,6 +1,9 @@
 """Tests for internal_links.py fix module."""
 
-from docuchango.fixes.internal_links import fix_links_in_content, fix_links_in_file, process_directory
+import sys
+
+from docuchango.fixes import internal_links
+from docuchango.fixes.internal_links import fix_links_in_content, fix_links_in_file, main, process_directory
 
 
 class TestInternalLinksContent:
@@ -305,3 +308,42 @@ class TestInternalLinksDirectory:
         assert stats["files_modified"] == 1
         # File should not be modified in dry-run
         assert file1.read_text(encoding="utf-8") == content
+
+
+class TestInternalLinksMain:
+    """Test the main() entry point, which discovers docs-cms relative to the module file."""
+
+    def _point_at(self, monkeypatch, tmp_path):
+        """Make main() treat tmp_path as the repo root containing docs-cms/."""
+        monkeypatch.setattr(internal_links, "__file__", str(tmp_path / "fixes" / "internal_links.py"))
+
+    def test_main_fixes_links_and_prints_summary(self, tmp_path, monkeypatch, capsys):
+        """main() processes docs-cms and prints a summary of files checked/modified."""
+        self._point_at(monkeypatch, tmp_path)
+        docs_cms = tmp_path / "docs-cms"
+        docs_cms.mkdir()
+        target = docs_cms / "guide.md"
+        target.write_text("[RFC](2025-10-13-rfc-001-test.md)", encoding="utf-8")
+
+        monkeypatch.setattr(sys, "argv", ["internal_links"])
+        main()
+
+        assert "rfc-001-test.md" in target.read_text(encoding="utf-8")
+        out = capsys.readouterr().out
+        assert "Files checked:  1" in out
+        assert "Files modified: 1" in out
+
+    def test_main_dry_run_leaves_files_untouched(self, tmp_path, monkeypatch, capsys):
+        """main() --dry-run reports what would change without writing files."""
+        self._point_at(monkeypatch, tmp_path)
+        docs_cms = tmp_path / "docs-cms"
+        docs_cms.mkdir()
+        target = docs_cms / "guide.md"
+        content = "[RFC](2025-10-13-rfc-001-test.md)"
+        target.write_text(content, encoding="utf-8")
+
+        monkeypatch.setattr(sys, "argv", ["internal_links", "--dry-run"])
+        main()
+
+        assert target.read_text(encoding="utf-8") == content
+        assert "DRY RUN MODE" in capsys.readouterr().out

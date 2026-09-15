@@ -122,6 +122,16 @@ class TestInitCommand:
             assert "Directory already exists" in result.output
             assert "Use --force to overwrite" in result.output
 
+    def test_init_succeeds_on_existing_empty_directory(self, runner, tmp_path):
+        """Test that init succeeds when the target path already exists but is empty."""
+        target_dir = tmp_path / "docs-cms"
+        target_dir.mkdir()
+
+        result = runner.invoke(main, ["init", "--path", str(target_dir)])
+
+        assert result.exit_code == 0
+        assert (target_dir / "docs-project.yaml").exists()
+
     def test_init_with_force_overwrites(self, runner, tmp_path):
         """Test that init with --force overwrites existing files."""
         with runner.isolated_filesystem(temp_dir=tmp_path):
