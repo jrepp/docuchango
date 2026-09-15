@@ -41,7 +41,7 @@ A monorepo can keep documents in more than one place. `docs_roots` lists the
 directories to scan, relative to the config file. It only takes effect
 takes effect for the standard document folders only together with `doc_types`
 below: with the plain `adr_dir`/`rfc_dir`/`memo_dir`/`prd_dir` layout, those
-folders resolve against the config's own directory; `docs_roots` still controls the top-level Markdown scan.
+folders resolve against the config's own directory, and `docs_roots` is ignored.
 
 ```yaml
 structure:
