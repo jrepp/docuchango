@@ -435,6 +435,7 @@ def validate(
         validator.validate_links()
         validator.check_project_ids()
         validator.check_ids()
+        validator.check_numbering_gaps()
         validator.check_uuids()
         validator.check_code_blocks()
         validator.check_mdx_compilation()

@@ -1,0 +1,16 @@
+version: "1"
+project:
+  id: fixture-project
+  name: Fixture Project
+  description: Synthetic project used by the finding regression fixtures
+structure:
+  document_folders:
+    - adr
+  doc_types:
+    adr:
+      schema: adr
+      folders: [adr]
+security:
+  allow_external_paths: false
+readability:
+  enabled: false

@@ -570,3 +570,32 @@ class TestScanSubfolders:
         assert config.structure.scan_subfolders is True
         assert config.structure.doc_types is not None
         assert config.structure.doc_types["adr"].scan_subfolders is False
+
+
+class TestReportNumberingGaps:
+    """ID-010: the per-type opt-in for the numbering gap report."""
+
+    def test_report_numbering_gaps_defaults_to_false(self):
+        """The check is opt-in, so a plain doc type never reports gaps."""
+        cfg = DocTypeConfig(folders=["adr"])
+        assert cfg.report_numbering_gaps is False
+
+    def test_report_numbering_gaps_can_be_enabled_per_type(self):
+        """Only the types that ask for it are checked."""
+        config = DocsProjectConfig(
+            project={"id": "gap-project", "name": "Gap Project"},
+            structure={
+                "doc_types": {
+                    "adr": {"schema": "adr", "folders": ["adr"], "report_numbering_gaps": True},
+                    "rfc": {"schema": "rfc", "folders": ["rfcs"]},
+                },
+            },
+        )
+        assert config.structure.doc_types is not None
+        assert config.structure.doc_types["adr"].report_numbering_gaps is True
+        assert config.structure.doc_types["rfc"].report_numbering_gaps is False
+
+    def test_report_numbering_gaps_has_no_structure_level_default(self):
+        """The option is per-type only; structure carries no default for it."""
+        config = DocsProjectConfig(project={"id": "gap-project", "name": "Gap Project"})
+        assert not hasattr(config.structure, "report_numbering_gaps")

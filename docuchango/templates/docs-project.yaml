@@ -68,6 +68,12 @@ structure:
   #     folders: [adr]
   #     filename_pattern: "^(adr)-(\\d{3})-(.+)\\.md$"
   #     scan_subfolders: true  # Wins over structure.scan_subfolders above
+  #   # Example opting one type into the ID-010 numbering gap report. Off by
+  #   # default, because a gap is usually a deliberately retired number.
+  #   rfc:
+  #     schema: rfc
+  #     folders: [rfcs]
+  #     report_numbering_gaps: true  # Report rfc-004 missing between 003 and 005
 
   # Named naming standards for document names.
   # Built-in standards: nnn-name, year-month-day-name, kebab-case, snake_case,

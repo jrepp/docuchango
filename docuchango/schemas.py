@@ -81,6 +81,14 @@ class DocTypeConfig(BaseModel):
             "for this document type when set; leave unset to use the structure-level default."
         ),
     )
+    report_numbering_gaps: bool = Field(
+        default=False,
+        description=(
+            "Whether ID-010 reports the numbers missing between the lowest and highest id of this "
+            "document type within the project that owns the documents. Gaps are often deliberate "
+            "(a withdrawn proposal), so this is opt-in and defaults to false."
+        ),
+    )
     model_config = ConfigDict(populate_by_name=True)
 
     frontmatter_schema: Literal["adr", "rfc", "memo", "prd", "generic"] = Field(

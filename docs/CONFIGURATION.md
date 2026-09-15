@@ -187,6 +187,7 @@ structure:
 | `require_frontmatter` | Set `false` to allow plain Markdown files with no frontmatter block - but only for `schema: generic`. An `adr`, `rfc`, `memo` or `prd` lane still reports a missing block regardless of this setting. |
 | `naming_standard` | A named filename rule instead of `filename_pattern`; see below. |
 | `scan_subfolders` | Overrides `structure.scan_subfolders` for this type. Leave unset to use the structure-level default. |
+| `report_numbering_gaps` | Report the numbers missing from this type's id sequence (`ID-010`). Default `false`; see below. |
 
 ## Naming standards
 
@@ -230,6 +231,42 @@ structure:
       folders: [reports]
       naming_standard: date-prefix
 ```
+
+## Reporting numbering gaps
+
+`docuchango validate` does not care that `adr-004` is missing between
+`adr-003` and `adr-005`: a gap is usually a number that was deliberately
+retired with a withdrawn proposal. A project that does want its numbering
+contiguous can opt one type in:
+
+```yaml
+structure:
+  doc_types:
+    adr:
+      schema: adr
+      folders: [adr]
+      report_numbering_gaps: true
+```
+
+The check then reports one finding per type, naming the missing numbers as a
+compact range list and the command that closes them:
+
+```text
+ID-010: adr numbering in docs-cms/docs-project.yaml has gaps: missing 3, 5-7
+(lowest adr-001, highest adr-010); run 'docuchango bulk compress-ids' to renumber
+```
+
+Nothing is renumbered by `validate` - renaming a document breaks every link to
+it, so the repair is the explicit
+`docuchango bulk compress-ids` run the message names.
+
+The option lives on the per-type block, so it needs a `doc_types` map; there
+is no structure-level default, because a numbering policy is a per-type
+decision rather than a layout-wide one. Sequences are grouped per project and
+per id prefix, so in a monorepo two sub-projects each keep their own `adr`
+sequence instead of being merged into one with holes in it. An id counts
+towards its sequence only when it is exactly `<prefix>-<number>`; an ADR
+amendment id such as `adr-043-a1` does not.
 
 ## Index files
 

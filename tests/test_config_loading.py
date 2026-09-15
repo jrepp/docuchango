@@ -45,6 +45,12 @@ class TestConfigLoading:
         assert "security" in schema["properties"]
         assert schema["properties"]["security"]["properties"]["allow_external_paths"]["default"] is False
 
+        doc_type_properties = schema["properties"]["structure"]["properties"]["doc_types"]["additionalProperties"][
+            "properties"
+        ]
+        assert doc_type_properties["report_numbering_gaps"]["type"] == "boolean"
+        assert doc_type_properties["report_numbering_gaps"]["default"] is False
+
     def test_load_valid_config(self):
         """Test that valid config file is loaded correctly."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1203,6 +1209,37 @@ doc_uuid: 22222222-2222-4222-8222-222222222222
             # (false) and its nested file is skipped.
             assert "adr-002-old.md" in doc_names
             assert "rfc-002-old.md" not in doc_names
+
+    def test_report_numbering_gaps_round_trips_from_yaml(self):
+        """The ID-010 opt-in survives a real docs-project.yaml load, per type."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            docs_cms = repo_root / "docs-cms"
+            (docs_cms / "adr").mkdir(parents=True)
+
+            (docs_cms / "docs-project.yaml").write_text(
+                yaml.dump(
+                    {
+                        "project": {"id": "gap-project", "name": "Gap Project"},
+                        "structure": {
+                            "doc_types": {
+                                "adr": {
+                                    "schema": "adr",
+                                    "folders": ["adr"],
+                                    "report_numbering_gaps": True,
+                                },
+                                "rfc": {"schema": "rfc", "folders": ["rfcs"]},
+                            },
+                        },
+                    }
+                )
+            )
+
+            validator = DocValidator(repo_root, verbose=False)
+            doc_types = validator.project_configs[0].config.structure.doc_types
+            assert doc_types is not None
+            assert doc_types["adr"].report_numbering_gaps is True
+            assert doc_types["rfc"].report_numbering_gaps is False
 
 
 class TestLegacyFoldersUnderDocsRoots:
