@@ -2,6 +2,38 @@
 
 <!-- version list -->
 
+## v1.19.0-rc.3 (2026-09-15)
+
+### Bug Fixes
+
+- **cli**: Resolve --repo-root before validating and label dry-run fixes as fixable
+  ([`57f691c`](https://github.com/jrepp/docuchango/commit/57f691c7e5f36d2e3f8f9cdf17fac5b30761a096))
+
+### Chores
+
+- **deps**: Bump nltk to 3.10.3 and add a dev dependency group
+  ([`c40b834`](https://github.com/jrepp/docuchango/commit/c40b834302d886efe58ac7d376a0ecd244a5bf61))
+
+### Documentation
+
+- Point the rfc-003 validator checklist at the regression fixtures
+  ([`e7e6da7`](https://github.com/jrepp/docuchango/commit/e7e6da707000cdfa06553526e9ac43f57e362f92))
+
+### Testing
+
+- Add fixture-driven finding regression harness
+  ([`2e52c29`](https://github.com/jrepp/docuchango/commit/2e52c29eba1a7945b8698b342f9eb05f7564ddeb))
+
+- Add xfail fixtures for the planned FM-010 and FMT-010 checks
+  ([`f017399`](https://github.com/jrepp/docuchango/commit/f0173996197c246dc6ed8a982e61205c081334a1))
+
+- Make the MDX-001 fixture hold across the MDX check rework
+  ([`a071116`](https://github.com/jrepp/docuchango/commit/a0711168923cbd4c2b8a389eff09b88154e31854))
+
+- Update finding fixtures for the Rejected status and the reworked link and MDX checks
+  ([`7b84045`](https://github.com/jrepp/docuchango/commit/7b840458b8410bd999a3d5a29372bde0b2e7721d))
+
+
 ## v1.19.0-rc.2 (2026-09-15)
 
 ### Bug Fixes
