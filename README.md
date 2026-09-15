@@ -224,6 +224,7 @@ never end up with an unrelated fix mixed into your working tree.
 from docuchango.validator import DocValidator
 from docuchango.schemas import ADRFrontmatter
 
+# DocValidator only reports; fixing is the `validate` command's own pass.
 validator = DocValidator(repo_root=".", verbose=True)
 validator.scan_documents()
 validator.check_code_blocks()

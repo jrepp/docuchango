@@ -66,8 +66,8 @@ reported.
 
 | ID | Check | Status | Mode | Where |
 |----|-------|--------|------|-------|
-| FM-001 | Missing YAML frontmatter block | Implemented | report | `DocValidator.scan_documents` |
-| FM-002 | Frontmatter fails the per-type Pydantic schema (required fields, types, status values) | Implemented | fix/report | `scan_documents`, `schemas.py` (`Literal` types and `VALID_*_STATUSES`), `fixes/frontmatter.py` (`VALID_STATUSES` and `STATUS_MAPPINGS`) |
+| FM-001 | Missing YAML frontmatter block | Implemented | fix/report | `DocValidator.scan_documents`, `fixes/frontmatter.py` (`add_missing_frontmatter`, `resolve_doc_type`) |
+| FM-002 | Frontmatter fails the per-type Pydantic schema (required fields, types, status values) | Implemented | fix/report | `scan_documents`, `schemas.py` (`Literal` types and `VALID_*_STATUSES`), `fixes/frontmatter.py` (`VALID_STATUSES`, `STATUS_MAPPINGS` and `resolve_doc_type`) |
 | FM-003 | Malformed `doc_uuid` | Implemented | report | `schemas.py` validators |
 | FM-004 | Duplicate `doc_uuid` across documents | Implemented | report | `check_uuids` |
 | FM-005 | Missing `tags`, `project_id` or `doc_uuid` filled in | Implemented | fix | `fixes/whitespace.py` `ensure_required_fields` |
@@ -179,7 +179,9 @@ IDs, which is the intended suppression mechanism and is out of scope here.
 1. Pick the next free number in the area and add the row here as `Planned`
    if it is not already listed.
 2. Detection goes in a `check_*` method on `DocValidator`; repair goes in a
-   module under `docuchango/fixes/` that returns what it changed.
+   module under `docuchango/fixes/` that returns what it changed. `DocValidator`
+   only reports - Phase 1 of `validate` in `cli.py` is the single path that
+   writes to disk, so the two can never drift.
 3. Wire the fixer into Phase 1 of `validate` in `cli.py` and the check into
    Phase 2, in the order the table above lists them.
 4. Prefix messages with the ID. Add tests under `tests/` named for the ID.

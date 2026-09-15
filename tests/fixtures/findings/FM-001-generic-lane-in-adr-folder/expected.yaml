@@ -1,0 +1,15 @@
+summary: >
+  A document with no frontmatter in a folder named `adr` that docs-project.yaml
+  binds to `schema: generic`. The generated block follows the configured schema
+  and not the folder name, so it carries no ADR `status` or `deciders`.
+# Substrings that must appear in the output of `docuchango validate --dry-run`.
+messages:
+  - "Missing YAML frontmatter"
+# `validate` (without --dry-run) repairs this finding.
+fixed: true
+# The generic block is generated. An ADR-shaped block would be reported as
+# "Added frontmatter block with ID 'adr-001'" instead.
+fix_messages:
+  - "[Frontmatter metadata] Added generic frontmatter block"
+dry_run_exit_code: 1
+exit_code: 0

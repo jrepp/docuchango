@@ -223,7 +223,7 @@ class TestValidatorEdgeCases:
 
     def test_scan_documents_on_empty_directory(self, tmp_path):
         """Scanning a directory with no markdown files should yield no documents."""
-        validator = DocValidator(repo_root=tmp_path, verbose=False, fix=False)
+        validator = DocValidator(repo_root=tmp_path, verbose=False)
         validator.scan_documents()
         assert len(validator.documents) == 0
 
@@ -245,7 +245,7 @@ status: accepted
             encoding="utf-8",
         )
 
-        validator = DocValidator(repo_root=tmp_path, verbose=False, fix=False)
+        validator = DocValidator(repo_root=tmp_path, verbose=False)
         validator.scan_documents()
 
         # A file whose frontmatter can't be parsed is skipped, not raised.

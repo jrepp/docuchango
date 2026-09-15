@@ -154,10 +154,9 @@ class ProjectConfigContext:
 class DocValidator:
     """Validates documentation"""
 
-    def __init__(self, repo_root: Path, verbose: bool = False, fix: bool = False) -> None:
+    def __init__(self, repo_root: Path, verbose: bool = False) -> None:
         self.repo_root = repo_root.resolve()
         self.verbose = verbose
-        self.fix = fix
         self.documents: list[Document] = []
         self.file_to_doc: dict[Path, Document] = {}
         self.all_links: list[Link] = []
@@ -1686,10 +1685,6 @@ class DocValidator:
         """
         self.log("\n📝 Checking code blocks...")
 
-        # If fix mode is enabled, apply fixes before validation
-        if self.fix:
-            self._apply_code_block_fixes()
-
         total_valid = 0
         total_invalid = 0
 
@@ -1851,57 +1846,9 @@ class DocValidator:
             f"\n   Total: {total_valid} valid code blocks, {total_invalid} invalid code blocks across {len(self.documents)} documents"
         )
 
-    def _apply_code_block_fixes(self):
-        """Apply code block fixes to all documents"""
-        from docuchango.fixes.docs import (
-            fix_blank_lines_after_fences,
-            fix_blank_lines_before_fences,
-            fix_code_fence_languages,
-        )
-
-        self.log("   Applying code block fixes...")
-        total_fixes = 0
-
-        for doc in self.documents:
-            fence_fixes = fix_code_fence_languages(doc.file_path)
-            blank_before_fixes = fix_blank_lines_before_fences(doc.file_path)
-            blank_after_fixes = fix_blank_lines_after_fences(doc.file_path)
-            fixes = fence_fixes + blank_before_fixes + blank_after_fixes
-
-            if fixes > 0:
-                total_fixes += fixes
-                # Clear cache so re-reading gets the fixed content
-                doc._content_cache = None
-                self.log(f"   ✓ Fixed {fixes} code block issues in {doc.file_path.name}")
-
-        if total_fixes > 0:
-            self.log(f"   Applied {total_fixes} code block fixes")
-
-    def _apply_formatting_fixes(self):
-        """Apply formatting fixes to all documents"""
-        from docuchango.fixes.docs import fix_trailing_whitespace
-
-        self.log("   Applying formatting fixes...")
-        total_fixes = 0
-
-        for doc in self.documents:
-            fixes = fix_trailing_whitespace(doc.file_path)
-            if fixes > 0:
-                total_fixes += fixes
-                # Clear cache so re-reading gets the fixed content
-                doc._content_cache = None
-                self.log(f"   ✓ Fixed {fixes} formatting issues in {doc.file_path.name}")
-
-        if total_fixes > 0:
-            self.log(f"   Applied {total_fixes} formatting fixes")
-
     def check_formatting(self):
         """Check markdown formatting issues"""
         self.log("\n📝 Checking formatting...")
-
-        # If fix mode is enabled, apply fixes before validation
-        if self.fix:
-            self._apply_formatting_fixes()
 
         for doc in self.documents:
             try:
@@ -2205,9 +2152,6 @@ Examples:
     # Verbose output
     uv run tooling/validate_docs.py --verbose
 
-    # Auto-fix issues (future)
-    uv run tooling/validate_docs.py --fix
-
 What this checks:
     ✓ YAML frontmatter format
     ✓ Internal link validity
@@ -2225,12 +2169,10 @@ What this checks:
         "--skip-build", action="store_true", help="Skip Docusaurus build check (faster, but less thorough)"
     )
 
-    parser.add_argument("--fix", action="store_true", help="Auto-fix issues where possible (not yet implemented)")
-
     args = parser.parse_args()
 
     repo_root = Path(__file__).parent.parent
-    validator = DocValidator(repo_root=repo_root, verbose=args.verbose, fix=args.fix)
+    validator = DocValidator(repo_root=repo_root, verbose=args.verbose)
 
     try:
         all_valid = validator.validate(skip_build=args.skip_build)

@@ -79,13 +79,20 @@ def _iter_docs_project_configs(root: Path) -> list[tuple[DocsProjectConfig, Path
     return configs
 
 
-def _discover_doc_files(root: Path) -> list[Path]:
-    """Discover markdown docs, preferring docs-project.yaml when present."""
+def _discover_doc_schemas(root: Path) -> dict[Path, str | None]:
+    """Discover markdown docs mapped to the schema configured for each of them.
+
+    The value is the ``schema`` of the ``structure.doc_types`` entry (or the
+    folder binding of a legacy ``adr_dir``/``rfc_dir``/``memo_dir``/``prd_dir``
+    layout) that owns the file, so the fixers shape frontmatter by the
+    configured schema instead of guessing from the folder name. It is ``None``
+    when no config claims the file, which leaves the fixers on their
+    folder-name heuristic.
+    """
     configs = _iter_docs_project_configs(root)
 
     if configs:
-        all_files: list[Path] = []
-        all_seen: set[Path] = set()
+        all_files: dict[Path, str | None] = {}
 
         for config, config_path in configs:
             if not config.structure:
@@ -107,10 +114,14 @@ def _discover_doc_files(root: Path) -> list[Path]:
                             if not folder_path.exists():
                                 continue
                             for file_path in folder_path.rglob("*.md"):
-                                if file_path not in all_seen:
-                                    all_seen.add(file_path)
-                                    all_files.append(file_path)
+                                all_files.setdefault(file_path, doc_type_cfg.frontmatter_schema)
             else:
+                folder_schemas = {
+                    config.structure.adr_dir: "adr",
+                    config.structure.rfc_dir: "rfc",
+                    config.structure.memo_dir: "memo",
+                    config.structure.prd_dir: "prd",
+                }
                 for folder in config.structure.document_folders:
                     folder_path = resolve_config_path(config_base, folder, config_base, allow_external_paths)
                     if not folder_path:
@@ -118,12 +129,10 @@ def _discover_doc_files(root: Path) -> list[Path]:
                     if not folder_path.exists():
                         continue
                     for file_path in folder_path.rglob("*.md"):
-                        if file_path not in all_seen:
-                            all_seen.add(file_path)
-                            all_files.append(file_path)
+                        all_files.setdefault(file_path, folder_schemas.get(folder))
 
         if all_files:
-            return sorted(all_files)
+            return all_files
 
     # Legacy mode (backwards compatibility)
     doc_patterns = [
@@ -136,10 +145,16 @@ def _discover_doc_files(root: Path) -> list[Path]:
         "docs-cms/memos/**/*.md",
         "docs-cms/prd/**/*.md",
     ]
-    files = []
+    files: dict[Path, str | None] = {}
     for pattern in doc_patterns:
-        files.extend(root.glob(pattern))
-    return sorted(set(files))
+        for file_path in root.glob(pattern):
+            files.setdefault(file_path, None)
+    return files
+
+
+def _discover_doc_files(root: Path) -> list[Path]:
+    """Discover markdown docs, preferring docs-project.yaml when present."""
+    return sorted(_discover_doc_schemas(root))
 
 
 def _restore_snapshot(snapshot: dict[Path, bytes | None]) -> bool:
@@ -263,7 +278,12 @@ def validate(
     # Discovered document paths are resolved, so the root must be too or
     # Path.relative_to raises for a root that goes through a symlink.
     repo_root = repo_root.resolve()
-    all_files = _discover_doc_files(repo_root)
+    # Each discovered file is paired with the schema its docs-project.yaml
+    # doc_types entry binds it to, so the frontmatter fixer shapes the block by
+    # the configured schema rather than by the folder name. The value is None
+    # for a file no config claims, which keeps the folder-name heuristic.
+    doc_schemas = _discover_doc_schemas(repo_root)
+    all_files = sorted(doc_schemas)
 
     # Track fixes applied and remaining issues
     fixes_applied: list[tuple[Path, str]] = []
@@ -286,7 +306,9 @@ def validate(
     if all_files:
         for file_path in all_files:
             try:
-                changed, messages = fix_frontmatter_metadata(file_path, dry_run=dry_run)
+                changed, messages = fix_frontmatter_metadata(
+                    file_path, dry_run=dry_run, schema=doc_schemas.get(file_path)
+                )
                 if changed and messages:
                     for msg in messages:
                         fixes_applied.append((file_path, f"[Frontmatter metadata] {msg}"))
@@ -318,8 +340,8 @@ def validate(
 
     # Phase 2: Run validation to find remaining issues
     try:
-        # Don't pass fix=True to validator since we already applied fixes above
-        validator = DocValidator(repo_root=repo_root, verbose=verbose, fix=False)
+        # Fixing is Phase 1 above; the validator only reports.
+        validator = DocValidator(repo_root=repo_root, verbose=verbose)
         validator.scan_documents()
         validator.extract_links()
         validator.validate_links()
