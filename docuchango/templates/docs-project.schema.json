@@ -53,6 +53,11 @@
           "items": {"type": "string"},
           "default": ["."]
         },
+        "scan_subfolders": {
+          "type": "boolean",
+          "default": false,
+          "description": "Scan Markdown files nested in subfolders of adr_dir/rfc_dir/memo_dir/prd_dir (and doc_types folders that do not set their own scan_subfolders) with the same id/uuid/link/filename rules as top-level files. Default false keeps nested files unscanned."
+        },
         "doc_types": {
           "type": ["object", "null"],
           "additionalProperties": {
@@ -72,7 +77,8 @@
               "filename_pattern": {"type": ["string", "null"]},
               "enforce_filename_pattern": {"type": "boolean", "default": true},
               "require_frontmatter": {"type": "boolean", "default": true},
-              "naming_standard": {"type": ["string", "null"], "description": "Named naming standard to apply (e.g., 'kebab-case', 'nnn-name'). Overrides filename_pattern if both set."}
+              "naming_standard": {"type": ["string", "null"], "description": "Named naming standard to apply (e.g., 'kebab-case', 'nnn-name'). Overrides filename_pattern if both set."},
+              "scan_subfolders": {"type": ["boolean", "null"], "description": "Overrides structure.scan_subfolders for this document type. Leave null to use the structure-level default."}
             }
           }
         },

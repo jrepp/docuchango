@@ -345,11 +345,17 @@ class DocValidator:
         # Default folders to scan (includes prd now!)
         return ["adr", "rfcs", "memos", "prd"]
 
-    def _build_scan_entries(self) -> list[tuple[str, str, str, bool, bool, Path, Path, bool]]:
+    def _get_scan_subfolders_default(self) -> bool:
+        """Get the structure-level default for scanning nested subfolders"""
+        if self.project_config and self.project_config.structure:
+            return self.project_config.structure.scan_subfolders
+        return False
+
+    def _build_scan_entries(self) -> list[tuple[str, str, str, bool, bool, Path, Path, bool, bool]]:
         """Build scan entries as tuples:
 
         (doc_type, folder_relative, filename_pattern, enforce_filename_pattern,
-        require_frontmatter, root_path, boundary, allow_external_paths)
+        require_frontmatter, root_path, boundary, allow_external_paths, scan_subfolders)
         """
         default_patterns = {
             "adr": r"^(adr)-(\d{3})-(.+)\.md$",
@@ -361,7 +367,7 @@ class DocValidator:
         contexts = self.project_configs or []
 
         if contexts:
-            entries: list[tuple[str, str, str, bool, bool, Path, Path, bool]] = []
+            entries: list[tuple[str, str, str, bool, bool, Path, Path, bool, bool]] = []
             for context in contexts:
                 config = context.config
                 config_base = context.base_dir
@@ -369,7 +375,11 @@ class DocValidator:
                 if config.structure and config.structure.doc_types:
                     roots = config.structure.docs_roots or ["."]
                     custom_naming = config.structure.naming_standards or {}
+                    structure_scan_subfolders = config.structure.scan_subfolders
                     for doc_type_name, cfg in config.structure.doc_types.items():
+                        scan_subfolders = (
+                            cfg.scan_subfolders if cfg.scan_subfolders is not None else structure_scan_subfolders
+                        )
                         if cfg.naming_standard:
                             pattern = resolve_naming_standard(cfg.naming_standard, custom_naming)
                             if pattern:
@@ -402,6 +412,7 @@ class DocValidator:
                                         root_path,
                                         root_path,
                                         context.allow_external_paths,
+                                        scan_subfolders,
                                     )
                                 )
                     continue
@@ -425,6 +436,7 @@ class DocValidator:
                                 config_base,
                                 config_base,
                                 context.allow_external_paths,
+                                config.structure.scan_subfolders,
                             )
                         )
             return entries
@@ -433,6 +445,7 @@ class DocValidator:
         config_base = self._get_config_base_dir()
         folder_config = self._get_folder_config()
         document_folders = self._get_document_folders()
+        scan_subfolders_default = self._get_scan_subfolders_default()
 
         entries = []
         for key, schema_name in [("adr", "adr"), ("rfc", "rfc"), ("memo", "memo"), ("prd", "prd")]:
@@ -448,6 +461,7 @@ class DocValidator:
                         config_base,
                         config_base,
                         False,
+                        scan_subfolders_default,
                     )
                 )
         return entries
@@ -460,6 +474,7 @@ class DocValidator:
         pattern: re.Pattern[str],
         enforce_filename_pattern: bool,
         require_frontmatter: bool,
+        scan_subfolders: bool = False,
     ):
         """Scan a specific document folder for markdown files"""
         if not folder_path.exists():
@@ -471,14 +486,20 @@ class DocValidator:
             if md_file.name in ["README.md", "index.md"]:
                 continue
 
-            # Only top-level files in the document folder are treated as
-            # numbered documents subject to strict naming/frontmatter/ID rules.
-            # Everything nested in a subfolder (e.g. prd/testing/*, memos/
-            # private/*) is supporting material and is skipped entirely -
-            # regardless of whether its name happens to match the pattern -
-            # so it is never validated (or mis-validated) as a top-level doc.
+            # By default, only top-level files in the document folder are
+            # treated as numbered documents subject to strict naming/
+            # frontmatter/ID rules. Everything nested in a subfolder (e.g.
+            # prd/testing/*, memos/private/*) is treated as supporting
+            # material and skipped entirely - regardless of whether its name
+            # happens to match the pattern - so it is never validated (or
+            # mis-validated) as a top-level doc. When scan_subfolders is
+            # enabled (structure.scan_subfolders, or the per-type
+            # structure.doc_types.<type>.scan_subfolders override) nested
+            # files are scanned with the same rules, matching the filename
+            # pattern and deriving the expected id against the file name
+            # only, never the subfolder path.
             is_top_level = md_file.parent == folder_path
-            if enforce_filename_pattern and not is_top_level:
+            if enforce_filename_pattern and not is_top_level and not scan_subfolders:
                 self.log(f"   ⊘ {md_file.relative_to(folder_path)}: nested support file, skipping")
                 continue
 
@@ -534,6 +555,7 @@ class DocValidator:
             root_path,
             boundary,
             allow_external_paths,
+            scan_subfolders,
         ) in entries:
             try:
                 pattern = re.compile(pattern_text)
@@ -555,6 +577,7 @@ class DocValidator:
                 pattern,
                 enforce_pattern,
                 require_frontmatter,
+                scan_subfolders,
             )
 
         # Scan general docs markdown files at each configured docs root.

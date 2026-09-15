@@ -26,6 +26,12 @@ structure:
     - memos
     - prd
 
+  # Scan Markdown files nested in subfolders of adr_dir/rfc_dir/memo_dir/prd_dir
+  # (for example adr/archive/ or rfcs/2024/) with the same id/uuid/link/filename
+  # rules as top-level files. Default is false: nested files are treated as
+  # support material and are not scanned.
+  # scan_subfolders: false
+
   # Optional advanced mapping for mixed schemas/layouts in one repository.
   # When doc_types is set, it takes precedence over adr_dir/rfc_dir/memo_dir/prd_dir.
   # doc_types:
@@ -54,6 +60,12 @@ structure:
   #     schema: generic
   #     folders: [ops/runbooks]
   #     naming_standard: snake_case  # Use built-in 'snake_case' standard
+  #   # Example overriding scan_subfolders for one type only:
+  #   adr-archived:
+  #     schema: adr
+  #     folders: [adr]
+  #     filename_pattern: "^(adr)-(\\d{3})-(.+)\\.md$"
+  #     scan_subfolders: true  # Wins over structure.scan_subfolders above
 
   # Named naming standards for document names.
   # Built-in standards: nnn-name, year-month-day-name, kebab-case, snake_case,
