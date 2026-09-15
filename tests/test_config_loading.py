@@ -7,6 +7,7 @@ from pathlib import Path
 import yaml
 
 from docuchango.cli import _discover_doc_files
+from docuchango.schemas import DocsProjectStructure, DocTypeConfig
 from docuchango.validator import DocValidator
 
 
@@ -1202,3 +1203,208 @@ doc_uuid: 22222222-2222-4222-8222-222222222222
             # (false) and its nested file is skipped.
             assert "adr-002-old.md" in doc_names
             assert "rfc-002-old.md" not in doc_names
+
+
+class TestLegacyFoldersUnderDocsRoots:
+    """`docs_roots` applies to the legacy adr_dir/rfc_dir/memo_dir/prd_dir layout."""
+
+    @staticmethod
+    def _write_config(repo_root: Path, structure: dict[str, object]) -> None:
+        (repo_root / "docs-project.yaml").write_text(
+            yaml.dump(
+                {
+                    "project": {"id": "secure-project", "name": "Secure Project"},
+                    "structure": structure,
+                }
+            )
+        )
+
+    def test_legacy_folders_resolve_under_docs_root(self):
+        """A legacy folder is looked for inside every configured docs root."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            adr_dir = repo_root / "docs-cms" / "adr"
+            adr_dir.mkdir(parents=True)
+            write_valid_adr(adr_dir / "adr-001-under-root.md")
+
+            self._write_config(
+                repo_root,
+                {"docs_roots": ["docs-cms"], "adr_dir": "adr", "document_folders": ["adr"]},
+            )
+
+            validator = DocValidator(repo_root, verbose=False)
+            validator.scan_documents()
+
+            assert [doc.file_path.name for doc in validator.documents] == ["adr-001-under-root.md"]
+            assert validator.errors == []
+            assert _discover_doc_files(repo_root) == [(adr_dir / "adr-001-under-root.md").resolve()]
+
+    def test_doc_types_control_finds_the_same_document(self):
+        """Control: the doc_types spelling of the same layout discovers the same file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            adr_dir = repo_root / "docs-cms" / "adr"
+            adr_dir.mkdir(parents=True)
+            write_valid_adr(adr_dir / "adr-001-under-root.md")
+
+            self._write_config(
+                repo_root,
+                {
+                    "docs_roots": ["docs-cms"],
+                    "doc_types": {"adr": {"schema": "adr", "folders": ["adr"]}},
+                },
+            )
+
+            validator = DocValidator(repo_root, verbose=False)
+            validator.scan_documents()
+
+            assert [doc.file_path.name for doc in validator.documents] == ["adr-001-under-root.md"]
+            assert _discover_doc_files(repo_root) == [(adr_dir / "adr-001-under-root.md").resolve()]
+
+    def test_legacy_folders_scan_every_docs_root(self):
+        """Each docs root is scanned for the same legacy folders."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            for index, root in enumerate(["services/billing", "services/search"], start=1):
+                adr_dir = repo_root / root / "adr"
+                adr_dir.mkdir(parents=True)
+                write_valid_adr(adr_dir / f"adr-00{index}-service.md", adr_id=f"adr-00{index}")
+
+            self._write_config(
+                repo_root,
+                {
+                    "docs_roots": ["services/billing", "services/search"],
+                    "adr_dir": "adr",
+                    "document_folders": ["adr"],
+                },
+            )
+
+            validator = DocValidator(repo_root, verbose=False)
+            validator.scan_documents()
+
+            assert sorted(doc.file_path.name for doc in validator.documents) == [
+                "adr-001-service.md",
+                "adr-002-service.md",
+            ]
+
+    def test_legacy_folders_without_docs_roots_resolve_against_config(self):
+        """With docs_roots unset the legacy folders still sit beside the config."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            adr_dir = repo_root / "adr"
+            adr_dir.mkdir(parents=True)
+            write_valid_adr(adr_dir / "adr-001-beside-config.md")
+
+            self._write_config(repo_root, {"adr_dir": "adr", "document_folders": ["adr"]})
+
+            validator = DocValidator(repo_root, verbose=False)
+            validator.scan_documents()
+
+            assert [doc.file_path.name for doc in validator.documents] == ["adr-001-beside-config.md"]
+            assert _discover_doc_files(repo_root) == [(adr_dir / "adr-001-beside-config.md").resolve()]
+
+    def test_empty_docs_roots_behaves_like_unset(self):
+        """An explicitly empty docs_roots falls back to the config's directory."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            adr_dir = repo_root / "adr"
+            adr_dir.mkdir(parents=True)
+            write_valid_adr(adr_dir / "adr-001-beside-config.md")
+
+            self._write_config(
+                repo_root,
+                {"docs_roots": [], "adr_dir": "adr", "document_folders": ["adr"]},
+            )
+
+            validator = DocValidator(repo_root, verbose=False)
+            validator.scan_documents()
+
+            assert [doc.file_path.name for doc in validator.documents] == ["adr-001-beside-config.md"]
+
+    def test_legacy_folder_prefixed_with_docs_root_is_not_doubled(self):
+        """A folder already written with its docs root is not nested twice."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            adr_dir = repo_root / "docs-cms" / "adr"
+            adr_dir.mkdir(parents=True)
+            write_valid_adr(adr_dir / "adr-001-prefixed.md")
+
+            self._write_config(
+                repo_root,
+                {
+                    "docs_roots": ["docs-cms"],
+                    "adr_dir": "docs-cms/adr",
+                    "document_folders": ["docs-cms/adr"],
+                },
+            )
+
+            validator = DocValidator(repo_root, verbose=False)
+            validator.scan_documents()
+
+            assert [doc.file_path.name for doc in validator.documents] == ["adr-001-prefixed.md"]
+            assert _discover_doc_files(repo_root) == [(adr_dir / "adr-001-prefixed.md").resolve()]
+
+    def test_legacy_folders_cannot_escape_the_config_boundary(self):
+        """docs_roots resolution keeps the existing containment guarantee."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            docs_dir = repo_root / "docs"
+            outside_adr = repo_root / "adr"
+            docs_dir.mkdir()
+            outside_adr.mkdir()
+            write_valid_adr(outside_adr / "adr-001-outside.md")
+
+            (docs_dir / "docs-project.yaml").write_text(
+                yaml.dump(
+                    {
+                        "project": {"id": "secure-project", "name": "Secure Project"},
+                        "structure": {
+                            "docs_roots": [".."],
+                            "adr_dir": "adr",
+                            "document_folders": ["adr"],
+                        },
+                    }
+                )
+            )
+
+            validator = DocValidator(repo_root, verbose=False)
+            validator.scan_documents()
+
+            assert validator.documents == []
+            assert any("Blocked docs root path '..'" in error for error in validator.errors)
+
+
+class TestFolderUnderRoot:
+    """Unit coverage for the shared docs-root folder resolver."""
+
+    def test_plain_folder_is_returned_unchanged(self):
+        assert DocsProjectStructure.folder_under_root("docs-cms", "adr") == "adr"
+
+    def test_dot_root_is_a_no_op(self):
+        assert DocsProjectStructure.folder_under_root(".", "adr") == "adr"
+
+    def test_shared_prefix_is_stripped_once(self):
+        assert DocsProjectStructure.folder_under_root("docs-cms", "docs-cms/adr") == "adr"
+        assert DocsProjectStructure.folder_under_root("a/b", "a/b/c/d") == "c/d"
+
+    def test_folder_equal_to_root_becomes_the_root_itself(self):
+        assert DocsProjectStructure.folder_under_root("docs", "docs") == "."
+
+    def test_partial_name_match_is_not_a_prefix(self):
+        assert DocsProjectStructure.folder_under_root("docs", "docs-cms/adr") == "docs-cms/adr"
+
+
+class TestLegacyFolderBindings:
+    """Unit coverage for the legacy folder/schema bindings."""
+
+    def test_only_folders_listed_in_document_folders_are_bound(self):
+        structure = DocsProjectStructure(document_folders=["adr", "prd"])
+        assert structure.legacy_folder_bindings() == [("adr", "adr"), ("prd", "prd")]
+
+    def test_doc_types_replace_the_legacy_bindings(self):
+        structure = DocsProjectStructure(doc_types={"adr": DocTypeConfig(schema="adr", folders=["adr"])})
+        assert structure.legacy_folder_bindings() == []
+
+    def test_unbound_folders_map_to_no_schema(self):
+        structure = DocsProjectStructure(document_folders=["adr", "guides"])
+        assert structure.legacy_folder_schemas() == {"adr": "adr", "guides": None}

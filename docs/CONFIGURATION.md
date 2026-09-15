@@ -46,10 +46,7 @@ a generic document, whether or not its folder is listed.
 ## Several documentation roots
 
 A monorepo can keep documents in more than one place. `docs_roots` lists the
-directories to scan, relative to the config file. It only takes effect for
-the standard document folders together with `doc_types` below: with the
-plain `adr_dir`/`rfc_dir`/`memo_dir`/`prd_dir` layout, those folders resolve
-against the config's own directory, and `docs_roots` is ignored.
+directories to scan, relative to the config file.
 
 ```yaml
 structure:
@@ -66,8 +63,27 @@ structure:
       folders: [rfcs]
 ```
 
-Each root is scanned for the same `doc_types` folders. To scan roots that
-should not share one set of folders and rules, use `subprojects` instead.
+Every document folder is resolved under every root, and the rule is the same
+whichever way the folders are named: the `folders` of a `doc_types` entry and
+the plain `adr_dir`/`rfc_dir`/`memo_dir`/`prd_dir` folders listed in
+`document_folders` both resolve relative to each entry in `docs_roots`. So
+this scans `docs-cms/adr/`:
+
+```yaml
+structure:
+  docs_roots: [docs-cms]
+  adr_dir: adr
+  document_folders: [adr]
+```
+
+When `docs_roots` is unset or empty it defaults to `["."]`, which is the
+directory holding the config, so a single-root project can leave it out. A
+folder that is already written with its docs root as a prefix is not nested
+twice: with `docs_roots: [docs-cms]`, an `adr_dir` of either `adr` or
+`docs-cms/adr` means `docs-cms/adr/`.
+
+Each root is scanned for the same folders. To scan roots that should not share
+one set of folders and rules, use `subprojects` instead.
 
 ## Scanning nested subfolders
 

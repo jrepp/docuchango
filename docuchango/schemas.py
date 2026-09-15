@@ -10,6 +10,7 @@ import re
 import typing
 from collections.abc import Callable
 from importlib.metadata import PackageNotFoundError, version
+from pathlib import PurePosixPath
 from typing import Any, Literal, cast
 
 _eval_type_candidate = getattr(typing, "_eval_type", None)
@@ -122,7 +123,11 @@ class DocsProjectStructure(BaseModel):
     )
     docs_roots: list[str] = Field(
         default_factory=lambda: ["."],
-        description="Optional list of roots (relative to the config file directory) to scan for folders. Useful for monorepos.",
+        description=(
+            "Optional list of roots (relative to the config file directory) to scan for folders. "
+            "Document folders - both doc_types folders and the legacy adr_dir/rfc_dir/memo_dir/prd_dir "
+            "folders - are resolved under every root. Useful for monorepos."
+        ),
     )
     scan_subfolders: bool = Field(
         default=False,
@@ -149,6 +154,59 @@ class DocsProjectStructure(BaseModel):
             "Example: {'kebab-case': '^[a-z0-9]+(-[a-z0-9]+)*\\.md$', 'date-numeric': '^\\d{4}-\\d{2}-\\d{2}-.+\\.md$'}"
         ),
     )
+
+    def effective_docs_roots(self) -> list[str]:
+        """Docs roots to scan, falling back to the config's own directory.
+
+        An empty or unset ``docs_roots`` means "just the directory holding the
+        config", which keeps a plain single-root layout working unchanged.
+        """
+        return list(self.docs_roots) or ["."]
+
+    @staticmethod
+    def folder_under_root(docs_root: str, folder: str) -> str:
+        """Return ``folder`` expressed relative to ``docs_root``.
+
+        Document folders are resolved under every docs root. A folder that is
+        already written with its docs root as a prefix (``docs_roots: [docs]``
+        with ``adr_dir: docs/adr``) must not have the root applied twice, so
+        the shared prefix is stripped instead.
+        """
+        root_parts = tuple(part for part in PurePosixPath(docs_root.replace("\\", "/")).parts if part != ".")
+        folder_parts = tuple(part for part in PurePosixPath(folder.replace("\\", "/")).parts if part != ".")
+        if root_parts and folder_parts[: len(root_parts)] == root_parts:
+            remainder = folder_parts[len(root_parts) :]
+            return str(PurePosixPath(*remainder)) if remainder else "."
+        return folder
+
+    def legacy_folder_bindings(self) -> list[tuple[str, str]]:
+        """``(schema, folder)`` for each legacy typed folder that is scanned.
+
+        Only folders listed in ``document_folders`` are returned, in
+        ADR/RFC/memo/PRD order. Empty when ``doc_types`` is configured, since
+        that map replaces the legacy fields.
+        """
+        if self.doc_types:
+            return []
+        return [
+            (schema, folder)
+            for schema, folder in (
+                ("adr", self.adr_dir),
+                ("rfc", self.rfc_dir),
+                ("memo", self.memo_dir),
+                ("prd", self.prd_dir),
+            )
+            if folder in self.document_folders
+        ]
+
+    def legacy_folder_schemas(self) -> dict[str, str | None]:
+        """Every ``document_folders`` entry mapped to its legacy schema.
+
+        A folder that no ``*_dir`` field binds maps to ``None``, so callers can
+        still walk it without claiming a schema for it.
+        """
+        bindings = {folder: schema for schema, folder in self.legacy_folder_bindings()}
+        return {folder: bindings.get(folder) for folder in self.document_folders}
 
 
 class DocsProjectMetadata(BaseModel):

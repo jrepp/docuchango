@@ -46,6 +46,7 @@ try:
         ADRFrontmatter,
         DocsProjectConfig,
         DocsProjectReadability,
+        DocsProjectStructure,
         GenericDocFrontmatter,
         MemoFrontmatter,
         PRDFrontmatter,
@@ -434,7 +435,7 @@ class DocValidator:
                 config_base = context.base_dir
 
                 if config.structure and config.structure.doc_types:
-                    roots = config.structure.docs_roots or ["."]
+                    roots = config.structure.effective_docs_roots()
                     custom_naming = config.structure.naming_standards or {}
                     structure_scan_subfolders = config.structure.scan_subfolders
                     for doc_type_name, cfg in config.structure.doc_types.items():
@@ -466,7 +467,7 @@ class DocValidator:
                                 entries.append(
                                     (
                                         cfg.frontmatter_schema,
-                                        folder,
+                                        config.structure.folder_under_root(root_rel, folder),
                                         pattern,
                                         cfg.enforce_filename_pattern,
                                         cfg.require_frontmatter,
@@ -478,51 +479,56 @@ class DocValidator:
                                 )
                     continue
 
-                folder_config = {
-                    "adr": config.structure.adr_dir,
-                    "rfc": config.structure.rfc_dir,
-                    "memo": config.structure.memo_dir,
-                    "prd": config.structure.prd_dir,
-                }
-                for key, schema_name in [("adr", "adr"), ("rfc", "rfc"), ("memo", "memo"), ("prd", "prd")]:
-                    folder_name = folder_config[key]
-                    if folder_name in config.structure.document_folders:
+                structure = config.structure
+                for root_rel in structure.effective_docs_roots():
+                    root_path = self._resolve_config_path(
+                        context,
+                        config_base,
+                        root_rel,
+                        config_base,
+                        "docs root",
+                    )
+                    if not root_path:
+                        continue
+                    for schema_name, folder_name in structure.legacy_folder_bindings():
                         entries.append(
                             (
                                 schema_name,
-                                folder_name,
+                                structure.folder_under_root(root_rel, folder_name),
                                 default_patterns[schema_name],
                                 True,
                                 True,
-                                config_base,
-                                config_base,
+                                root_path,
+                                root_path,
                                 context.allow_external_paths,
-                                config.structure.scan_subfolders,
+                                structure.scan_subfolders,
                             )
                         )
             return entries
 
         # Legacy behavior
         config_base = self._get_config_base_dir()
-        folder_config = self._get_folder_config()
-        document_folders = self._get_document_folders()
-        scan_subfolders_default = self._get_scan_subfolders_default()
+        structure = (
+            self.project_config.structure
+            if self.project_config and self.project_config.structure
+            else DocsProjectStructure()
+        )
 
         entries = []
-        for key, schema_name in [("adr", "adr"), ("rfc", "rfc"), ("memo", "memo"), ("prd", "prd")]:
-            folder_name = folder_config[key]
-            if folder_name in document_folders:
+        for root_rel in structure.effective_docs_roots():
+            root_path = (config_base / root_rel).resolve()
+            for schema_name, folder_name in structure.legacy_folder_bindings():
                 entries.append(
                     (
                         schema_name,
-                        folder_name,
+                        structure.folder_under_root(root_rel, folder_name),
                         default_patterns[schema_name],
                         True,
                         True,
-                        config_base,
-                        config_base,
+                        root_path,
+                        root_path,
                         False,
-                        scan_subfolders_default,
+                        structure.scan_subfolders,
                     )
                 )
         return entries

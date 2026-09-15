@@ -105,36 +105,36 @@ def _discover_doc_claims(root: Path) -> dict[Path, list[tuple[str | None, str]]]
             allow_external_paths = config.security.allow_external_paths
             project_id = config.project.id
 
-            if config.structure.doc_types:
-                roots = config.structure.docs_roots or ["."]
-                for doc_type_cfg in config.structure.doc_types.values():
-                    for root_rel in roots:
-                        root_path = resolve_config_path(config_base, root_rel, config_base, allow_external_paths)
-                        if not root_path:
-                            continue
-                        for folder in doc_type_cfg.folders:
-                            folder_path = resolve_config_path(root_path, folder, root_path, allow_external_paths)
-                            if not folder_path:
-                                continue
-                            if not folder_path.exists():
-                                continue
-                            for file_path in folder_path.rglob("*.md"):
-                                claim(file_path, doc_type_cfg.frontmatter_schema, project_id)
+            structure = config.structure
+            roots = structure.effective_docs_roots()
+
+            if structure.doc_types:
+                folder_schemas: dict[str, str | None] = {}
+                for doc_type_cfg in structure.doc_types.values():
+                    for folder in doc_type_cfg.folders:
+                        # A folder claimed by two types keeps the first type's
+                        # schema, as it did when each type walked separately.
+                        folder_schemas.setdefault(folder, doc_type_cfg.frontmatter_schema)
             else:
-                folder_schemas = {
-                    config.structure.adr_dir: "adr",
-                    config.structure.rfc_dir: "rfc",
-                    config.structure.memo_dir: "memo",
-                    config.structure.prd_dir: "prd",
-                }
-                for folder in config.structure.document_folders:
-                    folder_path = resolve_config_path(config_base, folder, config_base, allow_external_paths)
+                folder_schemas = structure.legacy_folder_schemas()
+
+            for root_rel in roots:
+                root_path = resolve_config_path(config_base, root_rel, config_base, allow_external_paths)
+                if not root_path:
+                    continue
+                for folder, schema_name in folder_schemas.items():
+                    folder_path = resolve_config_path(
+                        root_path,
+                        structure.folder_under_root(root_rel, folder),
+                        root_path,
+                        allow_external_paths,
+                    )
                     if not folder_path:
                         continue
                     if not folder_path.exists():
                         continue
                     for file_path in folder_path.rglob("*.md"):
-                        claim(file_path, folder_schemas.get(folder), project_id)
+                        claim(file_path, schema_name, project_id)
 
         if claims:
             return claims

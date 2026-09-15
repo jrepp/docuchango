@@ -51,7 +51,8 @@
         "docs_roots": {
           "type": "array",
           "items": {"type": "string"},
-          "default": ["."]
+          "default": ["."],
+          "description": "Roots to scan, relative to this file. Every document folder - document_folders and doc_types folders alike - is resolved under each root. Defaults to the directory holding this file."
         },
         "scan_subfolders": {
           "type": "boolean",

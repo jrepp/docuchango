@@ -1,0 +1,14 @@
+summary: >-
+  A legacy adr_dir/document_folders layout whose folders live under
+  docs_roots: [docs-cms]. Not keyed to a finding ID: the leading underscore
+  keeps it out of registry discovery. It guards discovery itself - the docs
+  root used to be ignored for legacy folders, so nothing was scanned and the
+  run passed by finding no documents at all. The FMT-001 trailing whitespace
+  below is only the evidence that the file was read and fixed.
+messages:
+  - "Line 14: Trailing whitespace"
+fixed: true
+fix_messages:
+  - "[Code blocks] Line 14: Removed trailing whitespace"
+dry_run_exit_code: 1
+exit_code: 0

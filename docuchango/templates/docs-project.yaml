@@ -14,6 +14,8 @@ structure:
   prd_dir: prd
   template_dir: templates
   # Optional roots to scan (relative to this file). Useful in monorepos.
+  # Every document folder below - document_folders and doc_types folders
+  # alike - is resolved under each root. Defaults to this file's directory.
   # docs_roots:
   #   - .
   #   - ../project-a/docs
