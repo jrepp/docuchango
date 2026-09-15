@@ -3,13 +3,16 @@
 This module provides reusable fixtures and data generators for testing.
 """
 
+import copy
 import random
 import string
 import uuid
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 
 # Set fixed seed for reproducible test data
 random.seed(42)
@@ -279,6 +282,93 @@ docusaurus:
         "guides_dir": guides_dir,
         "config_file": config_file,
     }
+
+
+#: Canonical docs-project.yaml content shared by tests that just need a valid,
+#: minimal project config rather than one exercising a specific config option.
+#: Individual tests customize it via `write_docs_project_config`'s `project_id`
+#: and `extra_config` arguments instead of hand-writing their own YAML.
+DEFAULT_DOCS_PROJECT_CONFIG: dict[str, Any] = {
+    "version": "1",
+    "project": {
+        "id": "test-project",
+        "name": "Test Project",
+        "description": "Test documentation project",
+    },
+    "structure": {
+        "adr_dir": "adr",
+        "rfc_dir": "rfcs",
+        "memo_dir": "memos",
+        "document_folders": ["adr", "rfcs", "memos"],
+    },
+    "security": {"allow_external_paths": False},
+}
+
+
+def write_docs_project_config(
+    target_dir: Path,
+    project_id: str | None = None,
+    extra_config: dict[str, Any] | None = None,
+) -> Path:
+    """Write a canonical docs-project.yaml into `target_dir`.
+
+    Args:
+        target_dir: Directory to write docs-project.yaml into.
+        project_id: Overrides just `project.id`; leave unset to keep the default
+            "test-project".
+        extra_config: Merged on top of the canonical defaults. A `"project"` entry
+            is merged one level deep (so callers can override `id`/`name` without
+            repeating `description`); every other top-level key replaces the
+            default wholesale, which lets a test add config sections the
+            canonical default doesn't have (e.g. `"indexes"`).
+
+    Returns:
+        The path to the written docs-project.yaml.
+    """
+    config = copy.deepcopy(DEFAULT_DOCS_PROJECT_CONFIG)
+    if project_id is not None:
+        config["project"]["id"] = project_id
+    if extra_config:
+        for key, value in extra_config.items():
+            if key == "project" and isinstance(value, dict):
+                config["project"].update(value)
+            else:
+                config[key] = value
+
+    config_path = target_dir / "docs-project.yaml"
+    config_path.write_text(yaml.dump(config, sort_keys=False), encoding="utf-8")
+    return config_path
+
+
+@pytest.fixture
+def docs_tree(tmp_path):
+    """Factory fixture that builds a docs folder tree plus a canonical
+    docs-project.yaml, for tests that need more control than `docs_repository`
+    gives (a custom root, a subset of folders, or extra config keys).
+
+    Returns a `make(...)` callable rather than a fixed structure, since the
+    project id, extra config, and folder layout needed vary per test:
+
+        def test_something(docs_tree):
+            tree = docs_tree(project_id="my-project", extra_config={"indexes": [...]})
+            tree["root"]       # tmp_path / "docs-cms" by default
+            tree["config_file"]  # tree["root"] / "docs-project.yaml"
+    """
+
+    def make(
+        root: Path | None = None,
+        folders: tuple[str, ...] = ("adr", "rfcs", "memos"),
+        project_id: str | None = None,
+        extra_config: dict[str, Any] | None = None,
+    ) -> dict[str, Path]:
+        root = root if root is not None else tmp_path / "docs-cms"
+        root.mkdir(parents=True, exist_ok=True)
+        for folder in folders:
+            (root / folder).mkdir(parents=True, exist_ok=True)
+        config_file = write_docs_project_config(root, project_id=project_id, extra_config=extra_config)
+        return {"root": root, "config_file": config_file}
+
+    return make
 
 
 @pytest.fixture
