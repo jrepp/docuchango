@@ -1,0 +1,8 @@
+summary: An ADR linking to a sibling document that does not exist.
+messages:
+  - "Broken link './adr-999-does-not-exist.md'"
+  - "File not found"
+# LNK-010 (planned) would rewrite these; today validate only reports them.
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1

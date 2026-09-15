@@ -1,0 +1,8 @@
+summary: An ADR with a bare ``` opening fence that carries no language.
+messages:
+  - "Line 16: Opening code fence missing language"
+fixed: true
+fix_messages:
+  - "[Code blocks] Line 16: Added 'text' language to bare opening fence"
+dry_run_exit_code: 1
+exit_code: 0

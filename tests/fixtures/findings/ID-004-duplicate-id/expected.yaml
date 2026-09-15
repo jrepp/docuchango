@@ -1,0 +1,7 @@
+summary: Two ADRs that claim the same `id`.
+messages:
+  - "Duplicate ID 'adr-004'"
+  - "also used by adr-004-copy.md"
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1

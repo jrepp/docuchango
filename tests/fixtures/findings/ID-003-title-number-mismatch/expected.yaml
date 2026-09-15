@@ -1,0 +1,6 @@
+summary: An ADR whose title number disagrees with its `id`.
+messages:
+  - "ID mismatch with title: frontmatter has 'adr-003' but title has 'ADR-009'"
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1

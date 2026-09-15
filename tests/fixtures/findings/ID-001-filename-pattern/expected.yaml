@@ -1,0 +1,6 @@
+summary: An ADR whose filename has letters where the number should be.
+messages:
+  - "Invalid ADR filename: adr-abc-non-numeric.md"
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1

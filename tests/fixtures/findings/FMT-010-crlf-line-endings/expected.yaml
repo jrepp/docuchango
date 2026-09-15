@@ -1,0 +1,9 @@
+summary: >-
+  An ADR written with CRLF line endings. FMT-010 is Planned, so this fixture
+  is collected as a strict xfail: it flips to a real failure the moment the
+  check lands, which is the signal to mark the registry row Implemented.
+messages:
+  - "CRLF"
+fixed: true
+dry_run_exit_code: 1
+exit_code: 0

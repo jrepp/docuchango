@@ -1,0 +1,8 @@
+summary: An ADR with four consecutive blank lines between two paragraphs.
+messages:
+  - "Line 17: More than 2 consecutive blank lines"
+  - "Line 18: More than 2 consecutive blank lines"
+# FMT-011 (planned) would collapse these runs; today the check only reports.
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1

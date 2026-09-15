@@ -1,0 +1,7 @@
+summary: An ADR whose `doc_uuid` is not a UUID.
+messages:
+  - "Frontmatter field 'doc_uuid'"
+  - "doc_uuid must be a valid UUID"
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1

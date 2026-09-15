@@ -1,0 +1,10 @@
+summary: >-
+  An ADR whose `project_id` is not the `project.id` of the governing
+  docs-project.yaml. FM-010 is Planned, so this fixture is a strict xfail
+  until the check is implemented.
+messages:
+  - "project_id"
+  - "fixture-project"
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1

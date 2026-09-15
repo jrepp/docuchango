@@ -1,0 +1,9 @@
+summary: >-
+  An ADR with a relative link that climbs out of the repository root. The
+  same link is also reported as broken (LNK-001), since it cannot resolve.
+messages:
+  - "Line 14: Link '../../../../other-plugin/docs/intro.md' points outside the repository"
+# LNK-011 (planned) would rewrite these to absolute repository URLs.
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1

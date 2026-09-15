@@ -1,0 +1,11 @@
+summary: >-
+  An ADR with one deliberately unreadable paragraph, under a config that
+  enables readability with a strict Flesch minimum.
+requires:
+  - textstat
+messages:
+  - "Line 14: Flesch Reading Ease score"
+  - "below minimum 90.0"
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1
