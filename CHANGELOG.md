@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.19.0-rc.12 (2026-09-15)
+
+### Features
+
+- **validate**: Implement FM-010 project_id match check and placeholder fix
+  ([`cc703d8`](https://github.com/jrepp/docuchango/commit/cc703d8f298520297466fe66dd4ca693a0ee8fec))
+
+### Testing
+
+- **frontmatter**: Type the FM-010 project_id test helper for mypy
+  ([`a703e15`](https://github.com/jrepp/docuchango/commit/a703e15dc2dfdba4ea036f804fa260bb7ab34290))
+
+
 ## v1.19.0-rc.11 (2026-09-15)
 
 ### Features
