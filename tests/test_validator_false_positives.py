@@ -441,3 +441,101 @@ class TestReviewNuances:
         v.extract_links()
         v.validate_links()
         assert all(link.is_valid for link in v.all_links), [str(link) for link in v.all_links if not link.is_valid]
+
+
+class TestMaintainerFollowUps:
+    """Regression tests for false positives/negatives found during maintainer review."""
+
+    def _mdx_errors(self, tmp_path: Path, body: str):
+        adr = tmp_path / "docs-cms" / "adr" / "adr-001-example.md"
+        _write(adr, ADR_FRONTMATTER.format(title="Example ADR Title", doc_id="adr-001", body=body))
+        v = DocValidator(repo_root=tmp_path, verbose=False)
+        v.scan_documents()
+        v.check_mdx_compatibility()
+        errors: list[str] = []
+        for doc in v.documents:
+            errors.extend(doc.errors)
+        return errors
+
+    # --- CommonMark autolinks are valid Markdown, never JSX ---
+
+    def test_url_autolink_not_flagged(self, tmp_path):
+        errors = self._mdx_errors(tmp_path, "See <https://example.com/a/b?c=1> for details.")
+        assert errors == [], f"URL autolink should be safe, got: {errors}"
+
+    def test_email_autolink_not_flagged(self, tmp_path):
+        errors = self._mdx_errors(tmp_path, "Mail <docs-team@example.com> to reach us.")
+        assert errors == [], f"email autolink should be safe, got: {errors}"
+
+    def test_scheme_autolink_not_flagged(self, tmp_path):
+        errors = self._mdx_errors(tmp_path, "Open <vscode://file/tmp/x> from the terminal.")
+        assert errors == [], f"scheme autolink should be safe, got: {errors}"
+
+    # --- a placeholder whose prefix happens to be an HTML tag is still risky ---
+
+    def test_hyphenated_placeholder_with_html_prefix_is_flagged(self, tmp_path):
+        errors = self._mdx_errors(tmp_path, "Set the <time-out> value in the config.")
+        assert len(errors) == 1, f"'<time-out>' is not a known element, got: {errors}"
+        assert "<time-out>" in errors[0]
+
+    def test_dotted_placeholder_with_html_prefix_is_flagged(self, tmp_path):
+        errors = self._mdx_errors(tmp_path, "Set the <a.href> value in the config.")
+        assert len(errors) == 1, f"'<a.href>' is not a known element, got: {errors}"
+        assert "<a.href>" in errors[0]
+
+    def test_self_closing_hyphenated_tag_not_flagged(self, tmp_path):
+        errors = self._mdx_errors(tmp_path, "A custom element <my-widget /> renders fine.")
+        assert errors == [], f"self-closing custom element should be safe, got: {errors}"
+
+    # --- a stray backtick must not mask the rest of the document ---
+
+    def test_stray_backtick_does_not_mask_later_paragraphs(self, tmp_path):
+        body = "A bare ` backtick in prose.\n\nThen <token> must still be flagged.\n\nAnother ` backtick.\n"
+        errors = self._mdx_errors(tmp_path, body)
+        assert len(errors) == 1, f"'<token>' should still be flagged, got: {errors}"
+        assert "<token>" in errors[0]
+
+    def test_inline_code_span_wrapping_one_line_break_still_masked(self, tmp_path):
+        errors = self._mdx_errors(tmp_path, "Use `<token>\nplaceholder` in the template.")
+        assert errors == [], f"wrapped code span should be masked, got: {errors}"
+
+    # --- link extraction uses the same masking as the other checks ---
+
+    def _link_errors(self, tmp_path: Path, body: str):
+        adr = tmp_path / "docs-cms" / "adr" / "adr-001-example.md"
+        _write(adr, ADR_FRONTMATTER.format(title="Example ADR Title", doc_id="adr-001", body=body))
+        v = DocValidator(repo_root=tmp_path, verbose=False)
+        v.scan_documents()
+        v.extract_links()
+        v.validate_links()
+        return [link for link in v.all_links if not link.is_valid]
+
+    def test_link_in_nested_fence_is_not_extracted(self, tmp_path):
+        body = "````markdown\n```\n[x](./does-not-exist.md)\n```\n````\n"
+        assert self._link_errors(tmp_path, body) == []
+
+    def test_link_in_indented_fence_is_not_extracted(self, tmp_path):
+        body = "- item\n\n  ```bash\n  [x](./does-not-exist.md)\n  ```\n\nDone.\n"
+        assert self._link_errors(tmp_path, body) == []
+
+    def test_broken_link_in_prose_still_reported(self, tmp_path):
+        broken = self._link_errors(tmp_path, "See [x](./does-not-exist.md).\n")
+        assert len(broken) == 1
+        assert "File not found" in broken[0].error_message
+
+    # --- link titles are not part of the path ---
+
+    def test_link_with_title_is_valid(self, tmp_path):
+        _write(tmp_path / "docs-cms" / "adr" / "adr-002-other.md", "stub")
+        assert self._link_errors(tmp_path, 'See [x](./adr-002-other.md "The Other ADR").\n') == []
+
+    def test_angle_bracket_link_destination_is_valid(self, tmp_path):
+        _write(tmp_path / "docs-cms" / "adr" / "adr-002-other.md", "stub")
+        assert self._link_errors(tmp_path, "See [x](<./adr-002-other.md>).\n") == []
+
+    # --- scheme targets stay UNKNOWN rather than becoming bogus file paths ---
+
+    def test_non_file_scheme_is_unknown_not_missing_file(self, tmp_path):
+        broken = self._link_errors(tmp_path, "See [x](ftp://example.com/file).\n")
+        assert len(broken) == 1
+        assert "Unknown link type" in broken[0].error_message

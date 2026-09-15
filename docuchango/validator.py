@@ -75,6 +75,10 @@ except ImportError as e:
 
 from docuchango.config_paths import is_within_path, resolve_config_path
 
+# A link target that starts with a URI scheme ("mailto:", "tel:", "ftp://",
+# ...) is never a filesystem path and must not be resolved as one.
+_URI_SCHEME_PATTERN = re.compile(r"[A-Za-z][A-Za-z0-9+.\-]*:")
+
 
 class LinkType(Enum):
     """Types of links in markdown documents"""
@@ -300,7 +304,21 @@ class DocValidator:
 
     @staticmethod
     def _link_path_target(target: str) -> str:
-        """Return the filesystem path portion of a Markdown link target."""
+        """Return the filesystem path portion of a Markdown link target.
+
+        Strips the optional CommonMark link title ('path "Title"'), the
+        angle-bracket destination form ('<path>'), and any query/anchor
+        suffix, then percent-decodes what is left.
+        """
+        target = target.strip()
+        # Optional link title: a destination followed by whitespace and a
+        # quoted or parenthesized title.
+        title_match = re.match(r"^(.*?)\s+(?:\"[^\"]*\"|'[^']*'|\([^()]*\))\s*$", target, flags=re.DOTALL)
+        if title_match:
+            target = title_match.group(1).strip()
+        # Angle-bracket destination form: <path with spaces>
+        if target.startswith("<") and target.endswith(">"):
+            target = target[1:-1]
         return unquote(re.split(r"[?#]", target, maxsplit=1)[0])
 
     def _get_folder_config(self) -> dict[str, str]:
@@ -702,26 +720,15 @@ class DocValidator:
         links = []
 
         try:
-            content = doc.get_content()
-            lines = content.split("\n")
+            # Use the same masking as the MDX and repo-escape checks so a link
+            # inside an indented or nested code fence is not extracted (and
+            # then reported as broken). Line numbers are preserved by the mask.
+            lines = self._mask_code(doc.get_content(), strip_frontmatter=True)
 
-            in_code_fence = False
-            code_fence_pattern = re.compile(r"^```")
             link_pattern = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 
             for line_num, line in enumerate(lines, start=1):
-                # Toggle code fence
-                if code_fence_pattern.match(line):
-                    in_code_fence = not in_code_fence
-                    continue
-
-                if in_code_fence:
-                    continue
-
-                # Remove inline code
-                line_without_code = re.sub(r"`[^`]+`", "", line)
-
-                for match in link_pattern.finditer(line_without_code):
+                for match in link_pattern.finditer(line):
                     link_target = match.group(2)
 
                     # Skip mailto and data links
@@ -756,11 +763,13 @@ class DocValidator:
             return LinkType.INTERNAL_RFC
         if target.endswith(".md") or target.startswith(("./", "../")):
             return LinkType.INTERNAL_DOC
-        # Any remaining non-anchor, non-URL, non-absolute target is a bare
-        # relative reference (e.g. 'other-doc', 'guide/'). Treat it as an
-        # internal doc link so it is resolved against the source directory
-        # instead of being reported as an unknown link type.
-        if not target.startswith(("http://", "https://", "/", "#", "mailto:", "data:", "tel:")):
+        # Any remaining target that is not root-relative and carries no URI
+        # scheme is a bare relative reference (e.g. 'other-doc', 'guide/').
+        # Treat it as an internal doc link so it is resolved against the source
+        # directory instead of being reported as an unknown link type. Targets
+        # with a scheme ('mailto:', 'tel:', 'ftp://', ...) stay UNKNOWN so they
+        # are reported as such rather than as a nonsensical missing file.
+        if not target.startswith("/") and not _URI_SCHEME_PATTERN.match(target):
             return LinkType.INTERNAL_DOC
         return LinkType.UNKNOWN
 
@@ -1054,6 +1063,14 @@ class DocValidator:
         }
     )
 
+    # CommonMark autolinks: '<scheme:rest>' (absolute URI) and '<local@domain>'
+    # (email). Both are valid Markdown and must never be reported as JSX.
+    _AUTOLINK_PATTERN = re.compile(
+        r"<(?:[A-Za-z][A-Za-z0-9+.\-]{1,31}:[^<>\s]*"
+        r"|[^\s<>@]+@[A-Za-z0-9](?:[A-Za-z0-9\-]*[A-Za-z0-9])?"
+        r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9\-]*[A-Za-z0-9])?)+)>"
+    )
+
     def _is_safe_mdx_tag(self, tag_text: str) -> bool:
         """Return True if a '<...>' occurrence is safe/valid in MDX.
 
@@ -1062,10 +1079,22 @@ class DocValidator:
         - JSX components: PascalCase names or self-closing tags with a proper
           structure (e.g. <Outlet />, <SuspenseWrapper>).
 
+        - CommonMark autolinks: '<https://example.com>' and '<user@host>'.
+          Markdown resolves these before MDX sees a JSX tag, so they are valid.
+
         Risky (returns False): bare placeholders in prose that are not valid
         elements, e.g. <agentName>, <token>, <your-secret>, <log-name>.
         """
-        m = re.match(r"</?([A-Za-z][A-Za-z0-9_]*)", tag_text)
+        # CommonMark autolinks are resolved by the Markdown parser and never
+        # reach the JSX parser. An absolute-URI autolink is '<scheme:rest>' with
+        # no whitespace; an email autolink is '<local@domain>'.
+        if self._AUTOLINK_PATTERN.fullmatch(tag_text):
+            return True
+
+        # The name charset must match the candidate pattern, otherwise a
+        # placeholder such as '<time-out>' or '<a-b>' would be truncated to a
+        # known HTML prefix ('time', 'a') and wrongly treated as safe.
+        m = re.match(r"</?([A-Za-z][A-Za-z0-9._-]*)", tag_text)
         if not m:
             return False
         name = m.group(1)
@@ -1081,7 +1110,7 @@ class DocValidator:
         # Self-closing tag with valid structure, with or without attributes,
         # e.g. '<thing />' or '<widget role="img" />'. Any explicitly
         # self-closed tag is safe MDX regardless of the element name.
-        return bool(re.match(r"<[A-Za-z][A-Za-z0-9_]*(\s[^<>]*)?/>", tag_text))
+        return bool(re.match(r"<[A-Za-z][A-Za-z0-9._-]*(\s[^<>]*)?/>", tag_text))
 
     @staticmethod
     def _mask_code(content: str, strip_frontmatter: bool = False) -> list[str]:
@@ -1165,8 +1194,12 @@ class DocValidator:
 
         # Backtick spans: two-backtick then single-backtick delimiters, matched
         # non-greedily, allowing newlines (multi-line inline spans).
-        joined = re.sub(r"``.+?``", _blank, joined, flags=re.DOTALL)
-        joined = re.sub(r"`[^`]+?`", _blank, joined, flags=re.DOTALL)
+        # A code span may wrap across lines but, per CommonMark, never across a
+        # blank line. Bounding the span that way stops a single stray backtick
+        # in prose from masking (and silencing the checks on) the rest of the
+        # document.
+        joined = re.sub(r"``(?:[^\n]|\n(?!\s*\n))+?``", _blank, joined)
+        joined = re.sub(r"`(?:[^`\n]|\n(?!\s*\n))+?`", _blank, joined)
 
         return joined.split("\n")
 
@@ -1254,8 +1287,9 @@ class DocValidator:
                     if target.startswith(("http://", "https://", "#", "mailto:", "data:", "tel:")):
                         continue
 
-                    # Strip anchors/query and ignore anchor-only targets.
-                    path_part = target.split("#", 1)[0].split("?", 1)[0].strip()
+                    # Strip an optional link title, anchors and query; ignore
+                    # anchor-only targets.
+                    path_part = self._link_path_target(target)
                     if not path_part:
                         continue
 
