@@ -96,7 +96,7 @@ reported.
 | FMT-011 | Collapse runs of blank lines | Planned | fix | see below |
 | CB-001 | Code fence without a language, or unclosed fence | Implemented | fix/report | `check_code_blocks`, `fixes/code_blocks.py` |
 | IDX-001 | Document index missing, unlinked, or missing bucket headings | Implemented | report | `check_document_indexes` |
-| RD-001 | Paragraph outside the configured readability thresholds | Implemented | report | `check_readability` |
+| RD-001 | Paragraph outside the readability thresholds of the (sub-)project that owns the document | Implemented | report | `check_readability`, `_readability_config_for`, `_config_context_for_path` |
 | BLD-001 | TypeScript config error | Implemented | report | `check_typescript_config` |
 | BLD-002 | Docusaurus build error | Implemented | report | `check_docusaurus_build` |
 
@@ -124,6 +124,17 @@ scanning nested files with the same id/uuid/link/filename rules as top-level
 files, matched against the file name and not the subfolder path.
 `structure.doc_types.<type>.scan_subfolders` overrides the structure default
 for one document type. Report only.
+
+**RD-001 Sub-project readability (shipped).** `check_readability` read the
+root config only, so a sub-project could not enable, disable or tune
+readability even though its schema, folder and index rules were honored.
+Settings are now resolved per document: `_config_context_for_path` maps a
+file to the deepest config whose directory or `docs_roots` contain it, and
+`_readability_config_for` returns that config's `readability` block, or the
+nearest declared block up the `subprojects` chain when it has none. The block
+is taken whole and never merged key by key, so a sub-project that declares
+one gets schema defaults for the keys it omits. Documents that resolve to
+different settings are scored by separate scorers in one pass. Report only.
 
 ### Planned validators
 
