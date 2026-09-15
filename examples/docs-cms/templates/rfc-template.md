@@ -93,4 +93,4 @@ Similar format...
 
 ---
 
-**Note**: This is a [Draft|In Review|Approved|Rejected] RFC. Feedback welcome on [specific aspects].
+**Note**: This is a [Draft|Proposed|Accepted|Rejected] RFC. Feedback welcome on [specific aspects].

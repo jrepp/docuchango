@@ -3,7 +3,7 @@
 id: "rfc-XXX"  # Lowercase format: "rfc-XXX" where XXX matches filename number (e.g., "rfc-001")
 slug: rfc-XXX-brief-description  # URL-friendly slug (lowercase-with-dashes)
 title: "RFC-XXX: Technical Proposal Title"  # Must start with "RFC-XXX:" where XXX is 3-digit number
-status: Draft  # Valid values: Draft, In Review, Accepted, Rejected, Implemented
+status: Draft  # Valid values: Draft, Proposed, Accepted, Rejected, Implemented, Deprecated, Superseded
 created: YYYY-MM-DD  # ISO 8601 format (YYYY-MM-DD) - date RFC was first created, DO NOT CHANGE after initial creation
                      # Generate: date +%Y-%m-%d  OR  python -c "from datetime import date; print(date.today())"  OR  auto-set with: docuchango bulk timestamps
 author: Your Name  # Person or team who wrote this RFC (e.g., "Jacob Repp", "Platform Team")

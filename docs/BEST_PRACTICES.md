@@ -280,10 +280,9 @@ git commit -m "ADR-043: Update authentication strategy (supersedes ADR-015)"
 **ADR Status Flow**:
 ```
 Proposed → Accepted → Implemented
-        ↓
-        Rejected
-        ↓
-        Superseded
+        ↓         ↓
+        Rejected  Deprecated
+                  Superseded
 ```
 
 **Agent Responsibilities**:
@@ -295,17 +294,16 @@ Proposed → Accepted → Implemented
 
 **RFC Status Flow**:
 ```
-Draft → In Review → Approved → Implemented
-      ↓
-      Rejected
-      ↓
-      Withdrawn
+Draft → Proposed → Accepted → Implemented
+      ↓                      ↓
+      Rejected               Deprecated
+                             Superseded
 ```
 
 **Agent Responsibilities**:
 - ✅ Create with `status: Draft`
 - ✅ Incorporate feedback and update
-- ❌ Change to `Approved` (human decision)
+- ❌ Change to `Accepted` (human decision)
 - ❌ Mark as `Rejected` (human decision)
 - ✅ Mark as `Implemented` when complete
 
