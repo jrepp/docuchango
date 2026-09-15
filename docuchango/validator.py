@@ -2217,6 +2217,108 @@ class DocValidator:
         else:
             self.log(f"   ✗ Found {id_errors} ID validation error(s)")
 
+    @staticmethod
+    def _format_number_ranges(numbers: list[int]) -> str:
+        """Render sorted numbers as a compact range list: ``3, 7-9``."""
+        if not numbers:
+            return ""
+        parts: list[str] = []
+        start = previous = numbers[0]
+        for number in numbers[1:]:
+            if number == previous + 1:
+                previous = number
+                continue
+            parts.append(str(start) if start == previous else f"{start}-{previous}")
+            start = previous = number
+        parts.append(str(start) if start == previous else f"{start}-{previous}")
+        return ", ".join(parts)
+
+    @staticmethod
+    def _numbering_gap_types(context: ProjectConfigContext) -> set[str]:
+        """Document types whose config opts into ID-010 for this (sub-)project.
+
+        The opt-in lives on the per-type block, so it is keyed by the schema
+        that block binds: two `doc_types` entries that bind the same schema
+        share one numbering sequence, and enabling the flag on either reports
+        that whole sequence.
+        """
+        structure = context.config.structure
+        if not structure or not structure.doc_types:
+            return set()
+        return {cfg.frontmatter_schema for cfg in structure.doc_types.values() if cfg.report_numbering_gaps}
+
+    def check_numbering_gaps(self):
+        """Report missing numbers in a document type's id sequence (ID-010).
+
+        Opt-in per type via
+        `structure.doc_types.<type>.report_numbering_gaps: true`, because a
+        gap is usually deliberate: a proposal was withdrawn and its number
+        was never reused. Numbering is grouped per (governing config, id
+        prefix), so the two `adr/` folders of a monorepo are two independent
+        sequences rather than one with holes in it. Report only - the remedy
+        is `docuchango bulk compress-ids`, which renumbers each type into a
+        contiguous sequence and rewrites the references.
+        """
+        self.log("\n🔢 Checking numbering gaps...")
+
+        if not self.project_configs:
+            self.log("   ⊘ No project config loaded; numbering gap check skipped")
+            return
+
+        # An id is part of a numbering sequence only when it is exactly
+        # `<prefix>-<number>`. An ADR amendment id (`adr-043-a1`) hangs off
+        # its parent and is never a number of its own.
+        id_pattern = re.compile(r"^([A-Za-z][A-Za-z0-9]*)-(\d+)$")
+
+        # (config path, id prefix) -> number -> the doc_id that claimed it
+        groups: dict[tuple[Path, str], dict[int, str]] = {}
+        enabled_cache: dict[Path, set[str]] = {}
+        for doc in self.documents:
+            if not doc.doc_id:
+                continue
+            match = id_pattern.match(doc.doc_id)
+            if not match:
+                continue
+
+            context = self._config_context_for_path(doc.file_path)
+            if context is None:
+                continue
+            enabled = enabled_cache.get(context.path)
+            if enabled is None:
+                enabled = self._numbering_gap_types(context)
+                enabled_cache[context.path] = enabled
+            if doc.doc_type not in enabled:
+                continue
+
+            prefix, number_text = match.groups()
+            groups.setdefault((context.path, prefix.lower()), {}).setdefault(int(number_text), doc.doc_id)
+
+        if not groups:
+            self.log("   ⊘ No document type opts into numbering gap reporting")
+            return
+
+        gaps_found = 0
+        for (config_path, prefix), numbers in sorted(groups.items(), key=lambda item: (str(item[0][0]), item[0][1])):
+            ordered = sorted(numbers)
+            lowest, highest = ordered[0], ordered[-1]
+            missing = [number for number in range(lowest, highest + 1) if number not in numbers]
+            if not missing:
+                self.log(f"   ✓ {prefix}: {len(ordered)} contiguous ids ({numbers[lowest]}..{numbers[highest]})")
+                continue
+
+            error = (
+                f"ID-010: {prefix} numbering in {self._display_path(config_path)} has gaps: "
+                f"missing {self._format_number_ranges(missing)} "
+                f"(lowest {numbers[lowest]}, highest {numbers[highest]}); "
+                f"run 'docuchango bulk compress-ids' to renumber"
+            )
+            self.errors.append(error)
+            self.log(f"   ✗ {error}")
+            gaps_found += 1
+
+        if gaps_found == 0:
+            self.log("   ✓ No numbering gaps found")
+
     def check_uuids(self):
         """Validate document UUIDs for uniqueness"""
         self.log("\n🔑 Checking document UUIDs...")
@@ -2370,6 +2472,7 @@ class DocValidator:
         self.check_project_ids()  # FM-010: project_id vs the governing config
         self.check_date_formats()  # FM-011: created/updated date formats
         self.check_ids()  # Validate document IDs
+        self.check_numbering_gaps()  # ID-010: opt-in numbering gap report
         self.check_uuids()  # Validate document UUID uniqueness
         self.check_code_blocks()  # Check code block balance and labeling
         self.check_mdx_compilation()  # Check MDX compilation with @mdx-js/mdx

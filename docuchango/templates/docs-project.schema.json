@@ -79,7 +79,8 @@
               "enforce_filename_pattern": {"type": "boolean", "default": true},
               "require_frontmatter": {"type": "boolean", "default": true},
               "naming_standard": {"type": ["string", "null"], "description": "Named naming standard to apply (e.g., 'kebab-case', 'nnn-name'). Overrides filename_pattern if both set."},
-              "scan_subfolders": {"type": ["boolean", "null"], "description": "Overrides structure.scan_subfolders for this document type. Leave null to use the structure-level default."}
+              "scan_subfolders": {"type": ["boolean", "null"], "description": "Overrides structure.scan_subfolders for this document type. Leave null to use the structure-level default."},
+              "report_numbering_gaps": {"type": "boolean", "default": false, "description": "Report (ID-010) the numbers missing between the lowest and highest id of this document type within the project that owns the documents. Gaps are often deliberate, so this is opt-in and defaults to false."}
             }
           }
         },

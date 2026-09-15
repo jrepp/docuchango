@@ -80,7 +80,7 @@ reported.
 | ID-002 | `id` does not match the filename; an ADR amendment `adr-NNN-amendment-MM-*` is expected to carry id `adr-NNN-aMM` | Implemented | report | `check_ids`, `_scan_document_folder` |
 | ID-003 | `id` does not match the number in the title | Implemented | report | `check_ids` |
 | ID-004 | Duplicate `id` across documents | Implemented | report | `check_ids` |
-| ID-010 | Gap or non-contiguous numbering within a document type | Planned | report | see below |
+| ID-010 | Gap or non-contiguous numbering within a document type, opt-in per type via `structure.doc_types.<type>.report_numbering_gaps` | Implemented | report | `check_numbering_gaps`, `_numbering_gap_types`, `_format_number_ranges`, `_config_context_for_path`, `schemas.py` (`DocTypeConfig.report_numbering_gaps`) |
 | ID-011 | Validate numbered documents nested in subfolders of a document folder, opt-in via `structure.scan_subfolders` (and per-type via `structure.doc_types.<type>.scan_subfolders`) | Implemented | report | `scan_documents`, `_build_scan_entries`, `_scan_document_folder`, `schemas.py` (`DocsProjectStructure.scan_subfolders`, `DocTypeConfig.scan_subfolders`) |
 | LNK-001 | Broken internal link, including bare relative, suffix-less and directory targets | Implemented | report | `validate_links`, `_resolve_link_target` |
 | LNK-002 | Link that resolves outside the repository root, reported once per link with line number and target | Implemented | report | `check_cross_plugin_links` |
@@ -236,6 +236,31 @@ real ID instead of the placeholder, and `add_missing_frontmatter` seeds the
 generated block with the same value so a repaired document needs no second
 pass.
 
+**ID-010 Numbering gaps (shipped).** For each type, the numeric parts of the
+ids are sorted and the numbers missing between the lowest and highest are
+reported, with `docuchango bulk compress-ids` named as the remedy - that is
+the command that renumbers a type into a contiguous sequence and rewrites the
+references. Gaps are common and often deliberate after a withdrawn proposal,
+so the check is opt-in per type via
+`structure.doc_types.<type>.report_numbering_gaps: true` and defaults to off.
+The opt-in is keyed by the schema the `doc_types` entry binds, so two entries
+that bind the same schema share one sequence and enabling the flag on either
+reports that whole sequence. No structure-level default was added: unlike
+`scan_subfolders`, which changes what is scanned for every type at once, a
+numbering policy is a per-type decision, and a legacy layout with no
+`doc_types` map has nothing to attach it to.
+
+Sequences are grouped per (governing config, id prefix), resolved with the
+same `_config_context_for_path` that RD-001 and FM-010 use, so a monorepo's
+two `adr/` folders are two independent sequences rather than one with holes
+in it. An id is part of a sequence only when it is exactly `<prefix>-<number>`:
+an ADR amendment id (`adr-043-a1`) hangs off its parent and is not a number of
+its own. Missing numbers are printed as a compact range list
+(`missing 3, 5-7`), and the finding is reported once per type against
+`DocValidator.errors` rather than against any one document, because no single
+file is at fault - the CLI shows it at the repository root, the same place a
+`SCAN-001` or a blocked config path lands. Report only.
+
 **FM-011 Date format (shipped).** `created` is typed
 `datetime | date | str` in every schema and `updated` is in no schema at all,
 so a date in any shape whatsoever passed FM-002, and FM-006 rewrote only the
@@ -277,12 +302,6 @@ cannot identify is an FM-011 report in either mode.
 
 Each entry lists what it detects, what it may fix, and the constraint that
 keeps it safe.
-
-**ID-010 Numbering gaps.** For each type, sort the numeric parts of the IDs
-and report the missing numbers between the lowest and highest. Report only,
-and mention `docuchango bulk compress-ids` in the message. Gaps are common
-and often deliberate after a deleted proposal, so this should be opt-in via
-`structure.doc_types.<type>.report_numbering_gaps: true` and default to off.
 
 **MDX-011 Indented code blocks.** `_mask_code` masks fenced blocks and
 inline spans before the prose checks run, but not 4-space indented code
@@ -384,7 +403,10 @@ repository to update the registry when a validator lands.
 
 - Whether FM-010 should also fix a non-placeholder mismatch when the user
   passes an explicit flag such as `--set-project-id`.
-- Whether ID-010 belongs in `validate` at all, or only as a `bulk` report.
+- Whether ID-010 belongs in `validate` at all, or only as a `bulk` report. It
+  shipped in `validate`, opt-in and off by default, which keeps the question
+  open rather than settling it: a repository that never turns the flag on
+  pays nothing for it.
 
 ## Future Possibilities
 

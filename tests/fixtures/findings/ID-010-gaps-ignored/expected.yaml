@@ -1,0 +1,13 @@
+summary: >-
+  The same six ADRs as ID-010-numbering-gaps, but with
+  structure.doc_types.adr.report_numbering_gaps left at its default (false):
+  the gaps at 3 and 5-7 are deliberate as far as the validator knows, so
+  nothing is reported.
+messages: []
+forbidden:
+  - "ID-010: adr numbering in docs-cms/docs-project.yaml has gaps"
+  - "missing 3, 5-7 (lowest adr-001, highest adr-010)"
+  - "run 'docuchango bulk compress-ids' to renumber"
+fixed: false
+dry_run_exit_code: 0
+exit_code: 0

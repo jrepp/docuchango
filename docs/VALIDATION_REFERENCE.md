@@ -234,6 +234,8 @@ wrap the text in backticks, then validate again.
 
 - Names that do not match `type-NNN-slug.md` or the configured pattern,
   unless `enforce_filename_pattern: false` is set for that folder
+- `ID-010`: numbers missing from a type's id sequence, when that type
+  opts in with `report_numbering_gaps`
 
 By default, only files directly inside a document folder are treated as
 documents. A file in a subfolder (`prd/testing/notes.md`,
@@ -246,8 +248,24 @@ are still matched against the file name, not the subfolder path. See
 amendment (`adr-043-amendment-01-cap.md`) is expected to carry the amendment
 id `adr-043-a1`, in a subfolder or not.
 
-There is no gap or sequence check: a jump from `adr-004` to `adr-009` is not
-reported. Filename problems are always left to you, because renaming can break
+A jump from `adr-004` to `adr-009` is not reported by default: a gap is
+usually a number deliberately retired with a withdrawn proposal. Set
+`structure.doc_types.<type>.report_numbering_gaps: true` to have the missing
+numbers between the lowest and highest id of that type reported as `ID-010`:
+
+```text
+ID-010: adr numbering in docs-cms/docs-project.yaml has gaps: missing 3, 5-7
+(lowest adr-001, highest adr-010); run 'docuchango bulk compress-ids' to renumber
+```
+
+The finding is reported once per type, against the repository root rather than
+any one document, because no single file is at fault. Sequences are grouped per
+project and per id prefix, so two sub-projects of a monorepo each keep their
+own `adr` sequence. An ADR amendment id (`adr-043-a1`) is not a number of its
+own and is not counted. See
+[Configuring docuchango](CONFIGURATION.md#reporting-numbering-gaps).
+
+Filename problems are always left to you, because renaming can break
 links elsewhere. `docuchango bulk compress-ids` can renumber documents and
 update references in one step.
 

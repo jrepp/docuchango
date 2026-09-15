@@ -1,0 +1,12 @@
+summary: >-
+  Six ADRs numbered 1, 2, 4, 8, 9 and 10 in a project whose adr doc type sets
+  report_numbering_gaps: true. The numbers 3, 5, 6 and 7 are missing between
+  the lowest and highest id, so ID-010 reports the gaps once for the type and
+  points at `docuchango bulk compress-ids`.
+messages:
+  - "ID-010: adr numbering in docs-cms/docs-project.yaml has gaps"
+  - "missing 3, 5-7 (lowest adr-001, highest adr-010)"
+  - "run 'docuchango bulk compress-ids' to renumber"
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1

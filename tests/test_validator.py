@@ -451,6 +451,139 @@ class TestProjectIdMatch:
         assert "root-project" in findings[0]
 
 
+class TestNumberingGaps:
+    """ID-010: missing numbers in a type's id sequence, opt-in per type."""
+
+    @staticmethod
+    def _config(project_id: str, report_gaps: bool, subprojects: list[str] | None = None) -> str:
+        gap_line = "      report_numbering_gaps: true\n" if report_gaps else ""
+        subproject_lines = "".join(f"  - {entry}\n" for entry in subprojects or [])
+        return (
+            'version: "1"\n'
+            "project:\n"
+            f"  id: {project_id}\n"
+            f"  name: {project_id}\n"
+            "structure:\n"
+            "  document_folders:\n"
+            "    - adr\n"
+            "  doc_types:\n"
+            "    adr:\n"
+            "      schema: adr\n"
+            "      folders: [adr]\n"
+            f"{gap_line}"
+            "security:\n"
+            "  allow_external_paths: false\n"
+            "readability:\n"
+            "  enabled: false\n"
+        ) + (f"subprojects:\n{subproject_lines}" if subproject_lines else "")
+
+    @staticmethod
+    def _adr(number: int, project_id: str) -> str:
+        return (
+            "---\n"
+            f"id: adr-{number:03d}\n"
+            f'title: "ADR-{number:03d}: Decision {number}"\n'
+            "status: Accepted\n"
+            "created: 2026-01-02\n"
+            "tags: []\n"
+            'deciders: "Engineering Team"\n'
+            f"project_id: {project_id}\n"
+            f"doc_uuid: 4f2f2b3e-0e2c-4b0a-9a4f-{number:012d}\n"
+            "---\n"
+            "\n"
+            f"# ADR-{number:03d}: Decision {number}\n"
+        )
+
+    @classmethod
+    def _write_project(cls, base: Path, project_id: str, numbers: list[int], report_gaps: bool) -> None:
+        adr_dir = base / "adr"
+        adr_dir.mkdir(parents=True, exist_ok=True)
+        (base / "docs-project.yaml").write_text(cls._config(project_id, report_gaps), encoding="utf-8")
+        for number in numbers:
+            (adr_dir / f"adr-{number:03d}-decision.md").write_text(cls._adr(number, project_id), encoding="utf-8")
+
+    @staticmethod
+    def _findings(repo_root: Path) -> list[str]:
+        validator = DocValidator(repo_root=repo_root, verbose=False)
+        validator.scan_documents()
+        validator.check_numbering_gaps()
+        return [error for error in validator.errors if "ID-010" in error]
+
+    def test_contiguous_ids_report_nothing(self, tmp_path):
+        """A sequence with no holes is silent even with the option on."""
+        self._write_project(tmp_path / "docs-cms", "gap-project", [1, 2, 3], report_gaps=True)
+
+        assert self._findings(tmp_path) == []
+
+    def test_single_document_reports_nothing(self, tmp_path):
+        """One document is its own lowest and highest, so there is no range to be missing from."""
+        self._write_project(tmp_path / "docs-cms", "gap-project", [7], report_gaps=True)
+
+        assert self._findings(tmp_path) == []
+
+    def test_gaps_are_reported_once_for_the_type(self, tmp_path):
+        """One finding names every missing number, the bounds and the remedy."""
+        self._write_project(tmp_path / "docs-cms", "gap-project", [1, 2, 4, 8, 9, 10], report_gaps=True)
+
+        findings = self._findings(tmp_path)
+
+        assert len(findings) == 1
+        assert "ID-010: adr numbering in docs-cms/docs-project.yaml has gaps" in findings[0]
+        assert "missing 3, 5-7" in findings[0]
+        assert "(lowest adr-001, highest adr-010)" in findings[0]
+        assert "run 'docuchango bulk compress-ids' to renumber" in findings[0]
+
+    def test_gaps_are_not_reported_without_the_opt_in(self, tmp_path):
+        """The default is off: a retired number is not a finding."""
+        self._write_project(tmp_path / "docs-cms", "gap-project", [1, 2, 4, 8, 9, 10], report_gaps=False)
+
+        assert self._findings(tmp_path) == []
+
+    def test_amendment_ids_do_not_count_towards_the_sequence(self, tmp_path):
+        """An `adr-NNN-aMM` id hangs off its parent and is not a number of its own."""
+        docs_cms = tmp_path / "docs-cms"
+        self._write_project(docs_cms, "gap-project", [1, 2], report_gaps=True)
+        amendment = self._adr(2, "gap-project").replace("id: adr-002", "id: adr-002-a1")
+        amendment = amendment.replace(
+            "doc_uuid: 4f2f2b3e-0e2c-4b0a-9a4f-000000000002", "doc_uuid: 4f2f2b3e-0e2c-4b0a-9a4f-000000000099"
+        )
+        (docs_cms / "adr" / "adr-002-amendment-01-scope.md").write_text(amendment, encoding="utf-8")
+
+        assert self._findings(tmp_path) == []
+
+    def test_monorepo_keeps_one_sequence_per_project(self, tmp_path):
+        """Two sub-projects each numbering from 1 are not merged into one gapped sequence."""
+        root = tmp_path / "docs-cms"
+        root.mkdir(parents=True)
+        (root / "docs-project.yaml").write_text(
+            self._config("root-project", report_gaps=True, subprojects=["services/service-a", "services/service-b"]),
+            encoding="utf-8",
+        )
+        (root / "adr").mkdir()
+        self._write_project(root / "services" / "service-a", "service-a", [1, 2, 3], report_gaps=True)
+        self._write_project(root / "services" / "service-b", "service-b", [1, 4], report_gaps=True)
+
+        findings = self._findings(tmp_path)
+
+        assert len(findings) == 1, findings
+        assert "services/service-b/docs-project.yaml" in findings[0]
+        assert "missing 2-3" in findings[0]
+
+    @pytest.mark.parametrize(
+        ("missing", "expected"),
+        [
+            ([3], "3"),
+            ([3, 7, 8, 9], "3, 7-9"),
+            ([2, 3], "2-3"),
+            ([1, 3, 5], "1, 3, 5"),
+            ([4, 5, 6, 9, 10], "4-6, 9-10"),
+        ],
+    )
+    def test_range_formatting(self, missing, expected):
+        """Consecutive missing numbers collapse into a range, singles stay single."""
+        assert DocValidator._format_number_ranges(missing) == expected
+
+
 class TestDateFormats:
     """FM-011: `created` and `updated` accept two forms and nothing else."""
 
