@@ -1,6 +1,7 @@
 """Tests for tags normalization fixes."""
 
 import frontmatter
+import pytest
 
 from docuchango.fixes.tags import fix_tags, normalize_tag
 
@@ -44,6 +45,40 @@ class TestNormalizeTag:
         """Test trimming whitespace."""
         assert normalize_tag("  backend  ") == "backend"
         assert normalize_tag("\tapi\n") == "api"
+
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            pytest.param("", "", id="empty-string"),
+            pytest.param("   ", "", id="whitespace-only"),
+            pytest.param("!!!", "", id="only-bangs"),
+            pytest.param("@#$%", "", id="only-symbols"),
+            pytest.param("---", "", id="only-dashes"),
+            pytest.param("café", "caf", id="unicode-accented"),
+            pytest.param("日本語", "", id="unicode-japanese"),
+            pytest.param("Москва", "", id="unicode-cyrillic"),
+            pytest.param("api__design--system", "api-design-system", id="mixed-separators-underscores-dashes"),
+            pytest.param("foo _ bar - baz", "foo-bar-baz", id="mixed-separators-spaced"),
+            pytest.param("v2.0", "v20", id="numeric-version"),
+            pytest.param("python3", "python3", id="numeric-trailing-digit"),
+            pytest.param("2023-Q1", "2023-q1", id="numeric-quarter"),
+            pytest.param("a" * 1000, "a" * 1000, id="very-long-tag"),
+            pytest.param("https://example.com", "httpsexamplecom", id="url-like"),
+            pytest.param("api.v1.endpoint", "apiv1endpoint", id="dotted-path"),
+            pytest.param("API2Design", "api2design", id="mixed-case-with-number"),
+            pytest.param("v1.2.3", "v123", id="dotted-version"),
+            pytest.param("2023-update", "2023-update", id="leading-number-year"),
+            pytest.param("1st-release", "1st-release", id="leading-number-ordinal"),
+            pytest.param("backend🔥", "backend", id="emoji-trailing"),
+            pytest.param("✨feature", "feature", id="emoji-leading"),
+            pytest.param("api\tdesign", "api-design", id="tab-whitespace"),
+            pytest.param("api\ndesign", "api-design", id="newline-whitespace"),
+            pytest.param("api\r\ndesign", "api-design", id="crlf-whitespace"),
+        ],
+    )
+    def test_normalize_tag_edge_cases(self, raw, expected):
+        """Test normalize_tag across empty, unicode, numeric, emoji, and whitespace inputs."""
+        assert normalize_tag(raw) == expected
 
 
 class TestFixTags:
@@ -168,3 +203,140 @@ class TestFixTags:
         assert len(messages) > 0
         # File should be unchanged
         assert doc.read_text() == content
+
+    @pytest.mark.parametrize(
+        "content",
+        [
+            pytest.param("---\nid: test\ntags: null\n---\n# Test\n", id="null-tags"),
+            pytest.param("---\nid: test\ntags:\n  backend: true\n---\n# Test", id="dict-tags"),
+        ],
+    )
+    def test_invalid_tags_type_is_not_changed(self, tmp_path, content):
+        """Test that non-list tags (null, dict) are reported but not modified."""
+        doc = tmp_path / "test.md"
+        doc.write_text(content)
+
+        changed, messages = fix_tags(doc)
+
+        assert not changed
+        assert any("invalid type" in msg.lower() for msg in messages)
+
+    def test_mixed_type_array_skips_non_string_tags(self, tmp_path):
+        """Test that non-string entries in a tags array are dropped with a message."""
+        doc = tmp_path / "test.md"
+        doc.write_text('---\nid: test\ntags: ["backend", 123, true]\n---\n# Test')
+
+        changed, messages = fix_tags(doc)
+
+        assert changed
+        assert any("Skipped non-string tag" in msg for msg in messages)
+
+        post = frontmatter.loads(doc.read_text())
+        assert post.metadata["tags"] == ["backend"]
+
+    def test_very_large_tag_array(self, tmp_path):
+        """Test array with many tags."""
+        doc = tmp_path / "test.md"
+        tags = [f"tag{i}" for i in range(1000)]
+        tags_str = str(tags).replace("'", '"')
+        doc.write_text(f"---\nid: test\ntags: {tags_str}\n---\n# Test")
+
+        fix_tags(doc)
+
+        post = frontmatter.loads(doc.read_text())
+        assert len(post.metadata["tags"]) == 1000
+
+    @pytest.mark.parametrize(
+        ("content", "expected_tags"),
+        [
+            pytest.param(
+                '---\nid: test\ntags: ["backend", "backend", "backend"]\n---\n# Test',
+                ["backend"],
+                id="duplicates-only",
+            ),
+            pytest.param(
+                '---\nid: test\ntags: ["backend", "", "  ", "frontend"]\n---\n# Test',
+                ["backend", "frontend"],
+                id="empty-strings-filtered",
+            ),
+            pytest.param(
+                '---\nid: test\ntags: ["!!!", "@@@", "###"]\n---\n# Test',
+                [],
+                id="all-invalid-chars",
+            ),
+            pytest.param(
+                '---\nid: test\ntags: ["API", "Api", "api", "aPi"]\n---\n# Test',
+                ["api"],
+                id="case-variations-collapse",
+            ),
+            pytest.param(
+                '---\nid: test\ntags: ["  API___DESIGN  ", "api-design", "api__design"]\n---\n# Test',
+                ["api-design"],
+                id="complex-normalization-collapse",
+            ),
+            pytest.param(
+                '---\nid: test\ntags: ["yes", "no", "true", "false", "on", "off"]\n---\n# Test',
+                ["false", "no", "off", "on", "true", "yes"],
+                id="yaml-boolean-like-strings",
+            ),
+            pytest.param(
+                '---\nid: test\ntags: ["Backend"]\n---\n# Test',
+                ["backend"],
+                id="single-tag-array",
+            ),
+            pytest.param(
+                "---\nid: test\ntags:\n  - Backend\n  - API Design\n  - frontend\n---\n# Test\n",
+                ["api-design", "backend", "frontend"],
+                id="multiline-yaml-array",
+            ),
+        ],
+    )
+    def test_fix_tags_normalizes_various_inputs(self, tmp_path, content, expected_tags):
+        """Test fix_tags collapses duplicates, drops blanks, and normalizes case/format."""
+        doc = tmp_path / "test.md"
+        doc.write_text(content)
+
+        changed, messages = fix_tags(doc)
+
+        assert changed
+        post = frontmatter.loads(doc.read_text())
+        assert post.metadata["tags"] == expected_tags
+
+    def test_file_without_frontmatter(self, tmp_path):
+        """Test file with no frontmatter at all."""
+        doc = tmp_path / "test.md"
+        doc.write_text("# Just a heading\n\nSome content.")
+
+        changed, messages = fix_tags(doc)
+        assert not changed
+        assert any("No frontmatter" in msg for msg in messages)
+
+    def test_file_with_incomplete_frontmatter(self, tmp_path):
+        """Test file with incomplete frontmatter."""
+        doc = tmp_path / "test.md"
+        doc.write_text("---\nid: test\n# Missing closing")
+
+        # Should fail to parse
+        changed, messages = fix_tags(doc)
+        assert not changed
+
+    def test_tags_with_quotes(self, tmp_path):
+        """Test tags with embedded quotes and mixed quoting styles."""
+        doc = tmp_path / "test.md"
+        doc.write_text("""---
+id: test
+tags: ['backend', "frontend", api]
+---
+# Test
+""")
+
+        changed, messages = fix_tags(doc)
+
+        assert changed
+
+        post = frontmatter.loads(doc.read_text())
+        tags = post.metadata["tags"]
+        assert isinstance(tags, list)
+        assert "api" in tags
+        assert "backend" in tags
+        assert "frontend" in tags

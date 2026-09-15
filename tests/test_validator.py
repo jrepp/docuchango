@@ -216,3 +216,37 @@ doc_uuid: {duplicate_uuid}
             all_errors.extend(doc.errors)
 
         assert any("Duplicate UUID" in error and duplicate_uuid in error for error in all_errors)
+
+
+class TestValidatorEdgeCases:
+    """Test DocValidator behaviour on empty or malformed input."""
+
+    def test_scan_documents_on_empty_directory(self, tmp_path):
+        """Scanning a directory with no markdown files should yield no documents."""
+        validator = DocValidator(repo_root=tmp_path, verbose=False, fix=False)
+        validator.scan_documents()
+        assert len(validator.documents) == 0
+
+    def test_scan_documents_with_malformed_frontmatter_does_not_raise(self, tmp_path):
+        """Malformed YAML frontmatter should be recorded as a document error, not raise."""
+        adr_dir = tmp_path / "adr"
+        adr_dir.mkdir()
+
+        test_file = adr_dir / "adr-001-test.md"
+        # Invalid YAML frontmatter (unterminated quote)
+        test_file.write_text(
+            """---
+title: "Test
+status: accepted
+---
+
+# Content
+""",
+            encoding="utf-8",
+        )
+
+        validator = DocValidator(repo_root=tmp_path, verbose=False, fix=False)
+        validator.scan_documents()
+
+        # A file whose frontmatter can't be parsed is skipped, not raised.
+        assert len(validator.documents) == 0

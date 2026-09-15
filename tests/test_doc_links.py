@@ -1,6 +1,7 @@
 """Tests for doc_links.py fix module."""
 
-from docuchango.fixes.doc_links import fix_links_in_file
+from docuchango.fixes import doc_links
+from docuchango.fixes.doc_links import fix_links_in_file, main
 
 
 class TestDocLinksRelative:
@@ -288,3 +289,44 @@ Content: 中文 ✗
         assert "/adr/adr-001" in result
         # Long name should be stripped
         assert "very-long-decision" not in result
+
+
+class TestDocLinksMain:
+    """Test the main() entry point, which discovers docs-cms relative to the module file."""
+
+    def _point_at(self, monkeypatch, tmp_path):
+        """Make main() treat tmp_path as the repo root containing docs-cms/."""
+        monkeypatch.setattr(doc_links, "__file__", str(tmp_path / "fixes" / "doc_links.py"))
+
+    def test_main_function_exists(self):
+        """Test that main function can be imported."""
+        assert callable(main)
+
+    def test_main_reports_error_when_docs_root_missing(self, tmp_path, monkeypatch, capsys):
+        """main() returns 1 and prints an error when docs-cms doesn't exist."""
+        self._point_at(monkeypatch, tmp_path)
+        assert not (tmp_path / "docs-cms").exists()
+
+        result = main()
+
+        assert result == 1
+        assert "not found" in capsys.readouterr().out
+
+    def test_main_fixes_links_and_skips_templates(self, tmp_path, monkeypatch, capsys):
+        """main() rewrites relative/case links under docs-cms but skips template files."""
+        self._point_at(monkeypatch, tmp_path)
+        docs_root = tmp_path / "docs-cms"
+        docs_root.mkdir()
+
+        fixable = docs_root / "guide.md"
+        fixable.write_text("[ADR](./ADR-001-decision.md)", encoding="utf-8")
+
+        template = docs_root / "000-template.md"
+        template.write_text("[ADR](./ADR-001-decision.md)", encoding="utf-8")
+
+        result = main()
+
+        assert result == 0
+        assert "/adr/adr-001" in fixable.read_text(encoding="utf-8")
+        assert template.read_text(encoding="utf-8") == "[ADR](./ADR-001-decision.md)"
+        assert "Modified 1 files" in capsys.readouterr().out

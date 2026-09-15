@@ -1,6 +1,7 @@
 """Tests for cross_plugin_links.py fix module."""
 
-from docuchango.fixes.cross_plugin_links import fix_cross_plugin_links
+from docuchango.fixes import cross_plugin_links
+from docuchango.fixes.cross_plugin_links import fix_cross_plugin_links, main
 
 
 class TestCrossPluginLinksFixes:
@@ -250,3 +251,70 @@ Just plain text, no links here.
         # The regex pattern might not handle fragments well
         # This is a limitation of the current implementation
         assert result  # Just verify it doesn't crash
+
+
+class TestCrossPluginLinksMain:
+    """Test the main() entry point, which discovers docs-cms relative to the module file."""
+
+    def _point_at(self, monkeypatch, tmp_path):
+        """Make main() treat tmp_path as the repo root containing docs-cms/."""
+        monkeypatch.setattr(cross_plugin_links, "__file__", str(tmp_path / "fixes" / "cross_plugin_links.py"))
+
+    def test_main_fixes_files_across_all_directories(self, tmp_path, monkeypatch, capsys):
+        """main() walks adr/, rfcs/, memos/ and rewrites cross-plugin links in each."""
+        self._point_at(monkeypatch, tmp_path)
+        docs_cms = tmp_path / "docs-cms"
+        (docs_cms / "adr").mkdir(parents=True)
+        (docs_cms / "rfcs").mkdir(parents=True)
+        (docs_cms / "memos").mkdir(parents=True)
+
+        adr_file = docs_cms / "adr" / "adr-001-test.md"
+        adr_file.write_text("[RFC](../rfcs/RFC-001-ref.md)", encoding="utf-8")
+
+        main()
+
+        assert "/rfc/RFC-001-ref" in adr_file.read_text(encoding="utf-8")
+        assert "Fixed 1 files with cross-plugin links" in capsys.readouterr().out
+
+    def test_main_skips_index_and_template_files(self, tmp_path, monkeypatch):
+        """main() must not rewrite index.md or 000-template.md even when they contain fixable links."""
+        self._point_at(monkeypatch, tmp_path)
+        docs_cms = tmp_path / "docs-cms"
+        rfcs_dir = docs_cms / "rfcs"
+        rfcs_dir.mkdir(parents=True)
+
+        index_file = rfcs_dir / "index.md"
+        template_file = rfcs_dir / "000-template.md"
+        index_file.write_text("[Link](../adr/ADR-001.md)", encoding="utf-8")
+        template_file.write_text("[Link](../adr/ADR-001.md)", encoding="utf-8")
+
+        main()
+
+        assert index_file.read_text(encoding="utf-8") == "[Link](../adr/ADR-001.md)"
+        assert template_file.read_text(encoding="utf-8") == "[Link](../adr/ADR-001.md)"
+
+    def test_main_with_missing_docs_cms_directory(self, tmp_path, monkeypatch, capsys):
+        """main() should not raise when docs-cms doesn't exist; it just reports zero fixes."""
+        self._point_at(monkeypatch, tmp_path)
+        assert not (tmp_path / "docs-cms").exists()
+
+        main()
+
+        assert "Fixed 0 files with cross-plugin links" in capsys.readouterr().out
+
+
+class TestCrossPluginLinksSourceEncoding:
+    """Guard against a regression where read_text()/write_text() drop the explicit
+    encoding="utf-8" argument. On this platform the OS default encoding is already
+    UTF-8, so a behavioral round-trip test would still pass even without the explicit
+    argument (Windows with a non-UTF-8 code page is where it would actually matter).
+    This test inspects the source directly so it fails immediately if the argument is
+    ever removed, regardless of which platform CI runs on.
+    """
+
+    def test_fix_cross_plugin_links_specifies_utf8_encoding(self):
+        """Test that fix_cross_plugin_links's file I/O declares encoding="utf-8"."""
+        import inspect
+
+        source = inspect.getsource(fix_cross_plugin_links)
+        assert 'encoding="utf-8"' in source

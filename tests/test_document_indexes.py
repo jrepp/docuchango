@@ -3,14 +3,16 @@
 import tempfile
 from pathlib import Path
 
-import yaml
-
 from docuchango.validator import DocValidator
+from tests.conftest import write_docs_project_config
 
 
 def write_config(repo_root: Path, config_data: dict[str, object]) -> None:
-    with (repo_root / "docs-project.yaml").open("w") as f:
-        yaml.dump(config_data, f)
+    """Write a docs-project.yaml for these tests, layered on the shared canonical
+    config (see `write_docs_project_config` in conftest.py) so each test only
+    spells out what it actually varies: the project id/name and its `indexes`.
+    """
+    write_docs_project_config(repo_root, extra_config=config_data)
 
 
 def test_document_index_requires_all_targets():

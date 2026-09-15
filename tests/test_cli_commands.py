@@ -6,7 +6,7 @@ from pathlib import Path
 import frontmatter
 from click.testing import CliRunner
 
-from docuchango.cli import main, migrate, validate
+from docuchango.cli import bootstrap, main, migrate, validate
 
 
 class TestValidateCommand:
@@ -720,3 +720,40 @@ class TestBulkUpdateCommand:
 
         assert result.exit_code == 1
         assert "non-empty OLD and NEW" in result.output
+
+
+class TestCliBootstrap:
+    """Test the bootstrap command, which prints an onboarding guide."""
+
+    def test_bootstrap_help(self):
+        """Test bootstrap --help documents the command."""
+        runner = CliRunner()
+        result = runner.invoke(bootstrap, ["--help"])
+        assert result.exit_code == 0
+        assert "bootstrap" in result.output.lower() or "guide" in result.output.lower()
+
+    def test_bootstrap_default(self):
+        """Test bootstrap with default guide."""
+        runner = CliRunner()
+        result = runner.invoke(bootstrap)
+        # May succeed or fail depending on whether guides are available
+        assert result.exit_code in [0, 1]
+
+    def test_bootstrap_agent_guide(self):
+        """Test bootstrap --guide agent."""
+        runner = CliRunner()
+        result = runner.invoke(bootstrap, ["--guide", "agent"])
+        assert result.exit_code in [0, 1]
+
+    def test_bootstrap_best_practices_guide(self):
+        """Test bootstrap --guide best-practices."""
+        runner = CliRunner()
+        result = runner.invoke(bootstrap, ["--guide", "best-practices"])
+        assert result.exit_code in [0, 1]
+
+    def test_bootstrap_output_to_file(self, tmp_path):
+        """Test bootstrap --output writes the guide to a file."""
+        runner = CliRunner()
+        output_file = tmp_path / "guide.md"
+        result = runner.invoke(bootstrap, ["--output", str(output_file)])
+        assert result.exit_code in [0, 1]

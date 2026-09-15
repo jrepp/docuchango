@@ -1,5 +1,8 @@
 """Test suite for link validation functionality."""
 
+import time
+
+from docuchango.fixes.mdx_syntax import fix_mdx_issues
 from docuchango.validator import DocValidator, LinkType
 
 
@@ -807,3 +810,65 @@ Supersedes [ADR 001](./adr-001-first.md) and [broken link](./missing.md).
         assert len(valid_links) == 4  # All internal links except the broken one
         assert len(invalid_links) == 1  # Only the missing.md link
         assert invalid_links[0].target == "./missing.md"
+
+
+class TestMdxDurationPatternBacktrackingSafety:
+    """fix_mdx_issues() backtick-wraps '<10ms'-style text so MDX doesn't parse it as a
+    JSX tag. The regex behind that once used an unbounded '\\w+' for the optional
+    trailing word, which is vulnerable to catastrophic backtracking (ReDoS) on inputs
+    with many short "words" after the number. It was bounded to '\\w{1,20}'. These
+    tests exercise the real fix_mdx_issues() function (not a copy of the regex) so a
+    future edit that reintroduces unbounded backtracking gets caught here.
+    """
+
+    def test_many_words_after_number_completes_quickly(self):
+        """Test that a line with many space-separated words doesn't trigger exponential
+        backtracking."""
+        adversarial = "<123 " + "abc " * 30 + "xyz"
+
+        start = time.time()
+        _fixed, changes = fix_mdx_issues(adversarial)
+        elapsed = time.time() - start
+
+        assert elapsed < 0.5, f"fix_mdx_issues took too long: {elapsed}s (possible ReDoS)"
+        assert changes  # The leading number was still matched and fixed
+
+    def test_word_longer_than_twenty_chars_is_truncated_at_the_backtick(self):
+        """Test that the trailing word is capped at 20 characters: the match (and thus
+        the backtick-wrapped portion) stops there, and the remainder of the word is
+        left outside the backticks."""
+        line = "<123 verylongwordthatexceedstwentycharacters"
+
+        start = time.time()
+        fixed, changes = fix_mdx_issues(line)
+        elapsed = time.time() - start
+
+        assert elapsed < 0.5, f"fix_mdx_issues took too long: {elapsed}s (possible ReDoS)"
+        assert fixed == "`<123 verylongwordthatexce`edstwentycharacters"
+        assert changes == ["Line 1: '<123 verylongwordthatexce' → '`<123 verylongwordthatexce`'"]
+
+    def test_valid_duration_and_size_annotations_are_still_backtick_wrapped(self):
+        """Test that the bounded regex still matches every real-world case it's meant to:
+        bare numbers, durations, percentages, and byte-size units."""
+        cases = {
+            "<10": "`<10`",
+            "<10ms": "`<10ms`",
+            "<1 minute": "`<1 minute`",
+            "<0.5 seconds": "`<0.5 seconds`",
+            "<100%": "`<100%`",
+            "<5MB": "`<5MB`",
+            "<2.5GB": "`<2.5GB`",
+            "<1KB": "`<1KB`",
+        }
+
+        for line, expected in cases.items():
+            fixed, changes = fix_mdx_issues(line)
+            assert fixed == expected, f"Should fix {line!r} to {expected!r}"
+            assert len(changes) == 1
+
+    def test_content_already_in_backticks_is_left_alone(self):
+        """Test that already-backticked '<...' text is not double-wrapped."""
+        for line in ["`<10ms`", "`<1 minute`", "``<100%``"]:
+            fixed, changes = fix_mdx_issues(line)
+            assert fixed == line
+            assert changes == []

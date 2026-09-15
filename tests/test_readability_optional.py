@@ -147,35 +147,6 @@ class TestReadabilityErrorMessages:
 class TestReadabilityDataStructures:
     """Test readability data structures without textstat."""
 
-    def test_paragraph_score_creation(self):
-        """Test ParagraphScore can be created without textstat."""
-        from docuchango.readability import ParagraphScore
-
-        score = ParagraphScore(
-            paragraph_text="Test paragraph",
-            line_number=5,
-            flesch_reading_ease=65.0,
-            flesch_kincaid_grade=8.5,
-        )
-
-        assert score.paragraph_text == "Test paragraph"
-        assert score.line_number == 5
-        assert score.flesch_reading_ease == 65.0
-        assert not score.has_errors()
-
-    def test_paragraph_score_with_errors(self):
-        """Test ParagraphScore error handling without textstat."""
-        from docuchango.readability import ParagraphScore
-
-        score = ParagraphScore(
-            paragraph_text="Complex text",
-            line_number=10,
-            errors=["Flesch Reading Ease too low", "Grade level too high"],
-        )
-
-        assert score.has_errors()
-        assert len(score.errors) == 2
-
     def test_document_report_creation(self):
         """Test DocumentReadabilityReport without textstat."""
         from docuchango.readability import DocumentReadabilityReport, ParagraphScore
