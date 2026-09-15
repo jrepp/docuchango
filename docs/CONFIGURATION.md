@@ -161,7 +161,7 @@ structure:
 
 | Key | Meaning |
 |-----|---------|
-| `schema` | `adr`, `rfc`, `memo`, `prd`, or `generic`. `generic` requires only `title`, `project_id` and `doc_uuid`; `id` and `tags` are optional and there is no `created` or `status`. |
+| `schema` | `adr`, `rfc`, `memo`, `prd`, or `generic`. `generic` requires only `title`, `project_id` and `doc_uuid`; `id` and `tags` are optional and there is no `created` or `status`. The fixers follow it too: a generated frontmatter block has the shape of this schema and status variants are mapped with this type's vocabulary, whatever the folder is named. |
 | `folders` | Folders (relative to each docs root) holding this type. |
 | `filename_pattern` | Regex a filename must match. |
 | `enforce_filename_pattern` | Report a mismatch as an error (`true`) or ignore it (`false`). |

@@ -223,7 +223,7 @@ class TestValidatorEdgeCases:
 
     def test_scan_documents_on_empty_directory(self, tmp_path):
         """Scanning a directory with no markdown files should yield no documents."""
-        validator = DocValidator(repo_root=tmp_path, verbose=False, fix=False)
+        validator = DocValidator(repo_root=tmp_path, verbose=False)
         validator.scan_documents()
         assert len(validator.documents) == 0
 
@@ -245,7 +245,7 @@ status: accepted
             encoding="utf-8",
         )
 
-        validator = DocValidator(repo_root=tmp_path, verbose=False, fix=False)
+        validator = DocValidator(repo_root=tmp_path, verbose=False)
         validator.scan_documents()
 
         # A file whose frontmatter can't be parsed is skipped, not raised.
@@ -280,7 +280,7 @@ class TestUtf8ByteOrderMark:
         """A BOM must not make a document with frontmatter look like it has none."""
         self._adr(tmp_path, self.BOM + self.VALID_ADR.encode("utf-8"))
 
-        validator = DocValidator(repo_root=tmp_path, verbose=False, fix=False)
+        validator = DocValidator(repo_root=tmp_path, verbose=False)
         validator.scan_documents()
 
         assert len(validator.documents) == 1
@@ -292,7 +292,7 @@ class TestUtf8ByteOrderMark:
         """check_formatting reports the byte-order mark it found on disk."""
         self._adr(tmp_path, self.BOM + self.VALID_ADR.encode("utf-8"))
 
-        validator = DocValidator(repo_root=tmp_path, verbose=False, fix=False)
+        validator = DocValidator(repo_root=tmp_path, verbose=False)
         validator.scan_documents()
         validator.check_formatting()
 
@@ -303,7 +303,7 @@ class TestUtf8ByteOrderMark:
         """FMT-012 does not fire on an ordinary UTF-8 document."""
         self._adr(tmp_path, self.VALID_ADR.encode("utf-8"))
 
-        validator = DocValidator(repo_root=tmp_path, verbose=False, fix=False)
+        validator = DocValidator(repo_root=tmp_path, verbose=False)
         validator.scan_documents()
         validator.check_formatting()
 
@@ -313,7 +313,7 @@ class TestUtf8ByteOrderMark:
         """Stripping the BOM does not invent frontmatter for a plain Markdown file."""
         self._adr(tmp_path, self.BOM + b"# ADR-001: Test\n\nNo frontmatter here.\n")
 
-        validator = DocValidator(repo_root=tmp_path, verbose=False, fix=False)
+        validator = DocValidator(repo_root=tmp_path, verbose=False)
         validator.scan_documents()
 
         assert len(validator.documents) == 1

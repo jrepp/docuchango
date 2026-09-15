@@ -75,7 +75,10 @@ STATUS_MAPPINGS = {
 
 
 def get_doc_type(file_path: Path) -> str | None:
-    """Extract document type from file path.
+    """Infer document type from the folder names in a file path.
+
+    This is the fallback used when no docs-project.yaml claims the file. Use
+    :func:`resolve_doc_type` instead wherever the configured schema is known.
 
     Args:
         file_path: Path to the document
@@ -95,12 +98,34 @@ def get_doc_type(file_path: Path) -> str | None:
     return None
 
 
-def fix_status_value(file_path: Path, dry_run: bool = False) -> tuple[bool, str]:
+def resolve_doc_type(file_path: Path, schema: str | None = None) -> str | None:
+    """Resolve the document type that shapes frontmatter fixes.
+
+    Args:
+        file_path: Path to the document
+        schema: The ``schema`` of the ``structure.doc_types`` entry in
+            docs-project.yaml (or a sub-project config) that owns this file,
+            when a config claims it. The configured schema always wins over the
+            folder-name heuristic, so a folder named ``adr`` bound to
+            ``schema: generic`` is fixed as a generic document, and a folder
+            named ``decisions`` bound to ``schema: adr`` is fixed as an ADR.
+
+    Returns:
+        Document type ('adr', 'rfc', 'memo', 'prd' or 'generic'), or None when
+        no config applies and the folder name is not one of the standard names.
+    """
+    if schema:
+        return schema
+    return get_doc_type(file_path)
+
+
+def fix_status_value(file_path: Path, dry_run: bool = False, schema: str | None = None) -> tuple[bool, str]:
     """Fix invalid status values in frontmatter.
 
     Args:
         file_path: Path to the markdown file
         dry_run: If True, don't write changes
+        schema: Configured schema for this file, if any (see resolve_doc_type)
 
     Returns:
         Tuple of (changed, message)
@@ -112,7 +137,7 @@ def fix_status_value(file_path: Path, dry_run: bool = False) -> tuple[bool, str]
         if "status" not in post.metadata:
             return False, "No status field found"
 
-        doc_type = get_doc_type(file_path)
+        doc_type = resolve_doc_type(file_path, schema)
         if not doc_type:
             return False, "Could not determine document type"
 
@@ -260,12 +285,13 @@ def fix_date_format(file_path: Path, dry_run: bool = False) -> tuple[bool, str]:
         return False, f"Error processing file: {e}"
 
 
-def add_missing_frontmatter(file_path: Path, dry_run: bool = False) -> tuple[bool, str]:
+def add_missing_frontmatter(file_path: Path, dry_run: bool = False, schema: str | None = None) -> tuple[bool, str]:
     """Add missing frontmatter block to a document.
 
     Args:
         file_path: Path to the markdown file
         dry_run: If True, don't write changes
+        schema: Configured schema for this file, if any (see resolve_doc_type)
 
     Returns:
         Tuple of (changed, message)
@@ -277,27 +303,47 @@ def add_missing_frontmatter(file_path: Path, dry_run: bool = False) -> tuple[boo
         if content.strip().startswith("---"):
             return False, "Frontmatter already exists"
 
-        doc_type = get_doc_type(file_path)
+        doc_type = resolve_doc_type(file_path, schema)
         if not doc_type:
             return False, "Could not determine document type"
 
-        # Extract ID from filename (e.g., "adr-001" from "adr-001-some-title.md").
         filename = file_path.stem
-        id_match = re.match(rf"^({doc_type})-(\d+)", filename, re.IGNORECASE)
-        doc_id = f"{doc_type}-{int(id_match.group(2)):03d}" if id_match else f"{doc_type}-001"
 
         # Generate title from filename
         title_parts = filename.replace("-", " ").split()
         title = " ".join(word.capitalize() for word in title_parts)
-
-        # Get default status for document type
-        default_status = VALID_STATUSES.get(doc_type, ["Draft"])[0]
 
         # Current date
         today = datetime.now().strftime("%Y-%m-%d")
 
         # Generate UUID
         doc_uuid = str(uuid.uuid4())
+
+        if doc_type == "generic":
+            # A generic lane has no id, no status and no per-type fields in its
+            # schema, so the generated block carries only what
+            # GenericDocFrontmatter requires plus the shared created/tags.
+            generic_lines = [
+                "---",
+                f'title: "{title}"',
+                f"created: {today}",
+                "tags: []",
+                'project_id: "my-project"',
+                f'doc_uuid: "{doc_uuid}"',
+                "---",
+            ]
+            generic_block = "\n".join(generic_lines)
+            generic_content = f"{generic_block}\n\n{content}"
+            if not dry_run:
+                file_path.write_text(generic_content, encoding="utf-8")
+            return True, f"Added generic frontmatter block with title '{title}'"
+
+        # Extract ID from filename (e.g., "adr-001" from "adr-001-some-title.md").
+        id_match = re.match(rf"^({doc_type})-(\d+)", filename, re.IGNORECASE)
+        doc_id = f"{doc_type}-{int(id_match.group(2)):03d}" if id_match else f"{doc_type}-001"
+
+        # Get default status for document type
+        default_status = VALID_STATUSES.get(doc_type, ["Draft"])[0]
 
         # Build frontmatter template
         frontmatter_lines = [
@@ -339,12 +385,13 @@ def add_missing_frontmatter(file_path: Path, dry_run: bool = False) -> tuple[boo
         return False, f"Error processing file: {e}"
 
 
-def fix_all_frontmatter(file_path: Path, dry_run: bool = False) -> list[str]:
+def fix_all_frontmatter(file_path: Path, dry_run: bool = False, schema: str | None = None) -> list[str]:
     """Apply all frontmatter fixes to a file.
 
     Args:
         file_path: Path to the markdown file
         dry_run: If True, don't write changes
+        schema: Configured schema for this file, if any (see resolve_doc_type)
 
     Returns:
         List of messages describing changes made
@@ -362,12 +409,12 @@ def fix_all_frontmatter(file_path: Path, dry_run: bool = False) -> list[str]:
         raise ValueError(f"File contains binary content: {e}") from e
 
     # Try to add missing frontmatter first
-    changed, msg = add_missing_frontmatter(file_path, dry_run)
+    changed, msg = add_missing_frontmatter(file_path, dry_run, schema=schema)
     if changed:
         messages.append(f"✓ {msg}")
 
     # Fix status value
-    changed, msg = fix_status_value(file_path, dry_run)
+    changed, msg = fix_status_value(file_path, dry_run, schema=schema)
     if changed:
         messages.append(f"✓ {msg}")
 
@@ -508,8 +555,14 @@ def _fix_tags_metadata(metadata: dict[str, Any]) -> list[str]:
     return messages
 
 
-def fix_frontmatter_metadata(file_path: Path, dry_run: bool = False) -> tuple[bool, list[str]]:
-    """Apply frontmatter metadata fixes with a single parse/write pass."""
+def fix_frontmatter_metadata(
+    file_path: Path, dry_run: bool = False, schema: str | None = None
+) -> tuple[bool, list[str]]:
+    """Apply frontmatter metadata fixes with a single parse/write pass.
+
+    ``schema`` is the schema configured for this file in docs-project.yaml, if
+    any; it decides the document type instead of the folder-name heuristic.
+    """
     try:
         content, bom_removed = read_document(file_path)
     except UnicodeDecodeError as e:
@@ -530,7 +583,7 @@ def fix_frontmatter_metadata(file_path: Path, dry_run: bool = False) -> tuple[bo
         messages.append(FMT_012_FIX_MESSAGE)
 
     if not post.metadata:
-        changed, message = add_missing_frontmatter(file_path, dry_run=dry_run)
+        changed, message = add_missing_frontmatter(file_path, dry_run=dry_run, schema=schema)
         if changed:
             messages.append(message)
         elif bom_removed and not dry_run:
@@ -540,7 +593,7 @@ def fix_frontmatter_metadata(file_path: Path, dry_run: bool = False) -> tuple[bo
     metadata = post.metadata.copy()
     original_metadata = metadata.copy()
 
-    status_message = _fix_status_metadata(metadata, get_doc_type(file_path))
+    status_message = _fix_status_metadata(metadata, resolve_doc_type(file_path, schema))
     if status_message:
         messages.append(status_message)
 

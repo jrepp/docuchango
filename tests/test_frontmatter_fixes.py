@@ -14,9 +14,16 @@ from docuchango.fixes.frontmatter import (
     fix_frontmatter_metadata,
     fix_status_value,
     get_doc_type,
+    resolve_doc_type,
 )
 from docuchango.fixes.yaml_utils import dumps as frontmatter_dumps
-from docuchango.schemas import ADRFrontmatter, MemoFrontmatter, PRDFrontmatter, RFCFrontmatter
+from docuchango.schemas import (
+    ADRFrontmatter,
+    GenericDocFrontmatter,
+    MemoFrontmatter,
+    PRDFrontmatter,
+    RFCFrontmatter,
+)
 
 
 class TestGetDocType:
@@ -82,6 +89,107 @@ class TestGetDocType:
         else:
             assert get_doc_type(Path("C:\\docs\\adr\\adr-001.md")) is None
             assert get_doc_type(Path("D:\\project\\rfcs\\rfc-001.md")) is None
+
+
+class TestResolveDocType:
+    """The configured schema wins over the folder-name heuristic."""
+
+    def test_configured_schema_overrides_folder_name(self):
+        """A folder named 'adr' bound to schema 'generic' resolves to generic."""
+        assert resolve_doc_type(Path("docs/adr/adr-001-test.md"), "generic") == "generic"
+
+    def test_configured_schema_names_a_non_standard_folder(self):
+        """A folder named 'decisions' bound to schema 'adr' resolves to adr."""
+        assert resolve_doc_type(Path("docs/decisions/adr-001-test.md"), "adr") == "adr"
+
+    def test_no_schema_falls_back_to_the_heuristic(self):
+        """Without a configured schema the folder name still decides."""
+        assert resolve_doc_type(Path("docs/adr/adr-001-test.md")) == "adr"
+        assert resolve_doc_type(Path("docs/rfcs/rfc-001-test.md"), None) == "rfc"
+        assert resolve_doc_type(Path("docs/random/file.md")) is None
+
+
+class TestSchemaAwareFixes:
+    """Frontmatter fixes shaped by the configured schema, not the folder name."""
+
+    def _write_bare(self, tmp_path, folder, filename):
+        doc = tmp_path / folder / filename
+        doc.parent.mkdir(parents=True, exist_ok=True)
+        doc.write_text("# A Document\n\nBody text.\n", encoding="utf-8")
+        return doc
+
+    def test_generic_schema_in_adr_folder_skips_adr_fields(self, tmp_path):
+        """schema 'generic' in a folder named adr generates a generic block."""
+        doc = self._write_bare(tmp_path, "adr", "adr-001-a-plain-note.md")
+
+        changed, msg = add_missing_frontmatter(doc, schema="generic")
+
+        assert changed
+        assert "generic" in msg
+        post = frontmatter.loads(doc.read_text())
+        assert "status" not in post.metadata
+        assert "deciders" not in post.metadata
+        assert "id" not in post.metadata
+        assert post.metadata["title"]
+        assert post.metadata["project_id"]
+        assert post.metadata["doc_uuid"]
+        GenericDocFrontmatter(**post.metadata)
+
+    def test_adr_schema_in_non_standard_folder_gets_adr_fields(self, tmp_path):
+        """schema 'adr' in a folder named decisions generates an ADR block."""
+        doc = self._write_bare(tmp_path, "decisions", "adr-001-pick-a-datastore.md")
+
+        changed, msg = add_missing_frontmatter(doc, schema="adr")
+
+        assert changed
+        assert "adr-001" in msg
+        post = frontmatter.loads(doc.read_text())
+        assert post.metadata["id"] == "adr-001"
+        assert post.metadata["status"] == "Proposed"
+        assert post.metadata["deciders"]
+        ADRFrontmatter(**post.metadata)
+
+    def test_no_schema_keeps_the_folder_heuristic(self, tmp_path):
+        """Without a schema the adr folder still generates an ADR block."""
+        doc = self._write_bare(tmp_path, "adr", "adr-001-pick-a-datastore.md")
+
+        changed, _msg = add_missing_frontmatter(doc)
+
+        assert changed
+        post = frontmatter.loads(doc.read_text())
+        assert post.metadata["status"] == "Proposed"
+        assert "deciders" in post.metadata
+
+    def test_status_is_not_mapped_for_a_generic_schema(self, tmp_path):
+        """A generic lane has no status vocabulary, so 'draft' is left alone."""
+        doc = tmp_path / "adr" / "adr-001-a-plain-note.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text(
+            "---\ntitle: A Plain Note\nstatus: draft\n---\n\nBody.\n",
+            encoding="utf-8",
+        )
+
+        changed, _msg = fix_status_value(doc, schema="generic")
+
+        assert not changed
+        assert frontmatter.loads(doc.read_text()).metadata["status"] == "draft"
+
+    def test_metadata_pass_uses_the_configured_schema(self, tmp_path):
+        """fix_frontmatter_metadata maps status by the configured schema."""
+        doc = tmp_path / "decisions" / "adr-001-pick-a-datastore.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text(
+            "---\ntitle: Pick A Datastore\nstatus: draft\ncreated: 2025-01-01\n"
+            'deciders: Core Team\ntags: []\nid: "adr-001"\n'
+            'project_id: "my-project"\ndoc_uuid: "12345678-1234-4123-8123-123456789abc"\n---\n\nBody.\n',
+            encoding="utf-8",
+        )
+
+        changed, messages = fix_frontmatter_metadata(doc, schema="adr")
+
+        assert changed
+        assert any("Proposed" in m for m in messages)
+        assert frontmatter.loads(doc.read_text()).metadata["status"] == "Proposed"
 
 
 class TestFixStatusValue:

@@ -71,11 +71,17 @@ checked for either.
   gets today's date when its block is generated. Also migrates a legacy
   `date` field to `created`
 
-Generating a missing frontmatter block and mapping status variants both infer
-the document type from the standard `adr/`, `rfcs/`, `memos/` and `prd/`
-folder names. A custom `doc_types` folder with a different name is not
-recognized: a missing block is reported instead of generated, and an invalid
-status is reported instead of mapped.
+Generating a missing frontmatter block and mapping status variants both take
+the document type from the `schema` of the `doc_types` entry that owns the
+file, including entries contributed by a sub-project config. A folder bound to
+`schema: generic` gets a generic block with no `status` and no per-type fields,
+whatever the folder is called, and a lane bound to `schema: adr` gets
+ADR-shaped frontmatter even when its folder is named something else.
+
+Only a file that no config claims falls back to inferring the type from the
+standard `adr/`, `rfcs/`, `memos/` and `prd/` folder names. For a file outside
+those folders the type is unknown, so a missing block is reported instead of
+generated and an invalid status is reported instead of mapped.
 
 **Left to you**
 
