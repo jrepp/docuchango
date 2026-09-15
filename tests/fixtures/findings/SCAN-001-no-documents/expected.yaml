@@ -1,0 +1,14 @@
+summary: >-
+  A repository with no documents at all. The harness supplies the default
+  docs-project.yaml, but none of the folders it configures exist, so the scan
+  finds nothing. Before SCAN-001 this run printed "All documents valid" and
+  exited 0, which let a wrong --repo-root pass CI (issue #87).
+messages:
+  - "SCAN-001: No documents were found"
+  - "contain no Markdown files"
+  - "pass --allow-empty to accept an empty scan"
+forbidden:
+  - "All documents valid"
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1
