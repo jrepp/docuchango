@@ -2,6 +2,100 @@
 
 <!-- version list -->
 
+## v1.19.0-rc.3 (2026-09-15)
+
+### Bug Fixes
+
+- **cli**: Resolve --repo-root before validating and label dry-run fixes as fixable
+  ([`57f691c`](https://github.com/jrepp/docuchango/commit/57f691c7e5f36d2e3f8f9cdf17fac5b30761a096))
+
+### Chores
+
+- **deps**: Bump nltk to 3.10.3 and add a dev dependency group
+  ([`c40b834`](https://github.com/jrepp/docuchango/commit/c40b834302d886efe58ac7d376a0ecd244a5bf61))
+
+### Documentation
+
+- Point the rfc-003 validator checklist at the regression fixtures
+  ([`e7e6da7`](https://github.com/jrepp/docuchango/commit/e7e6da707000cdfa06553526e9ac43f57e362f92))
+
+### Testing
+
+- Add fixture-driven finding regression harness
+  ([`2e52c29`](https://github.com/jrepp/docuchango/commit/2e52c29eba1a7945b8698b342f9eb05f7564ddeb))
+
+- Add xfail fixtures for the planned FM-010 and FMT-010 checks
+  ([`f017399`](https://github.com/jrepp/docuchango/commit/f0173996197c246dc6ed8a982e61205c081334a1))
+
+- Make the MDX-001 fixture hold across the MDX check rework
+  ([`a071116`](https://github.com/jrepp/docuchango/commit/a0711168923cbd4c2b8a389eff09b88154e31854))
+
+- Update finding fixtures for the Rejected status and the reworked link and MDX checks
+  ([`7b84045`](https://github.com/jrepp/docuchango/commit/7b840458b8410bd999a3d5a29372bde0b2e7721d))
+
+
+## v1.19.0-rc.2 (2026-09-15)
+
+### Bug Fixes
+
+- **validator**: Address PR review feedback
+  ([`c74fe8d`](https://github.com/jrepp/docuchango/commit/c74fe8d90343dd6d10c3060c728f3b5de01ffd8e))
+
+- **validator**: Address second review round
+  ([`fb6d442`](https://github.com/jrepp/docuchango/commit/fb6d442a991f0128143a53cfc08c41e97bbaff4e))
+
+- **validator**: Correct false positives found in maintainer review
+  ([`55068c6`](https://github.com/jrepp/docuchango/commit/55068c6fbbd45f4ef0550dc59b94c08d392a274b))
+
+- **validator**: Eliminate validation false positives
+  ([`108f554`](https://github.com/jrepp/docuchango/commit/108f554b224ae13042b8a72fe155857859dafd79))
+
+### Chores
+
+- **deps**: Bump nltk in the uv group across 1 directory
+  ([`4fd374f`](https://github.com/jrepp/docuchango/commit/4fd374f690d4d26affa7369506b52d170897685f))
+
+- **deps**: Bump setuptools in the uv group across 1 directory
+  ([`0a14006`](https://github.com/jrepp/docuchango/commit/0a14006ec65c267caf2ea7eb121b976924c5f132))
+
+### Code Style
+
+- Fix ruff format/lint and mypy for validator changes
+  ([`e7fa018`](https://github.com/jrepp/docuchango/commit/e7fa0180f0bfdbd03fbb95b345702b584f7285e4))
+
+### Documentation
+
+- Add validator roadmap with finding IDs
+  ([`9d0a371`](https://github.com/jrepp/docuchango/commit/9d0a3715a23c67192af78f8fff1cf5c1d2d2d0b2))
+
+- Align agent guide frontmatter examples with the schemas
+  ([`54bfb45`](https://github.com/jrepp/docuchango/commit/54bfb451a51171301044c09533e240e19fb990f4))
+
+- Align every ADR/RFC status enumeration with the schema
+  ([`f9edb00`](https://github.com/jrepp/docuchango/commit/f9edb00ec2c6b4cbaa9821da761f5e2d13537433))
+
+- Correct claims flagged in PR review
+  ([`c545334`](https://github.com/jrepp/docuchango/commit/c545334c5ac52103408bab8447e72f3148440dda))
+
+- Format heading test
+  ([`baaa53a`](https://github.com/jrepp/docuchango/commit/baaa53ac7e5c5c8adc0bae6db9c05bed88ab800e))
+
+- Name every status enumeration in the FM-002 registry row
+  ([`9e6acf8`](https://github.com/jrepp/docuchango/commit/9e6acf8c951b86a6e08ad0ec778715e70f99aecc))
+
+- Refresh onboarding and simplify the introduction
+  ([`ea055bf`](https://github.com/jrepp/docuchango/commit/ea055bf41fe3dd910ac2e82544847be327a16408))
+
+- Update README logo image
+  ([`c0c2e4c`](https://github.com/jrepp/docuchango/commit/c0c2e4c51ec82962da3c290a9ae15a4bef0b993a))
+
+- Update the validation reference for the reworked checks
+  ([`7430624`](https://github.com/jrepp/docuchango/commit/74306242c68d4fb42736120942732f548b3b5be4))
+
+- Update the validator registry for the reworked link and MDX checks
+  ([`9b2ca2f`](https://github.com/jrepp/docuchango/commit/9b2ca2f0f9bdd163701d2fff22d86a29ae68dd5d))
+
+
 ## v1.19.0-rc.1 (2026-09-14)
 
 ### Bug Fixes

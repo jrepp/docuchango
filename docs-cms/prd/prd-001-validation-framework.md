@@ -111,7 +111,8 @@ docuchango validate --repo-root /path/to/docs
 # See errors
 ❌ adr/adr-001.md:
    - Missing field: 'deciders'
-   - Invalid status: 'Draft' (use: Proposed, Accepted, Deprecated, Superseded)
+   - Frontmatter field 'status': Input should be 'Proposed', 'Accepted',
+     'Rejected', 'Implemented', 'Deprecated' or 'Superseded'
 
 # Fix automatically
 docuchango validate

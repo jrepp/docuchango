@@ -1,6 +1,6 @@
 [project]
 name = "docuchango"
-version = "1.19.0-rc.1"
+version = "1.19.0-rc.3"
 description = "Docusaurus validation and repair framework for opinionated micro-CMS documentation, designed for human-agent collaboration workflows"
 readme = "README.md"
 requires-python = ">=3.10,<3.16"
@@ -288,3 +288,7 @@ changelog_file = "CHANGELOG.md"
 allowed_tags = ["feat", "fix", "docs", "style", "refactor", "perf", "test", "build", "ci", "chore"]
 minor_tags = ["feat"]
 patch_tags = ["fix", "perf"]
+
+[dependency-groups]
+# Installed by a bare `uv sync`, so a fresh checkout can run the tests and linters.
+dev = ["docuchango[dev]"]

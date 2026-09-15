@@ -77,6 +77,15 @@ uuidgen | tr '[:upper:]' '[:lower:]'     # paste into doc_uuid
 date -u +%Y-%m-%dT%H:%M:%SZ              # paste into created
 ```
 
+The two generator commands are macOS/Linux shells; on Windows (PowerShell or
+without `uuidgen`/`date`) use the Python one-liners instead, which work
+anywhere docuchango does:
+
+```bash
+python -c "import uuid; print(uuid.uuid4())"
+python -c "from datetime import datetime, timezone; print(datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))"
+```
+
 ```yaml
 ---
 id: adr-001
@@ -99,10 +108,13 @@ docuchango validate --dry-run    # report only
 docuchango validate              # fix what can be fixed, report the rest
 ```
 
-The dry run shows everything docuchango would change or cannot change. The
-second command applies the safe fixes: whitespace, tag normalization, date
-formats, code fence languages, missing defaults. Anything left in the report,
-such as an `id` that does not match its filename, needs a person.
+The dry run never changes a file. Frontmatter fixes - status variants, date
+formats, tag normalization, a missing `tags`, `project_id` or `doc_uuid` -
+are simulated and shown as "would be applied". Code fence and trailing
+whitespace fixes are not previewed the same way: they show up as plain
+issues in the dry run, even though the second command fixes them silently.
+Anything left in the report after a real run, such as an `id` that does not
+match its filename or a broken link, needs a person.
 
 ### 6. Tell your agents
 
@@ -143,11 +155,17 @@ jobs:
         with:
           fetch-depth: 0
       - uses: astral-sh/setup-uv@v8
-      - run: uvx docuchango validate --dry-run --verbose
+      - run: uvx docuchango validate --dry-run --verbose --skip-build
 ```
 
-`--dry-run` makes the job fail on problems rather than rewriting files in CI.
-`fetch-depth: 0` gives docuchango the git history it uses for timestamps.
+This job only validates the documents. If the repository also has a
+`docusaurus/` directory, drop `--skip-build` and add the site's Node install
+step first, or `validate` will run `npm run build` and typecheck against a
+`node_modules` that was never installed.
+
+`--dry-run` never rewrites files in CI; the job fails when an issue remains
+in the committed files, fixable or not. `fetch-depth: 0` gives docuchango the
+git history it uses for timestamps.
 
 ## Reference
 
@@ -176,8 +194,8 @@ Every type requires:
 |-------|------|
 | `id` | Lowercase `type-NNN`, must match the filename prefix |
 | `title` | Plain title without the id |
-| `created` | ISO 8601 date or timestamp |
-| `tags` | List of lowercase, hyphenated tags |
+| `created` | ISO 8601 date or timestamp; a handful of other formats are recognized and normalized, anything else is accepted as-is (strict rejection is planned, see the [validator roadmap](../docs-cms/rfcs/rfc-003-validator-roadmap.md)) |
+| `tags` | List of lowercase, hyphenated tags; defaults to `[]` and is filled in automatically if missing |
 | `project_id` | Copy `project.id` by convention; docuchango does not compare them |
 | `doc_uuid` | UUID v4, generated once and never changed |
 
@@ -253,8 +271,9 @@ Use a value from the table above for that document type. Common variants
 such as `accepted` or `Draft` on an ADR are corrected automatically.
 
 **Nothing is scanned**
-The folder is not listed in `document_folders`, or the config is not where
-you ran the command. Use `--repo-root` to point at the right directory.
+The folder is not listed in `document_folders` (or, with `structure.doc_types`
+configured, not listed under any type's `folders`), or the config is not
+where you ran the command. Use `--repo-root` to point at the right directory.
 
 ## Next
 

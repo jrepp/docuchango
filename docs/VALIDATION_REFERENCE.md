@@ -22,6 +22,10 @@ every check, are tracked in the
 - Duplicate `id` or `doc_uuid` across documents
 - Binary or non-UTF-8 files in a document folder
 
+The `id`/`doc_uuid` mismatch and duplicate checks above apply only to the
+standard `adr`, `rfc`, `memo` and `prd` schemas; a `generic` document is not
+checked for either.
+
 **Fixed automatically**
 
 - Generates a frontmatter block with sensible defaults when one is missing
@@ -31,7 +35,16 @@ every check, are tracked in the
   `14.09.2026`, `September 14, 2026`) to ISO 8601
 - Normalizes tags to a sorted, de-duplicated, lowercase-with-dashes list
 - Trims whitespace and removes empty or null values
-- Adds `created` from git history and migrates a legacy `date` field
+- Adds `created` from git history, but only when a frontmatter block already
+  exists and is missing that field; a document with no frontmatter at all
+  gets today's date when its block is generated. Also migrates a legacy
+  `date` field to `created`
+
+Generating a missing frontmatter block and mapping status variants both infer
+the document type from the standard `adr/`, `rfcs/`, `memos/` and `prd/`
+folder names. A custom `doc_types` folder with a different name is not
+recognized: a missing block is reported instead of generated, and an invalid
+status is reported instead of mapped.
 
 **Left to you**
 
@@ -59,6 +72,10 @@ every check, are tracked in the
 - Strips text from closing fences
 - Adds missing closing fences
 - Inserts the missing blank lines
+
+None of these fixes run in `--dry-run`: the fixer that applies them is
+skipped entirely for a dry run, so each one is reported as a plain "Detected"
+issue above instead of a previewed fix, then silently fixed on the real run.
 
 ## Links
 
@@ -113,11 +130,16 @@ wrap the text in backticks, then validate again.
 
 **Fixed automatically**
 
-- Removes trailing whitespace outside code blocks
+- Removes trailing whitespace outside code blocks, on a real run - like code
+  fence fixes (above), this is not previewed in `--dry-run`: a trailing-space
+  line shows up as a plain issue there, then disappears silently on the real
+  run
 
 **Left to you**
 
 - Runs of more than two blank lines, which are reported but not collapsed
+  (collapsing them is planned - see the
+  [validator roadmap](../docs-cms/rfcs/rfc-003-validator-roadmap.md), FMT-011)
 
 ## Filenames
 
@@ -142,7 +164,9 @@ update references in one step.
 When `indexes` are configured, an index file is checked for:
 
 - Every target linked when `require_all_targets` is set
-- At least one entry when `require_entries` is set
+- At least one entry when `require_entries` is set and its `targets` glob
+  matches at least one file - an index whose targets glob matches nothing is
+  allowed to be empty even with `require_entries: true`
 - No links outside the target set unless `allow_extra_links` is set
 - Each target listed under the correct time-bucket or milestone heading
 
@@ -150,9 +174,12 @@ Index findings are reported, not fixed.
 
 ## Readability
 
-When `textstat` is installed and `readability.enabled` is true, paragraphs
-longer than the configured minimum are scored. Paragraphs outside the
-thresholds are reported with the metric that failed. Nothing is rewritten.
+When `textstat` is installed and `readability.enabled` is true in the
+top-level config, paragraphs at least as long as the configured minimum are
+scored. Paragraphs outside the thresholds are reported with the metric that
+failed. Nothing is rewritten. In a monorepo with `subprojects`, only the
+top-level `readability` settings apply; a sub-project's own settings are not
+read.
 
 ## Docusaurus build
 
@@ -166,9 +193,17 @@ and in CI jobs that do not have Node installed.
 | Code | Meaning |
 |------|---------|
 | 0 | Every document valid, or every issue fixed |
-| 1 | Issues remain that need a person |
+| 1 | Issues remain after the fixes for this run were applied (or, in `--dry-run`, simulated) |
 | 2 | The run itself failed: the validator could not be imported or raised, or the command line was wrong (a bad `--repo-root`, an unknown option) |
 
 Treat 2 as "docuchango could not tell you anything", not as a documentation
-problem. With `--dry-run` the exit code reflects the issues found, so a CI
-job fails on problems without rewriting files.
+problem. Exit code 1 does not always mean a person has to act: in
+`--dry-run`, nothing is written, so a fixable problem whose fixer only runs
+outside `--dry-run` (any code fence or trailing-whitespace fix, or a status
+value that maps to a valid one) still counts as a remaining issue and exits
+1, even though the plain `validate` form would clear it automatically. A
+value the schema itself accepts without complaint, such as an unusual but
+parseable `created` string, is proposed as a normalization without causing a
+failing exit code either way. `--dry-run` never writes to the working tree,
+so use it in CI to fail the build on whatever would still be wrong afterwards
+- not as a guarantee that every fixable issue also fails the build.
