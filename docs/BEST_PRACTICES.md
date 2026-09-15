@@ -229,7 +229,7 @@ Analysis shows Redis can reduce API latency by 60% while maintaining
 data consistency. Proposes phased rollout starting with read-heavy
 endpoints.
 
-🤖 Generated with Claude Code - NEEDS REVIEW"
+NEEDS REVIEW"
 ```
 
 ### Updating Documents
@@ -478,7 +478,7 @@ API responses should probably have metadata or something.
 
    REQUIRES HUMAN REVIEW to confirm accuracy and complete context.
 
-   🤖 Generated with Claude Code - NEEDS REVIEW"
+   NEEDS REVIEW"
    ```
 
 ## Common Pitfalls

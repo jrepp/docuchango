@@ -2,6 +2,16 @@
 
 This guide is for AI agents working with projects that use `docs-cms` for documentation and knowledge management.
 
+**In one paragraph:** `docs-cms/` is the project's memory. Before you answer
+an architecture question or change anything significant, search it and read
+the relevant ADRs, RFCs, PRDs and memos. Cite them by id when you answer.
+When you learn something durable, write it down there as a new document from
+a template, in the draft state for its type unless a human has approved it:
+`status: Proposed` for an ADR, `status: Draft` for an RFC or PRD, and no
+`status` field at all for a memo. Run `docuchango validate --dry-run`, then
+`docuchango validate`, before you commit, and report anything it could not
+fix. The rest of this guide is detail on how to do each of those well.
+
 ## Core Principle: Trust the CMS
 
 **The docs-cms is your single source of truth.** When answering questions, making decisions, or proposing changes, always:
@@ -136,9 +146,7 @@ git add docs-cms/adr/adr-042-new-decision.md
 git commit -m "Add ADR-042: Document decision about X
 
 Rationale: ...
-Consequences: ...
-
-🤖 Generated with Claude Code"
+Consequences: ..."
 ```
 
 ### 4. Update Existing Documents
@@ -170,7 +178,7 @@ git commit -m "Update ADR-015: Add OAuth2 refresh token handling"
 id: adr-043
 title: Updated Authentication Strategy
 status: Accepted
-date: 2025-10-27
+created: 2025-10-27
 supersedes: adr-015
 ---
 
@@ -207,8 +215,9 @@ superseded_by: adr-043
 ---
 id: adr-NNN
 title: Brief decision title
-status: Proposed | Accepted | Rejected | Superseded
-date: YYYY-MM-DD
+status: Proposed | Accepted | Implemented | Deprecated | Superseded
+created: YYYY-MM-DD
+deciders: Team or person who made the decision
 tags: [architecture, decision, ...]
 project_id: project-name
 doc_uuid: uuid-v4
@@ -256,8 +265,8 @@ Why we didn't choose other options
 ---
 id: rfc-NNN
 title: Proposal title
-status: Draft | In Review | Approved | Rejected | Implemented
-date: YYYY-MM-DD
+status: Draft | Proposed | Accepted | Implemented | Deprecated | Superseded
+created: YYYY-MM-DD
 author: Your Name (or "Claude Code Agent")
 tags: [rfc, proposal, ...]
 project_id: project-name
@@ -307,7 +316,7 @@ Unresolved items
 ---
 id: memo-NNN
 title: Memo title
-date: YYYY-MM-DD
+created: YYYY-MM-DD
 author: Your Name (or "Claude Code Agent")
 tags: [memo, ...]
 project_id: project-name
@@ -389,17 +398,13 @@ This project uses **Conventional Commits** for automated semantic versioning. Yo
 git commit -m "feat: add real-time notification system
 
 Implements WebSocket-based notifications per RFC-042.
-Includes connection pooling and automatic reconnection.
-
-🤖 Generated with Claude Code"
+Includes connection pooling and automatic reconnection."
 
 # Bug fix commit (PATCH bump)
 git commit -m "fix: resolve memory leak in connection pool
 
 Closes connection handles properly in error cases.
-Addresses issue reported in #123.
-
-🤖 Generated with Claude Code"
+Addresses issue reported in #123."
 
 # Breaking change commit (MAJOR bump)
 git commit -m "feat!: change authentication API to use OAuth2
@@ -407,26 +412,21 @@ git commit -m "feat!: change authentication API to use OAuth2
 BREAKING CHANGE: The /auth endpoint now requires OAuth2 tokens
 instead of API keys. All clients must be updated.
 
-Migration guide: docs-cms/adr/adr-043-oauth2-migration.md
-
-🤖 Generated with Claude Code"
+Migration guide: docs-cms/adr/adr-043-oauth2-migration.md"
 
 # Documentation commit (no release)
 git commit -m "docs: add ADR-042 for Redis caching
 
 Context: Need to improve API response times
 Decision: Use Redis for application-level caching
-Consequences: Faster responses, additional infrastructure
-
-🤖 Generated with Claude Code"
+Consequences: Faster responses, additional infrastructure"
 
 # Chore commit (no release)
 git commit -m "chore: update ADR-015 with session timeout details
 
 Clarifies session handling per RFC-018 discussion.
 
-References: RFC-018, ADR-015
-🤖 Generated with Claude Code"
+References: RFC-018, ADR-015"
 ```
 
 #### Semantic Release Workflow
@@ -438,9 +438,19 @@ When commits are pushed to `main`:
    - `feat:` → MINOR bump (0.1.0 → 0.2.0)
    - `fix:` or `perf:` → PATCH bump (0.1.0 → 0.1.1)
    - `BREAKING CHANGE` → MAJOR bump (0.1.0 → 1.0.0)
+   - The bump is published as a **release candidate**: `0.2.0rc1`, `0.2.0rc2`, ...
 3. **Changelog**: Automatically generates `CHANGELOG.md` from commit messages
-4. **Release**: Creates GitHub release with generated notes
-5. **Publish**: Triggers PyPI publication and binary builds
+4. **Release**: Creates a GitHub pre-release with the changelog section plus
+   GitHub's generated "What's Changed" list
+5. **Publish**: Publishes to PyPI via trusted publishing, builds PyApp binaries, signs with Sigstore
+
+**Stable releases are a manual step.** Run the Release workflow from the
+Actions tab (Actions → Release → Run workflow → "Promote to stable"). The
+same commits are re-released as `0.2.0`, marked "latest" on GitHub, with
+release notes rolled up from every rc since the previous stable.
+
+Resolvers ignore pre-releases unless the consumer opts in, so an rc never
+reaches existing `docuchango>=X` pins. See `PUBLISHING.md` for details.
 
 **Important for agents:**
 - Use `feat:` for new features (even documentation of new features)
@@ -457,9 +467,7 @@ Extends the schema validator to handle nested YAML structures
 in document frontmatter. Enables complex metadata like author
 objects with name, email, and URL fields.
 
-Implements RFC-045.
-
-🤖 Generated with Claude Code"
+Implements RFC-045."
 
 # Good: Fix with issue reference
 git commit -m "fix(cli): handle missing config file gracefully
@@ -467,16 +475,12 @@ git commit -m "fix(cli): handle missing config file gracefully
 Previously crashed with FileNotFoundError when docs-project.yaml
 was missing. Now provides helpful error message and exits cleanly.
 
-Fixes #42
-
-🤖 Generated with Claude Code"
+Fixes #42"
 
 # Good: Documentation change
 git commit -m "docs: add ADR-046 for message queue selection
 
-Documents decision to use RabbitMQ for async task processing.
-
-🤖 Generated with Claude Code"
+Documents decision to use RabbitMQ for async task processing."
 ```
 
 ### 3. Reference Related Documents
@@ -574,7 +578,7 @@ When you notice missing documentation:
    This decision was inferred from codebase analysis but requires
    human confirmation and potential corrections.
 
-   🤖 Generated with Claude Code - NEEDS REVIEW"
+   NEEDS REVIEW"
    ```
 
 ## Searching and Finding Documents
@@ -781,65 +785,20 @@ def test_authentication_flow():
 ## Resources
 
 - **Bootstrap Guide**: `docs/BOOTSTRAP_GUIDE.md` - How to set up docs-cms
+- **Configuration**: `docs/CONFIGURATION.md` - Monorepos, mixed schemas, naming standards
+- **Validation Reference**: `docs/VALIDATION_REFERENCE.md` - Every check and fix
 - **Schema Reference**: `docuchango/schemas.py` - Field requirements
 - **Templates**: `docs-cms/templates/` - Document templates
 - **Examples**: `examples/docs-cms/` - Sample documents
 
 ## Naming Standards
 
-Docuchango supports configurable naming standards applied to document folders via `docs-project.yaml`. Use the `naming_standard` field in `doc_types` configuration.
-
-### Built-in Naming Standards
-
-| Standard | Pattern | Example |
-|----------|---------|---------|
-| `nnn-name` | `^\d{3}-(.+)\.md$` | `001-intro.md` |
-| `year-month-day-name` | `^\d{4}-\d{2}-\d{2}-(.+)\.md$` | `2025-05-25-intro.md` |
-| `kebab-case` | `^[a-z0-9]+(-[a-z0-9]+)*\.md$` | `my-document-name.md` |
-| `snake_case` | `^[a-z0-9]+(_[a-z0-9]+)*\.md$` | `my_document_name.md` |
-| `camelCase` | `^[a-z][a-zA-Z0-9]*\.md$` | `myDocumentName.md` |
-| `PascalCase` | `^[A-Z][a-zA-Z0-9]*\.md$` | `MyDocumentName.md` |
-| `lowercase` | `^[a-z0-9]+\.md$` | `mydocumentname.md` |
-| `uppercase` | `^[A-Z0-9]+\.md$` | `MYDOCUMENTNAME.md` |
-
-### Configuration Example
-
-```yaml
-structure:
-  doc_types:
-    guides:
-      schema: generic
-      folders: [guides]
-      naming_standard: kebab-case
-    
-    runbooks:
-      schema: generic
-      folders: [ops/runbooks]
-      naming_standard: snake_case
-  
-  naming_standards:
-    my-custom: "^custom-.+\\.md$"
-```
-
-### Custom Naming Standards
-
-Define custom standards in `naming_standards` section of `docs-project.yaml`:
-
-```yaml
-structure:
-  naming_standards:
-    date-prefix: "^\\d{6}-.+必$"
-  doc_types:
-    reports:
-      naming_standard: date-prefix
-```
-
-The naming module (`docuchango/naming.py`) provides:
-- `BUILTIN_NAMING_STANDARDS`: Dict of all built-in patterns
-- `validate_name(name, pattern)`: Validate filename against regex
-- `validate_name_with_standard(name, standard, custom)`: Validate using named standard
-- `resolve_naming_standard(standard, custom)`: Resolve name to regex pattern
-- `describe_standard(standard, custom)`: Human-readable description
+Folders can enforce a filename rule through `naming_standard` in
+`docs-project.yaml`, using built-ins such as `kebab-case`, `snake_case` or
+`year-month-day-name`, or a custom regex. When a validation error mentions a
+naming standard, check the folder's `doc_types` entry. The full table of
+standards and how to define your own is in
+[CONFIGURATION.md](CONFIGURATION.md#naming-standards).
 
 ## Remember
 

@@ -1,6 +1,6 @@
 [project]
 name = "docuchango"
-version = "1.18.1"
+version = "1.19.0-rc.1"
 description = "Docusaurus validation and repair framework for opinionated micro-CMS documentation, designed for human-agent collaboration workflows"
 readme = "README.md"
 requires-python = ">=3.10,<3.16"
@@ -257,8 +257,22 @@ upload_to_vcs_release = true
 build_command = "uv build"
 commit_message = "chore(release): {version}"
 
+# Release channels. semantic-release picks the channel by the name of the
+# branch it runs on.
+#
+#   main   -> every releasable merge publishes a PEP 440 pre-release
+#             (v1.19.0-rc.1 -> PyPI 1.19.0rc1). Resolvers ignore pre-releases
+#             unless a consumer opts in, so existing pins are unaffected.
+#   stable -> not a real branch. The "Promote to stable" run of release.yml
+#             checks out main's HEAD under this name so the same commits are
+#             released as v1.19.0. See PUBLISHING.md.
 [tool.semantic_release.branches.main]
-match = "main"
+match = "^main$"
+prerelease = true
+prerelease_token = "rc"
+
+[tool.semantic_release.branches.stable]
+match = "^stable$"
 prerelease = false
 
 [tool.semantic_release.changelog]
