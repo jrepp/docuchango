@@ -2,10 +2,13 @@
 
 import subprocess
 from datetime import datetime
+from pathlib import Path
 
 import frontmatter
 import pytest
+from click.testing import CliRunner
 
+from docuchango.cli import main
 from docuchango.fixes.timestamps import (
     get_git_dates,
     migrate_date_to_created,
@@ -654,3 +657,76 @@ date: 2025-01-26
 
         assert changed
         assert messages == ["Migrated 'date' → 'created'"]
+
+
+class TestBulkTimestampsCliRelativePath:
+    """Regression tests for `docuchango bulk timestamps --path` with a relative root.
+
+    Discovered files under a docs-project.yaml driven root are always
+    resolved to absolute paths, so the CLI must resolve the user-supplied
+    --path up front or later Path.relative_to(root) calls can raise/degrade.
+    """
+
+    def _write_project(self, root: Path) -> Path:
+        adr_dir = root / "adr"
+        adr_dir.mkdir(parents=True)
+        (root / "docs-project.yaml").write_text(
+            """
+project:
+  id: repro
+  name: Repro
+structure:
+  document_folders:
+    - adr
+""".strip(),
+            encoding="utf-8",
+        )
+        doc = adr_dir / "adr-001-test.md"
+        doc.write_text("---\nid: adr-001\nstatus: Draft\ndate: 2020-01-01\n---\n# Test\n", encoding="utf-8")
+
+        subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=root, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.name", "Test"], cwd=root, check=True, capture_output=True)
+        subprocess.run(["git", "add", "."], cwd=root, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "add"], cwd=root, check=True, capture_output=True)
+        return doc
+
+    def test_relative_path_does_not_crash_and_shows_relative_output(self, tmp_path, monkeypatch):
+        self._write_project(tmp_path)
+        monkeypatch.chdir(tmp_path)
+
+        result = CliRunner().invoke(main, ["bulk", "timestamps", "--path", ".", "--verbose"])
+
+        assert result.exit_code == 0, result.output
+        assert "Modified 1 of 1 files" in result.output
+        assert "adr/adr-001-test.md" in result.output
+        assert str(tmp_path) not in result.output
+
+    def test_relative_and_absolute_paths_agree(self, tmp_path, monkeypatch):
+        self._write_project(tmp_path)
+
+        absolute_result = CliRunner().invoke(
+            main, ["bulk", "timestamps", "--path", str(tmp_path), "--dry-run", "--verbose"]
+        )
+        assert absolute_result.exit_code == 0, absolute_result.output
+
+        monkeypatch.chdir(tmp_path)
+        relative_result = CliRunner().invoke(main, ["bulk", "timestamps", "--path", ".", "--dry-run", "--verbose"])
+        assert relative_result.exit_code == 0, relative_result.output
+        assert relative_result.output == absolute_result.output
+
+    def test_root_through_symlink(self, tmp_path):
+        """A root reached through a symlink (as macOS /tmp is) must resolve cleanly."""
+        real_root = tmp_path / "real"
+        doc = self._write_project(real_root)
+
+        symlink_root = tmp_path / "link"
+        symlink_root.symlink_to(real_root)
+
+        result = CliRunner().invoke(main, ["bulk", "timestamps", "--path", str(symlink_root), "--verbose"])
+
+        assert result.exit_code == 0, result.output
+        assert "Modified 1 of 1 files" in result.output
+        post = frontmatter.loads(doc.read_text(encoding="utf-8"))
+        assert "date" not in post.metadata
+        assert "created" in post.metadata

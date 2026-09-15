@@ -4,7 +4,9 @@ from pathlib import Path
 
 import frontmatter
 import pytest
+from click.testing import CliRunner
 
+from docuchango.cli import main
 from docuchango.fixes.bulk_update import (
     bulk_update_files,
     should_skip_file,
@@ -356,6 +358,78 @@ class TestBulkUpdateFiles:
         for doc in [doc1, doc2]:
             post = frontmatter.loads(doc.read_text())
             assert post.metadata["priority"] == "high"
+
+
+class TestBulkUpdateCliRelativePath:
+    """Regression tests for `docuchango bulk update --path` with a relative root.
+
+    Discovered files under a docs-project.yaml driven root are always
+    resolved to absolute paths, so the CLI must resolve the user-supplied
+    --path up front or later Path.relative_to(root) calls can raise/degrade.
+    """
+
+    def _write_project(self, root: Path) -> Path:
+        adr_dir = root / "adr"
+        adr_dir.mkdir(parents=True)
+        (root / "docs-project.yaml").write_text(
+            """
+project:
+  id: repro
+  name: Repro
+structure:
+  document_folders:
+    - adr
+""".strip(),
+            encoding="utf-8",
+        )
+        doc = adr_dir / "adr-001-test.md"
+        doc.write_text("---\nid: adr-001\nstatus: Draft\n---\n# Test\n", encoding="utf-8")
+        return doc
+
+    def test_relative_path_does_not_crash_and_shows_relative_output(self, tmp_path, monkeypatch):
+        self._write_project(tmp_path)
+        monkeypatch.chdir(tmp_path)
+
+        result = CliRunner().invoke(main, ["bulk", "update", "--set", "status=Accepted", "--path", ".", "--verbose"])
+
+        assert result.exit_code == 0, result.output
+        assert "Modified 1 of 1 files" in result.output
+        assert "adr/adr-001-test.md" in result.output
+        assert str(tmp_path) not in result.output
+
+    def test_relative_and_absolute_paths_agree(self, tmp_path, monkeypatch):
+        doc = self._write_project(tmp_path)
+
+        absolute_result = CliRunner().invoke(
+            main, ["bulk", "update", "--set", "status=Accepted", "--path", str(tmp_path), "--dry-run", "--verbose"]
+        )
+        assert absolute_result.exit_code == 0, absolute_result.output
+
+        # Reset - the absolute run was a dry-run, so nothing changed on disk.
+        monkeypatch.chdir(tmp_path)
+        relative_result = CliRunner().invoke(
+            main, ["bulk", "update", "--set", "status=Accepted", "--path", ".", "--dry-run", "--verbose"]
+        )
+        assert relative_result.exit_code == 0, relative_result.output
+        assert relative_result.output == absolute_result.output
+        assert doc.exists()
+
+    def test_root_through_symlink(self, tmp_path):
+        """A root reached through a symlink (as macOS /tmp is) must resolve cleanly."""
+        real_root = tmp_path / "real"
+        doc = self._write_project(real_root)
+
+        symlink_root = tmp_path / "link"
+        symlink_root.symlink_to(real_root)
+
+        result = CliRunner().invoke(
+            main, ["bulk", "update", "--set", "status=Accepted", "--path", str(symlink_root), "--verbose"]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "Modified 1 of 1 files" in result.output
+        post = frontmatter.loads(doc.read_text(encoding="utf-8"))
+        assert post.metadata["status"] == "Accepted"
 
     def test_bulk_update_dry_run(self, tmp_path):
         """Test that dry run doesn't modify files."""

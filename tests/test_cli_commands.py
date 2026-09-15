@@ -92,6 +92,39 @@ class TestValidateCommand:
         # Should attempt to validate current directory
         assert result.exit_code in [0, 1, 2]
 
+    def test_validate_relative_repo_root_does_not_crash(self, docs_repository, monkeypatch):
+        """Regression test: a relative --repo-root must not raise Path.relative_to.
+
+        Discovered document paths are always resolved to absolute paths, so
+        --repo-root must be resolved up front (see the comment near the top
+        of this function) or comparisons against a relative root crash.
+        """
+        runner = CliRunner()
+        monkeypatch.chdir(docs_repository["root"].parent)
+
+        result = runner.invoke(
+            validate,
+            ["--repo-root", docs_repository["root"].name, "--skip-build"],
+            catch_exceptions=False,
+        )
+
+        assert result.exit_code in [0, 1]
+        assert str(docs_repository["root"]) not in result.output
+
+    def test_validate_repo_root_through_symlink(self, docs_repository, tmp_path):
+        """A --repo-root reached through a symlink (as macOS /tmp is) must resolve cleanly."""
+        symlink_root = tmp_path / "link-to-repo"
+        symlink_root.symlink_to(docs_repository["root"])
+
+        runner = CliRunner()
+        result = runner.invoke(
+            validate,
+            ["--repo-root", str(symlink_root), "--skip-build"],
+            catch_exceptions=False,
+        )
+
+        assert result.exit_code in [0, 1]
+
     def test_validate_actually_applies_fixes(self, tmp_path):
         """Regression test: validate must actually apply fixes, not just report them.
 
@@ -754,6 +787,87 @@ doc_uuid: 12345678-1234-4123-8123-123456789abc
         # Verify file was NOT modified
         after_content = test_file.read_text(encoding="utf-8")
         assert after_content == original_content
+
+    def _write_project(self, root: Path) -> Path:
+        """Write a docs-project.yaml driven repo, which forces resolved (absolute)
+        discovered file paths regardless of whether --path itself is relative."""
+        adr_dir = root / "adr"
+        adr_dir.mkdir(parents=True)
+        (root / "docs-project.yaml").write_text(
+            """
+project:
+  id: repro
+  name: Repro
+structure:
+  document_folders:
+    - adr
+""".strip(),
+            encoding="utf-8",
+        )
+        doc = adr_dir / "adr-001-test.md"
+        # Pre-populate doc_uuid/created so re-running migrate is deterministic
+        # (migrate would otherwise mint a fresh random doc_uuid each run).
+        doc.write_text(
+            "---\n"
+            "id: adr-001\n"
+            "status: Accepted\n"
+            "doc_uuid: 12345678-1234-4123-8123-123456789abc\n"
+            "created: '2025-01-01T00:00:00Z'\n"
+            "---\n\n# Test ADR\n",
+            encoding="utf-8",
+        )
+        return doc
+
+    def test_migrate_relative_path_does_not_crash(self, tmp_path, monkeypatch):
+        """Regression test: a relative --path must not crash with Path.relative_to.
+
+        Discovered files are resolved to absolute paths when a docs-project.yaml
+        is present, but the original code compared them against the unresolved
+        --path the user typed.
+        """
+        self._write_project(tmp_path)
+        monkeypatch.chdir(tmp_path)
+
+        runner = CliRunner()
+        result = runner.invoke(migrate, ["--project-id", "test-project", "--path", ".", "--verbose"])
+
+        assert result.exit_code == 0, result.output
+        assert "Modified 1 of 1 files" in result.output
+        assert "adr/adr-001-test.md" in result.output
+        assert str(tmp_path) not in result.output
+
+    def test_migrate_relative_and_absolute_paths_agree(self, tmp_path, monkeypatch):
+        """A relative --path must produce the same result as the absolute form."""
+        self._write_project(tmp_path)
+
+        runner = CliRunner()
+        absolute_result = runner.invoke(
+            migrate, ["--project-id", "test-project", "--path", str(tmp_path), "--dry-run", "--verbose"]
+        )
+        assert absolute_result.exit_code == 0, absolute_result.output
+
+        monkeypatch.chdir(tmp_path)
+        relative_result = runner.invoke(
+            migrate, ["--project-id", "test-project", "--path", ".", "--dry-run", "--verbose"]
+        )
+        assert relative_result.exit_code == 0, relative_result.output
+        assert relative_result.output == absolute_result.output
+
+    def test_migrate_root_through_symlink(self, tmp_path):
+        """A root reached through a symlink (as macOS /tmp is) must resolve cleanly."""
+        real_root = tmp_path / "real"
+        doc = self._write_project(real_root)
+
+        symlink_root = tmp_path / "link"
+        symlink_root.symlink_to(real_root)
+
+        runner = CliRunner()
+        result = runner.invoke(migrate, ["--project-id", "test-project", "--path", str(symlink_root), "--verbose"])
+
+        assert result.exit_code == 0, result.output
+        assert "Modified 1 of 1 files" in result.output
+        post = frontmatter.loads(doc.read_text(encoding="utf-8"))
+        assert post.metadata["project_id"] == "test-project"
 
 
 class TestCLIErrorHandling:

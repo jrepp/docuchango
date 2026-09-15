@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.19.0-rc.5 (2026-09-15)
+
+### Bug Fixes
+
+- **cli**: Resolve --path/--repo-root before comparing to discovered paths
+  ([`c1a502a`](https://github.com/jrepp/docuchango/commit/c1a502a299f29582c4179ed9aa5cd8abc2e6eb85))
+
+### Testing
+
+- Cover relative and symlinked --path/--repo-root for CLI commands
+  ([`1e80ea6`](https://github.com/jrepp/docuchango/commit/1e80ea667779e12c11f6e401d065fce06400dc40))
+
+
 ## v1.19.0-rc.4 (2026-09-15)
 
 ### Documentation
