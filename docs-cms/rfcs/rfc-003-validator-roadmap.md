@@ -74,7 +74,7 @@ reported.
 | FM-004 | Duplicate `doc_uuid` across documents | Implemented | report | `check_uuids` |
 | FM-005 | Missing `tags`, `project_id` or `doc_uuid` filled in | Implemented | fix | `fixes/whitespace.py` `ensure_required_fields` |
 | FM-006 | Recognized non-ISO date formats normalized | Implemented | fix | `fixes/frontmatter.py` |
-| FM-010 | `project_id` does not match `project.id` of the governing config | Planned | fix/report | see below |
+| FM-010 | `project_id` does not match the `project.id` of the config that governs the document's folder | Implemented | fix/report | `check_project_ids`, `_config_context_for_path`, `cli._discover_doc_claims`, `fixes/frontmatter.py` (`_fix_project_id_metadata`, `PROJECT_ID_PLACEHOLDER`) |
 | FM-011 | `created` or `updated` is not an ISO 8601 date or datetime | Planned | report | see below |
 | ID-001 | Top-level filename does not match the configured pattern (files in subfolders are support material and are not scanned, unless `structure.scan_subfolders` or a per-type override enables ID-011) | Implemented | report | `check_ids`, `_scan_document_folder` |
 | ID-002 | `id` does not match the filename; an ADR amendment `adr-NNN-amendment-MM-*` is expected to carry id `adr-NNN-aMM` | Implemented | report | `check_ids`, `_scan_document_folder` |
@@ -173,18 +173,34 @@ is taken whole and never merged key by key, so a sub-project that declares
 one gets schema defaults for the keys it omits. Documents that resolve to
 different settings are scored by separate scorers in one pass. Report only.
 
+**FM-010 `project_id` match (shipped).** Every schema requires `project_id`,
+but nothing compared it to the project it names, so a document copied from
+another repository or straight from a template kept pointing at the wrong
+project and validated clean. `check_project_ids` now compares each document's
+`project_id` with the `project.id` of the config that governs its folder,
+resolved with the same `_config_context_for_path` that RD-001 uses, so a
+monorepo is not flattened to one ID and a sub-project document is measured
+against its own config. A mismatch is reported as
+`FM-010: project_id 'x' does not match project.id 'y' in <config>`. A document
+whose frontmatter has no `project_id` key at all is skipped, because FM-002
+and FM-005 already own that, and so is a document no config governs.
+
+Phase 1 repairs the two cases that are never deliberate: an empty value and
+the `init` placeholder `my-project`. It does so only when exactly one config
+claims the file, which `cli._discover_doc_claims` records alongside the
+schema; when two configs claim the same folder there is no single governing
+ID to write and the finding stays a report. A different, non-placeholder value
+may be intentional, so it is never rewritten - that is the check's whole
+safety margin. The rewrite goes through `fix_frontmatter_metadata`, ahead of
+`ensure_required_fields` so a document missing `project_id` entirely gets the
+real ID instead of the placeholder, and `add_missing_frontmatter` seeds the
+generated block with the same value so a repaired document needs no second
+pass.
+
 ### Planned validators
 
 Each entry lists what it detects, what it may fix, and the constraint that
 keeps it safe.
-
-**FM-010 `project_id` match.** Compare each document's `project_id` with the
-`project.id` of the config that governs its folder, honouring sub-project
-configs so a monorepo is not flattened to one ID. Report the mismatch. Fix
-only when the folder is governed by exactly one config and the current value
-is empty or the `init` placeholder `my-project`; a different, non-placeholder
-value may be intentional and stays a report. This is the check the old docs
-promised and the one most likely to catch a copy-pasted template.
 
 **FM-011 Date format.** Accept `YYYY-MM-DD` and `YYYY-MM-DDTHH:MM:SSZ`, the
 two forms the templates use. Anything else that FM-006 did not recognize is

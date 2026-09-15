@@ -965,3 +965,109 @@ class TestUtf8ByteOrderMark:
 
         post = frontmatter.loads(doc.read_text(encoding="utf-8"))
         assert post.metadata["id"] == "adr-001"
+
+
+class TestProjectIdPlaceholderFix:
+    """FM-010: only an empty or placeholder project_id is rewritten."""
+
+    @staticmethod
+    def _adr(tmp_path: Path, project_id_line: str) -> Path:
+        doc = tmp_path / "adr" / "adr-001-test.md"
+        doc.parent.mkdir(parents=True, exist_ok=True)
+        doc.write_text(
+            "---\n"
+            "id: adr-001\n"
+            'title: "ADR-001: Test"\n'
+            "status: Accepted\n"
+            "created: 2026-01-02\n"
+            "tags: []\n"
+            'deciders: "Engineering Team"\n'
+            f"{project_id_line}"
+            "doc_uuid: 4f2f2b3e-0e2c-4b0a-9a4f-2a8b1c9d0e11\n"
+            "---\n"
+            "\n"
+            "# ADR-001: Test\n",
+            encoding="utf-8",
+        )
+        return doc
+
+    @staticmethod
+    def _project_id(doc: Path) -> object:
+        metadata: dict[str, object] = frontmatter.loads(doc.read_text(encoding="utf-8")).metadata
+        return metadata.get("project_id")
+
+    def test_placeholder_is_replaced_with_the_governing_id(self, tmp_path):
+        """`my-project` is the init placeholder and is always safe to rewrite."""
+        doc = self._adr(tmp_path, "project_id: my-project\n")
+
+        changed, messages = fix_frontmatter_metadata(doc, project_id="real-project")
+
+        assert changed
+        assert "FM-010: Replaced placeholder project_id 'my-project' with 'real-project'" in messages
+        assert self._project_id(doc) == "real-project"
+
+    def test_empty_value_is_filled_in(self, tmp_path):
+        """An empty project_id is filled from the governing config."""
+        doc = self._adr(tmp_path, 'project_id: ""\n')
+
+        changed, messages = fix_frontmatter_metadata(doc, project_id="real-project")
+
+        assert changed
+        assert any(msg.startswith("FM-010: Set project_id to 'real-project'") for msg in messages)
+        assert self._project_id(doc) == "real-project"
+
+    def test_missing_field_gets_the_governing_id_not_the_placeholder(self, tmp_path):
+        """FM-010 runs before the required-field fixer would add `my-project`."""
+        doc = self._adr(tmp_path, "")
+
+        changed, _ = fix_frontmatter_metadata(doc, project_id="real-project")
+
+        assert changed
+        assert self._project_id(doc) == "real-project"
+
+    def test_non_placeholder_mismatch_is_never_rewritten(self, tmp_path):
+        """A deliberate-looking value stays put; check_project_ids reports it."""
+        doc = self._adr(tmp_path, "project_id: other-project\n")
+        before = doc.read_text(encoding="utf-8")
+
+        changed, messages = fix_frontmatter_metadata(doc, project_id="real-project")
+
+        assert not changed
+        assert not any("FM-010" in msg for msg in messages)
+        assert doc.read_text(encoding="utf-8") == before
+
+    def test_matching_value_is_left_alone(self, tmp_path):
+        """Nothing is reported or written when the value already matches."""
+        doc = self._adr(tmp_path, "project_id: real-project\n")
+
+        assert fix_frontmatter_metadata(doc, project_id="real-project") == (False, [])
+
+    def test_without_a_governing_id_the_placeholder_survives(self, tmp_path):
+        """No single governing config means no value to write; FM-005 still applies."""
+        doc = self._adr(tmp_path, "project_id: my-project\n")
+
+        assert fix_frontmatter_metadata(doc, project_id=None) == (False, [])
+        assert self._project_id(doc) == "my-project"
+
+    def test_dry_run_does_not_write(self, tmp_path):
+        """--dry-run reports the rewrite and leaves the file alone."""
+        doc = self._adr(tmp_path, "project_id: my-project\n")
+        before = doc.read_text(encoding="utf-8")
+
+        changed, messages = fix_frontmatter_metadata(doc, dry_run=True, project_id="real-project")
+
+        assert changed
+        assert any("FM-010" in msg for msg in messages)
+        assert doc.read_text(encoding="utf-8") == before
+
+    def test_generated_frontmatter_seeds_the_governing_id(self, tmp_path):
+        """A document with no frontmatter needs no second pass to get it right."""
+        doc = tmp_path / "adr" / "adr-001-test.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text("# ADR-001: Test\n\nNo frontmatter here.\n", encoding="utf-8")
+
+        changed, _ = fix_frontmatter_metadata(doc, project_id="real-project")
+
+        assert changed
+        assert self._project_id(doc) == "real-project"
+        assert fix_frontmatter_metadata(doc, project_id="real-project") == (False, [])

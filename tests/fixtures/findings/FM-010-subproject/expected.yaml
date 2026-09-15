@@ -1,0 +1,14 @@
+summary: >-
+  A monorepo whose sub-project declares its own `project.id`. The sub-project's
+  ADR carries the root project's id, so FM-010 must report it against
+  `service-d` and leave the correctly-tagged root ADR alone. The value is not a
+  placeholder, so it is never rewritten.
+messages:
+  - "services/service-d/adr/adr-002-service-decision.md"
+  - "FM-010: project_id 'fixture-project' does not match project.id 'service-d'"
+  - "services/service-d/docs-project.yaml"
+forbidden:
+  - "adr-001-root-decision.md"
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1

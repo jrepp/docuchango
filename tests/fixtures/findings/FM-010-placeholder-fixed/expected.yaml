@@ -1,0 +1,11 @@
+summary: >-
+  An ADR left with the `docuchango init` placeholder `project_id: my-project`.
+  Exactly one config governs the folder, so FM-010 rewrites the value to that
+  config's `project.id` instead of only reporting it.
+messages:
+  - "FM-010: project_id 'my-project' does not match project.id 'fixture-project'"
+fix_messages:
+  - "FM-010: Replaced placeholder project_id 'my-project' with 'fixture-project'"
+fixed: true
+dry_run_exit_code: 1
+exit_code: 0

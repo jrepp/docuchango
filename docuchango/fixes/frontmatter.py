@@ -4,6 +4,7 @@ This module provides fixes for common frontmatter problems:
 - Invalid status values (converts to valid values for document type)
 - Invalid date formats (converts to ISO 8601)
 - Missing frontmatter blocks (adds template frontmatter)
+- Placeholder ``project_id`` values (FM-010)
 """
 
 import re
@@ -25,6 +26,12 @@ from docuchango.text_io import (
     read_text,
     write_text,
 )
+
+# The ``project_id`` value that ``docuchango init`` and every bundled template
+# ship with. FM-010 treats it, and an empty value, as "never filled in" and
+# rewrites it to the governing config's project.id; any other mismatch may be
+# deliberate and is only reported.
+PROJECT_ID_PLACEHOLDER = "my-project"
 
 # Valid status values by document type
 VALID_STATUSES = {
@@ -292,13 +299,18 @@ def fix_date_format(file_path: Path, dry_run: bool = False) -> tuple[bool, str]:
         return False, f"Error processing file: {e}"
 
 
-def add_missing_frontmatter(file_path: Path, dry_run: bool = False, schema: str | None = None) -> tuple[bool, str]:
+def add_missing_frontmatter(
+    file_path: Path, dry_run: bool = False, schema: str | None = None, project_id: str | None = None
+) -> tuple[bool, str]:
     """Add missing frontmatter block to a document.
 
     Args:
         file_path: Path to the markdown file
         dry_run: If True, don't write changes
         schema: Configured schema for this file, if any (see resolve_doc_type)
+        project_id: ``project.id`` of the config that governs this file, used
+            for the generated ``project_id`` (FM-010). Falls back to the
+            ``my-project`` placeholder when no single config governs it.
 
     Returns:
         Tuple of (changed, message)
@@ -326,6 +338,10 @@ def add_missing_frontmatter(file_path: Path, dry_run: bool = False, schema: str 
         # Generate UUID
         doc_uuid = str(uuid.uuid4())
 
+        # FM-010: seed project_id from the governing config so the generated
+        # block does not have to be repaired by a second pass.
+        block_project_id = project_id or PROJECT_ID_PLACEHOLDER
+
         if doc_type == "generic":
             # A generic lane has no id, no status and no per-type fields in its
             # schema, so the generated block carries only what
@@ -335,7 +351,7 @@ def add_missing_frontmatter(file_path: Path, dry_run: bool = False, schema: str 
                 f'title: "{title}"',
                 f"created: {today}",
                 "tags: []",
-                'project_id: "my-project"',
+                f'project_id: "{block_project_id}"',
                 f'doc_uuid: "{doc_uuid}"',
                 "---",
             ]
@@ -359,7 +375,7 @@ def add_missing_frontmatter(file_path: Path, dry_run: bool = False, schema: str 
             f'title: "{title}"',
             f"created: {today}",
             "tags: []",
-            'project_id: "my-project"',
+            f'project_id: "{block_project_id}"',
             f'doc_uuid: "{doc_uuid}"',
         ]
 
@@ -519,6 +535,32 @@ def _fix_date_metadata(metadata: dict[str, Any], content: str) -> str | None:
     return None
 
 
+def _fix_project_id_metadata(metadata: dict[str, Any], project_id: str | None) -> str | None:
+    """Fill in a placeholder or empty ``project_id`` from the config (FM-010).
+
+    ``project_id`` is the ``project.id`` of the config that governs this file,
+    or ``None`` when no single config does. Only a missing, empty or
+    ``my-project`` value is rewritten: a different, non-placeholder value may
+    be intentional, so it stays a report from ``check_project_ids``.
+    """
+    if not project_id:
+        return None
+
+    current = metadata.get("project_id")
+    if isinstance(current, str) and current.strip() == project_id:
+        return None
+
+    if current is None or (isinstance(current, str) and not current.strip()):
+        metadata["project_id"] = project_id
+        return f"FM-010: Set project_id to '{project_id}' from the governing docs-project.yaml"
+
+    if isinstance(current, str) and current.strip() == PROJECT_ID_PLACEHOLDER:
+        metadata["project_id"] = project_id
+        return f"FM-010: Replaced placeholder project_id '{PROJECT_ID_PLACEHOLDER}' with '{project_id}'"
+
+    return None
+
+
 def _fix_tags_metadata(metadata: dict[str, Any]) -> list[str]:
     """Normalize tags in already-parsed metadata."""
     messages = []
@@ -563,12 +605,14 @@ def _fix_tags_metadata(metadata: dict[str, Any]) -> list[str]:
 
 
 def fix_frontmatter_metadata(
-    file_path: Path, dry_run: bool = False, schema: str | None = None
+    file_path: Path, dry_run: bool = False, schema: str | None = None, project_id: str | None = None
 ) -> tuple[bool, list[str]]:
     """Apply frontmatter metadata fixes with a single parse/write pass.
 
     ``schema`` is the schema configured for this file in docs-project.yaml, if
     any; it decides the document type instead of the folder-name heuristic.
+    ``project_id`` is the ``project.id`` of the config that governs the file,
+    used by FM-010 to replace a missing, empty or placeholder ``project_id``.
     """
     # FMT-010: read the bytes for carriage returns before the text read, which
     # translates them away. Every write below goes through `write_text`, so any
@@ -602,7 +646,7 @@ def fix_frontmatter_metadata(
     rewrite_only = bom_removed or bool(crlf_findings)
 
     if not post.metadata:
-        changed, message = add_missing_frontmatter(file_path, dry_run=dry_run, schema=schema)
+        changed, message = add_missing_frontmatter(file_path, dry_run=dry_run, schema=schema, project_id=project_id)
         if changed:
             messages.append(message)
         elif rewrite_only and not dry_run:
@@ -628,6 +672,13 @@ def fix_frontmatter_metadata(
 
     metadata, empty_messages = normalize_empty_values(metadata)
     messages.extend(empty_messages)
+
+    # FM-010 runs before ensure_required_fields so a document that has no
+    # project_id at all gets the governing config's ID rather than the
+    # "my-project" placeholder that the required-field fixer would add.
+    project_id_message = _fix_project_id_metadata(metadata, project_id)
+    if project_id_message:
+        messages.append(project_id_message)
 
     metadata, required_messages = ensure_required_fields(metadata)
     messages.extend(required_messages)

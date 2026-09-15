@@ -32,9 +32,12 @@ structure:
   document_folders: [adr, rfcs, memos, prd]
 ```
 
-`project.id` is the value to copy into each document's `project_id` field.
-The match is a convention: `project_id` is required on every document, but
-docuchango never compares it against `project.id`. `document_folders` lists
+`project.id` is the value that belongs in each document's `project_id` field.
+`validate` enforces the match as `FM-010`: a document whose `project_id` is
+not the `project.id` of the config that governs its folder is reported, and an
+empty or placeholder value (`my-project`) is rewritten to the right one when
+exactly one config governs that folder. In a monorepo a document is compared
+against its own sub-project's `project.id`, not the root one. `document_folders` lists
 the typed folders (ADR, RFC, memo, PRD) that are scanned; it is not the whole
 story, though - a top-level `*.md` file directly under a configured docs root
 (anything other than `README.md` or `docs-project.yaml`) is still scanned as
