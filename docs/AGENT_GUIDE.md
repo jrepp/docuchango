@@ -215,7 +215,7 @@ superseded_by: adr-043
 ---
 id: adr-NNN
 title: Brief decision title
-status: Proposed | Accepted | Implemented | Deprecated | Superseded
+status: Proposed | Accepted | Rejected | Implemented | Deprecated | Superseded
 created: YYYY-MM-DD
 deciders: Team or person who made the decision
 tags: [architecture, decision, ...]
@@ -265,7 +265,7 @@ Why we didn't choose other options
 ---
 id: rfc-NNN
 title: Proposal title
-status: Draft | Proposed | Accepted | Implemented | Deprecated | Superseded
+status: Draft | Proposed | Accepted | Rejected | Implemented | Deprecated | Superseded
 created: YYYY-MM-DD
 author: Your Name (or "Claude Code Agent")
 tags: [rfc, proposal, ...]
@@ -616,7 +616,7 @@ grep -C 3 "OAuth" docs-cms/
 grep -l "status: Proposed" docs-cms/adr/*.md
 
 # Find all Active RFCs
-grep -l "status: In Review\|status: Draft" docs-cms/rfcs/*.md
+grep -l "status: Draft\|status: Proposed" docs-cms/rfcs/*.md
 
 # Find Superseded decisions
 grep -l "status: Superseded" docs-cms/adr/*.md

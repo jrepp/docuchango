@@ -67,25 +67,27 @@ reported.
 | ID | Check | Status | Mode | Where |
 |----|-------|--------|------|-------|
 | FM-001 | Missing YAML frontmatter block | Implemented | report | `DocValidator.scan_documents` |
-| FM-002 | Frontmatter fails the per-type Pydantic schema (required fields, types, status values) | Implemented | fix/report | `scan_documents`, `fixes/frontmatter.py` |
+| FM-002 | Frontmatter fails the per-type Pydantic schema (required fields, types, status values) | Implemented | fix/report | `scan_documents`, `schemas.py` (`Literal` types and `VALID_*_STATUSES`), `fixes/frontmatter.py` (`VALID_STATUSES` and `STATUS_MAPPINGS`) |
 | FM-003 | Malformed `doc_uuid` | Implemented | report | `schemas.py` validators |
 | FM-004 | Duplicate `doc_uuid` across documents | Implemented | report | `check_uuids` |
 | FM-005 | Missing `tags`, `project_id` or `doc_uuid` filled in | Implemented | fix | `fixes/whitespace.py` `ensure_required_fields` |
 | FM-006 | Recognized non-ISO date formats normalized | Implemented | fix | `fixes/frontmatter.py` |
 | FM-010 | `project_id` does not match `project.id` of the governing config | Planned | fix/report | see below |
 | FM-011 | `created` or `updated` is not an ISO 8601 date or datetime | Planned | report | see below |
-| ID-001 | Filename does not match the configured pattern | Implemented | report | `check_ids` |
-| ID-002 | `id` does not match the filename | Implemented | report | `check_ids` |
+| ID-001 | Top-level filename does not match the configured pattern (files in subfolders are support material and are not scanned) | Implemented | report | `check_ids`, `_scan_document_folder` |
+| ID-002 | `id` does not match the filename; an ADR amendment `adr-NNN-amendment-MM-*` is expected to carry id `adr-NNN-aMM` | Implemented | report | `check_ids`, `_scan_document_folder` |
 | ID-003 | `id` does not match the number in the title | Implemented | report | `check_ids` |
 | ID-004 | Duplicate `id` across documents | Implemented | report | `check_ids` |
 | ID-010 | Gap or non-contiguous numbering within a document type | Planned | report | see below |
-| LNK-001 | Broken internal link | Implemented | report | `validate_links` |
-| LNK-002 | Relative link that escapes the docs root (cross-plugin link) | Implemented | report | `check_cross_plugin_links` |
+| ID-011 | Validate numbered documents nested in subfolders of a document folder, opt-in via `structure.doc_types.<type>.recursive: true` | Planned | report | see below |
+| LNK-001 | Broken internal link, including bare relative, suffix-less and directory targets | Implemented | report | `validate_links`, `_resolve_link_target` |
+| LNK-002 | Link that resolves outside the repository root, reported once per link with line number and target | Implemented | report | `check_cross_plugin_links` |
 | LNK-010 | Rewrite a broken internal link when the target exists elsewhere | Planned | fix | see below |
 | LNK-011 | Rewrite cross-plugin links to absolute repository URLs | Planned | fix | see below |
-| MDX-001 | Unescaped `<` or `>` that MDX reads as JSX | Implemented | report | `check_mdx_compatibility` |
+| MDX-001 | `<` that opens a JSX-shaped tag which is not a valid HTML element, PascalCase component, self-closing tag or CommonMark autolink (bare prose placeholders such as `<token>`). Comparisons such as `<5ms` or `a < b` are not findings | Implemented | report | `check_mdx_compatibility`, `_is_safe_mdx_tag`, `_mask_code` |
 | MDX-002 | MDX compilation error | Implemented | report | `check_mdx_compilation` |
 | MDX-010 | Escape `<` and `>` and repair common JSX-incompatible Markdown | Planned | fix | see below |
+| MDX-011 | Mask 4-space indented code blocks before the prose checks (only fenced blocks and inline spans are masked today) | Planned | report | see below |
 | FMT-001 | Trailing whitespace | Implemented | fix | `check_formatting`, `fixes/code_blocks.py` |
 | FMT-002 | More than two consecutive blank lines | Implemented | report | `check_formatting` |
 | FMT-010 | CRLF or mixed line endings | Planned | fix | see below |
@@ -119,6 +121,19 @@ and report the missing numbers between the lowest and highest. Report only,
 and mention `docuchango bulk compress-ids` in the message. Gaps are common
 and often deliberate after a deleted proposal, so this should be opt-in via
 `structure.doc_types.<type>.report_numbering_gaps: true` and default to off.
+
+**ID-011 Nested documents.** Documents inside subfolders of a document
+folder (`adr/archive/`, `rfcs/2024/`) are treated as support material and
+not scanned at all, so a duplicate `doc_uuid`, a mismatched `id` or a broken
+link in one of them is never reported. An opt-in
+`structure.doc_types.<type>.recursive: true` would scan them with the same
+rules as top-level files. Report only.
+
+**MDX-011 Indented code blocks.** `_mask_code` masks fenced blocks and
+inline spans before the prose checks run, but not 4-space indented code
+blocks, so a `<token>` placeholder inside one is reported. Correct handling
+needs list-continuation context, because a 4-space indent inside a list
+item is a paragraph, not code.
 
 **LNK-010 Internal link rewrite.** Wire `fixes/internal_links.py` into the
 Phase 1 fix loop of `validate`. When a link is broken and exactly one

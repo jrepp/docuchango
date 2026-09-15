@@ -91,7 +91,7 @@ header:
 ---
 id: adr-001                 # lowercase, matches the filename
 title: Adopt docs-cms
-status: Accepted            # ADR: Proposed, Accepted, Implemented, Deprecated, Superseded
+status: Accepted            # ADR: Proposed, Accepted, Rejected, Implemented, Deprecated, Superseded
 created: 2026-09-14
 deciders: Platform Team
 tags: [documentation, process]
@@ -104,8 +104,8 @@ Each type adds a field or two:
 
 | Type | Folder | Extra required fields | Status values |
 |------|--------|----------------------|---------------|
-| ADR  | `adr/`   | `deciders` | Proposed, Accepted, Implemented, Deprecated, Superseded |
-| RFC  | `rfcs/`  | `author`   | Draft, Proposed, Accepted, Implemented, Deprecated, Superseded |
+| ADR  | `adr/`   | `deciders` | Proposed, Accepted, Rejected, Implemented, Deprecated, Superseded |
+| RFC  | `rfcs/`  | `author`   | Draft, Proposed, Accepted, Rejected, Implemented, Deprecated, Superseded |
 | Memo | `memos/` | `author`   | none required |
 | PRD  | `prd/`   | `author`, `target_release` | Draft, In Review, Approved, In Progress, Completed, Cancelled |
 

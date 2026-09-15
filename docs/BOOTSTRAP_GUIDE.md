@@ -185,8 +185,8 @@ Per type:
 
 | Type | Extra required | `status` values |
 |------|----------------|-----------------|
-| ADR | `status`, `deciders` | Proposed, Accepted, Implemented, Deprecated, Superseded |
-| RFC | `status`, `author` | Draft, Proposed, Accepted, Implemented, Deprecated, Superseded |
+| ADR | `status`, `deciders` | Proposed, Accepted, Rejected, Implemented, Deprecated, Superseded |
+| RFC | `status`, `author` | Draft, Proposed, Accepted, Rejected, Implemented, Deprecated, Superseded |
 | Memo | `author` | no status |
 | PRD | `status`, `author`, `target_release` | Draft, In Review, Approved, In Progress, Completed, Cancelled |
 
@@ -205,10 +205,12 @@ Per type:
 ADR:  Proposed → Accepted → Implemented
                           → Deprecated
                           → Superseded (by adr-NNN)
+           → Rejected
 
 RFC:  Draft → Proposed → Accepted → Implemented
                                   → Deprecated
                                   → Superseded
+                     → Rejected
 
 PRD:  Draft → In Review → Approved → In Progress → Completed
                                                  → Cancelled

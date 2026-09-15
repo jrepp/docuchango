@@ -203,7 +203,7 @@ class TestSMOGIndex:
 
         # SMOG may calculate or may be None if not enough polysyllabic words
         # Just verify it doesn't crash
-        assert isinstance(score.smog_index, (float, type(None)))
+        assert isinstance(score.smog_index, float | type(None))
 
 
 class TestAutomatedReadabilityIndex:

@@ -3,7 +3,7 @@
 id: "adr-XXX"  # Lowercase format: "adr-XXX" where XXX matches filename number (e.g., "adr-001")
 slug: adr-XXX-brief-description  # URL-friendly slug (lowercase-with-dashes)
 title: "ADR-XXX: Decision Title"  # Must start with "ADR-XXX:" where XXX is 3-digit number
-status: Proposed  # Valid values: Proposed, Accepted, Deprecated, Superseded, Implemented
+status: Proposed  # Valid values: Proposed, Accepted, Rejected, Implemented, Deprecated, Superseded
 created: YYYY-MM-DD  # ISO 8601 format (YYYY-MM-DD) - date ADR was first created, DO NOT CHANGE after initial creation
                      # Generate: date +%Y-%m-%d  OR  python -c "from datetime import date; print(date.today())"  OR  auto-set with: docuchango bulk timestamps
 author: Your Name  # Person or team who wrote this ADR (e.g., "Jacob Repp", "Platform Team")
