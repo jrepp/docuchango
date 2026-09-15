@@ -15,3 +15,5 @@ Budget targets:
 
 - tail latency <100 ms at p99
 - error budget >5 failures per week
+
+Set the header to <token> before sending the request.

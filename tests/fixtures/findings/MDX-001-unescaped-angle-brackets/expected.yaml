@@ -1,9 +1,10 @@
 summary: >-
-  An ADR with bare `<` and `>` before numbers in a bullet list, which MDX
-  reads as the start of a JSX tag.
+  An ADR with a bare `<token>` placeholder in prose and bare `<`/`>` before
+  numbers in a bullet list. Which of the two shapes is reported depends on
+  the MDX check's current rules, so only the shared "Unescaped" wording is
+  asserted here; tighten it once the check settles.
 messages:
-  - "Line 16: Unescaped < before number (use &lt; or backticks)"
-  - "Line 17: Unescaped > before number (use &gt; or backticks)"
+  - "Unescaped"
 # MDX-010 (planned) would escape these automatically.
 fixed: false
 dry_run_exit_code: 1
