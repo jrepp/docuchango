@@ -178,7 +178,7 @@ git commit -m "Update ADR-015: Add OAuth2 refresh token handling"
 id: adr-043
 title: Updated Authentication Strategy
 status: Accepted
-date: 2025-10-27
+created: 2025-10-27
 supersedes: adr-015
 ---
 
@@ -215,8 +215,8 @@ superseded_by: adr-043
 ---
 id: adr-NNN
 title: Brief decision title
-status: Proposed | Accepted | Rejected | Superseded
-date: YYYY-MM-DD
+status: Proposed | Accepted | Implemented | Deprecated | Superseded
+created: YYYY-MM-DD
 tags: [architecture, decision, ...]
 project_id: project-name
 doc_uuid: uuid-v4
@@ -264,8 +264,8 @@ Why we didn't choose other options
 ---
 id: rfc-NNN
 title: Proposal title
-status: Draft | In Review | Approved | Rejected | Implemented
-date: YYYY-MM-DD
+status: Draft | Proposed | Accepted | Implemented | Deprecated | Superseded
+created: YYYY-MM-DD
 author: Your Name (or "Claude Code Agent")
 tags: [rfc, proposal, ...]
 project_id: project-name
@@ -315,7 +315,7 @@ Unresolved items
 ---
 id: memo-NNN
 title: Memo title
-date: YYYY-MM-DD
+created: YYYY-MM-DD
 author: Your Name (or "Claude Code Agent")
 tags: [memo, ...]
 project_id: project-name
