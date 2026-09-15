@@ -723,7 +723,10 @@ def bulk_update(
         operation = "rename"
 
     # Find files to process
-    root = target_path or Path.cwd()
+    # Discovered document paths are resolved (see docs-project.yaml driven
+    # discovery in _discover_doc_files), so root must be too or
+    # Path.relative_to raises for a relative or symlinked root.
+    root = (target_path or Path.cwd()).resolve()
 
     all_files = _filter_files_by_doc_type(_discover_doc_files(root), doc_type)
 
@@ -815,7 +818,10 @@ def bulk_timestamps(
     from docuchango.fixes.timestamps import update_document_timestamps
 
     # Find files to process
-    root = target_path or Path.cwd()
+    # Discovered document paths are resolved (see docs-project.yaml driven
+    # discovery in _discover_doc_files), so root must be too or
+    # Path.relative_to raises for a relative or symlinked root.
+    root = (target_path or Path.cwd()).resolve()
 
     all_files = _filter_files_by_doc_type(_discover_doc_files(root), doc_type)
 
@@ -916,7 +922,10 @@ def bulk_compress_ids(
     """
     from docuchango.fixes.id_compression import compress_document_ids
 
-    root = target_path or Path.cwd()
+    # Discovered document paths are resolved (see docs-project.yaml driven
+    # discovery in _discover_doc_files), so root must be too or
+    # Path.relative_to raises for a relative or symlinked root.
+    root = (target_path or Path.cwd()).resolve()
     discovered_files = _discover_doc_files(root)
     all_files = _filter_files_by_doc_type(discovered_files, doc_type)
 
@@ -1069,7 +1078,10 @@ def migrate(
     from docuchango.fixes.yaml_utils import dumps as frontmatter_dumps
 
     # Find files to process
-    root = target_path or Path.cwd()
+    # Discovered document paths are resolved (see docs-project.yaml driven
+    # discovery in _discover_doc_files), so root must be too or
+    # Path.relative_to raises for a relative or symlinked root.
+    root = (target_path or Path.cwd()).resolve()
 
     all_files = _filter_files_by_doc_type(_discover_doc_files(root), doc_type)
 

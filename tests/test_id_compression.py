@@ -175,3 +175,86 @@ def test_bulk_compress_ids_cli(tmp_path):
     assert result.exit_code == 0
     assert "Renumbered 1 document" in result.output
     assert (memos_dir / "memo-002-second.md").exists()
+
+
+def _write_docs_project_config(root, docs_root: str = ".") -> None:
+    (root / "docs-project.yaml").write_text(
+        f"""
+project:
+  id: repro
+  name: Repro
+structure:
+  docs_roots:
+    - "{docs_root}"
+  document_folders:
+    - memos
+""".strip(),
+        encoding="utf-8",
+    )
+
+
+def test_bulk_compress_ids_cli_relative_path_does_not_crash(tmp_path, monkeypatch):
+    """Regression test: a relative --path must not crash with Path.relative_to.
+
+    Bug: discovered files are resolved to absolute paths (docs-project.yaml
+    driven discovery always resolves), but the CLI compared them against the
+    unresolved --path the user typed, raising ValueError from relative_to.
+    """
+    memos_dir = tmp_path / "memos"
+    memos_dir.mkdir()
+    _write_docs_project_config(tmp_path)
+
+    _write_memo(memos_dir / "memo-001-first.md", "memo-001", "First Memo")
+    _write_memo(memos_dir / "memo-010-second.md", "memo-010", "Second Memo")
+
+    monkeypatch.chdir(tmp_path)
+
+    result = CliRunner().invoke(main, ["bulk", "compress-ids", "--path", ".", "--type", "memo", "--verbose"])
+
+    assert result.exit_code == 0, result.output
+    assert "Renumbered 1 document" in result.output
+    # Output should show paths relative to the (resolved) root, not raise or
+    # fall back to printing absolute paths.
+    assert "memos/memo-002-second.md" in result.output
+    assert str(tmp_path) not in result.output
+    assert (memos_dir / "memo-002-second.md").exists()
+
+
+def test_bulk_compress_ids_cli_relative_and_absolute_paths_agree(tmp_path, monkeypatch):
+    """A relative --path must produce the same result as the absolute form."""
+    memos_dir = tmp_path / "memos"
+    memos_dir.mkdir()
+    _write_docs_project_config(tmp_path)
+    _write_memo(memos_dir / "memo-001-first.md", "memo-001", "First Memo")
+    _write_memo(memos_dir / "memo-010-second.md", "memo-010", "Second Memo")
+
+    absolute_result = CliRunner().invoke(
+        main, ["bulk", "compress-ids", "--path", str(tmp_path), "--type", "memo", "--dry-run", "--verbose"]
+    )
+    assert absolute_result.exit_code == 0, absolute_result.output
+
+    monkeypatch.chdir(tmp_path)
+    relative_result = CliRunner().invoke(
+        main, ["bulk", "compress-ids", "--path", ".", "--type", "memo", "--dry-run", "--verbose"]
+    )
+    assert relative_result.exit_code == 0, relative_result.output
+    assert relative_result.output == absolute_result.output
+
+
+def test_bulk_compress_ids_cli_root_through_symlink(tmp_path):
+    """A root reached through a symlink (as macOS /tmp is) must resolve cleanly."""
+    real_root = tmp_path / "real"
+    memos_dir = real_root / "memos"
+    memos_dir.mkdir(parents=True)
+    _write_docs_project_config(real_root)
+    _write_memo(memos_dir / "memo-001-first.md", "memo-001", "First Memo")
+    _write_memo(memos_dir / "memo-010-second.md", "memo-010", "Second Memo")
+
+    symlink_root = tmp_path / "link"
+    symlink_root.symlink_to(real_root)
+
+    result = CliRunner().invoke(main, ["bulk", "compress-ids", "--path", str(symlink_root), "--type", "memo"])
+
+    assert result.exit_code == 0, result.output
+    assert "Renumbered 1 document" in result.output
+    assert (memos_dir / "memo-002-second.md").exists()
