@@ -11,6 +11,7 @@ from docuchango.fixes.whitespace import (
     normalize_empty_values,
     trim_string_values,
 )
+from docuchango.markdown import blank_line_runs, collapse_blank_lines
 
 
 class TestTrimStringValues:
@@ -657,3 +658,185 @@ custom: "  value  "
         # Required fields added
         assert "doc_uuid" in post.metadata
         assert "project_id" in post.metadata
+
+
+# A frontmatter block that needs no metadata repair at all, so that the only
+# thing `fix_whitespace_and_fields` can do to a document is collapse its blank
+# lines. Anything missing here would send the fixer down the re-serializing
+# path, where python-frontmatter rewrites the body's trailing whitespace too.
+COMPLETE_FRONTMATTER = """---
+id: adr-001
+title: "ADR-001: Blank Lines"
+status: Accepted
+created: 2026-01-02
+tags: [testing]
+project_id: fixture-project
+doc_uuid: 5c3a9f2e-1b7d-4f6a-9c21-0d8e4b6a7f31
+---
+"""
+
+
+class TestBlankLineCollapse:
+    """FMT-011: runs of more than two blank lines are collapsed to two.
+
+    FMT-002 reports exactly the runs this collapses, so every case here also
+    asserts that `blank_line_runs` -- the function `check_formatting` reports
+    from -- agrees with the fixer. A disagreement of one line would make the
+    default atomic run withhold every fix in the tree.
+    """
+
+    def _write(self, tmp_path, body: str):
+        doc = tmp_path / "adr" / "adr-001-blank-lines.md"
+        doc.parent.mkdir(parents=True, exist_ok=True)
+        doc.write_text(COMPLETE_FRONTMATTER + body, encoding="utf-8")
+        return doc
+
+    def test_collapses_a_run_to_two_blank_lines(self, tmp_path):
+        """A run of five blank lines becomes two, and is reported once."""
+        doc = self._write(tmp_path, "\n# Test\n\nFirst.\n\n\n\n\n\nSecond.\n")
+
+        changed, messages = fix_whitespace_and_fields(doc)
+
+        assert changed
+        assert messages == ["FMT-011: Collapsed 5 blank lines to 2 at line 14"]
+        assert doc.read_text(encoding="utf-8").endswith("First.\n\n\nSecond.\n")
+        assert blank_line_runs(doc.read_text(encoding="utf-8")) == []
+
+    def test_reports_each_run_separately(self, tmp_path):
+        """Two runs in one document are two messages, in file order."""
+        doc = self._write(tmp_path, "\n# Test\n\nA.\n\n\n\nB.\n\n\n\n\nC.\n")
+
+        _changed, messages = fix_whitespace_and_fields(doc)
+
+        assert messages == [
+            "FMT-011: Collapsed 3 blank lines to 2 at line 14",
+            "FMT-011: Collapsed 4 blank lines to 2 at line 18",
+        ]
+
+    def test_two_blank_lines_are_left_alone(self, tmp_path):
+        """Two blank lines are legal, so nothing is reported or rewritten."""
+        body = "\n# Test\n\nA.\n\n\nB.\n"
+        doc = self._write(tmp_path, body)
+        before = doc.read_bytes()
+
+        changed, messages = fix_whitespace_and_fields(doc)
+
+        assert not changed
+        assert messages == []
+        assert doc.read_bytes() == before
+
+    def test_dry_run_reports_without_writing(self, tmp_path):
+        """--dry-run names the run it would collapse and touches nothing."""
+        doc = self._write(tmp_path, "\n# Test\n\nA.\n\n\n\n\nB.\n")
+        before = doc.read_bytes()
+
+        changed, messages = fix_whitespace_and_fields(doc, dry_run=True)
+
+        assert changed
+        assert messages == ["FMT-011: Collapsed 4 blank lines to 2 at line 14"]
+        assert doc.read_bytes() == before
+
+    def test_blank_lines_inside_a_backtick_fence_are_content(self, tmp_path):
+        """A deliberate gap in sample output survives the fixer untouched."""
+        body = "\n# Test\n\n```text\nfirst\n\n\n\n\nlast\n```\n\nTail.\n"
+        doc = self._write(tmp_path, body)
+        before = doc.read_bytes()
+
+        changed, messages = fix_whitespace_and_fields(doc)
+
+        assert not changed
+        assert messages == []
+        assert doc.read_bytes() == before
+        assert blank_line_runs(before.decode()) == []
+
+    def test_blank_lines_inside_a_tilde_fence_are_content(self, tmp_path):
+        """Tilde fences are tracked the same way backtick fences are."""
+        body = "\n# Test\n\n~~~text\nfirst\n\n\n\nlast\n~~~\n\nTail.\n"
+        doc = self._write(tmp_path, body)
+        before = doc.read_bytes()
+
+        changed, messages = fix_whitespace_and_fields(doc)
+
+        assert not changed
+        assert messages == []
+        assert doc.read_bytes() == before
+
+    def test_a_run_outside_a_fence_is_still_collapsed(self, tmp_path):
+        """A fenced gap does not make the fixer give up on the rest of the file."""
+        body = "\n# Test\n\n```text\nfirst\n\n\n\nlast\n```\n\nTail.\n\n\n\n\nEnd.\n"
+        doc = self._write(tmp_path, body)
+
+        _changed, messages = fix_whitespace_and_fields(doc)
+
+        assert messages == ["FMT-011: Collapsed 4 blank lines to 2 at line 22"]
+        after = doc.read_text(encoding="utf-8")
+        assert "first\n\n\n\nlast" in after
+        assert after.endswith("Tail.\n\n\nEnd.\n")
+
+    def test_blank_lines_in_a_frontmatter_block_scalar_are_content(self, tmp_path):
+        """Blank lines inside YAML are part of the value, not formatting."""
+        doc = tmp_path / "adr" / "adr-001-block-scalar.md"
+        doc.parent.mkdir(parents=True, exist_ok=True)
+        content = (
+            "---\n"
+            "id: adr-001\n"
+            'title: "ADR-001: Block Scalar"\n'
+            "status: Accepted\n"
+            "created: 2026-01-02\n"
+            "tags: [testing]\n"
+            "project_id: fixture-project\n"
+            "doc_uuid: 5c3a9f2e-1b7d-4f6a-9c21-0d8e4b6a7f31\n"
+            "note: |\n"
+            "  first\n"
+            "\n"
+            "\n"
+            "\n"
+            "  last\n"
+            "---\n"
+            "\n# Test\n"
+        )
+        doc.write_text(content, encoding="utf-8")
+
+        assert blank_line_runs(content) == []
+        assert collapse_blank_lines(content) == (content, [])
+
+        _changed, messages = fix_whitespace_and_fields(doc)
+
+        # The value is trimmed (an unrelated, pre-existing fix), but the blank
+        # lines inside the scalar are part of it and survive.
+        assert not [m for m in messages if m.startswith("FMT-011")]
+        assert frontmatter.loads(doc.read_text(encoding="utf-8")).metadata["note"] == "first\n\n\n\nlast"
+
+    def test_trailing_blank_lines_at_eof_are_collapsed_like_any_other_run(self, tmp_path):
+        """A run at end of file is a run: it is collapsed, not stripped."""
+        doc = self._write(tmp_path, "\n# Test\n\nBody.\n\n\n\n\n")
+
+        _changed, messages = fix_whitespace_and_fields(doc)
+
+        assert messages == ["FMT-011: Collapsed 5 blank lines to 2 at line 14"]
+        # Two blank "lines" in the split sense: the file keeps one blank line
+        # and its final newline. Nothing else about the ending is normalized.
+        assert doc.read_text(encoding="utf-8").endswith("Body.\n\n")
+        assert blank_line_runs(doc.read_text(encoding="utf-8")) == []
+
+    def test_a_document_of_only_blank_lines_keeps_two(self, tmp_path):
+        """The degenerate case does not lose the file or loop."""
+        collapsed, runs = collapse_blank_lines("\n\n\n\n\n")
+
+        # Six blank "lines" in the split sense collapse to two, which is the
+        # one newline a file holding a single blank line has.
+        assert collapsed == "\n"
+        assert [(run.start_line, run.length) for run in runs] == [(1, 6)]
+
+    def test_second_run_is_a_no_op(self, tmp_path):
+        """The collapse is idempotent: two blank lines are already legal."""
+        doc = self._write(tmp_path, "\n# Test\n\nA.\n\n\n\n\nB.\n\n\n\nC.\n")
+
+        changed_first, messages_first = fix_whitespace_and_fields(doc)
+        after_first = doc.read_bytes()
+        changed_second, messages_second = fix_whitespace_and_fields(doc)
+
+        assert changed_first and messages_first
+        assert not changed_second
+        assert messages_second == []
+        assert doc.read_bytes() == after_first

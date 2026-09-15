@@ -76,6 +76,12 @@ except ImportError as e:
 
 
 from docuchango.config_paths import is_within_path, resolve_config_path
+from docuchango.markdown import (
+    blank_line_finding_message,
+    blank_line_runs,
+    fence_mask,
+    frontmatter_span,
+)
 from docuchango.text_io import (
     FMT_012_FINDING_MESSAGE,
     carriage_return_lines,
@@ -1238,58 +1244,15 @@ class DocValidator:
         compiled as MDX and its values must not be treated as prose.
         """
         lines = content.split("\n")
-        out: list[str] = []
 
         # Optionally mask a leading YAML frontmatter block.
-        start = 0
-        if strip_frontmatter and lines and lines[0].strip() == "---":
-            out.append("")
-            i = 1
-            while i < len(lines) and lines[i].strip() != "---":
-                out.append("")
-                i += 1
-            if i < len(lines):  # closing '---'
-                out.append("")
-                i += 1
-            start = i
+        start = frontmatter_span(lines) if strip_frontmatter else 0
+        out: list[str] = [""] * start
 
-        fence_re = re.compile(r"^(\s*)(`{3,}|~{3,})(.*)$")
-        fence_char: str | None = None
-        fence_len = 0
-        for line in lines[start:]:
-            m = fence_re.match(line)
-            if m:
-                marker = m.group(2)
-                rest = m.group(3)
-                char = marker[0]
-                length = len(marker)
-                if fence_char is None:
-                    # Opening fence. May carry an info string (e.g. ```go).
-                    # Backtick fences may not contain a backtick in the info
-                    # string; if they do, this is not a valid opening fence.
-                    if char == "`" and "`" in rest:
-                        out.append(line)
-                        continue
-                    fence_char = char
-                    fence_len = length
-                    out.append("")
-                    continue
-                # A closing fence must use the same character, be at least as
-                # long, and (per CommonMark) carry no info string - only
-                # trailing whitespace is allowed.
-                if char == fence_char and length >= fence_len and rest.strip() == "":
-                    fence_char = None
-                    fence_len = 0
-                    out.append("")
-                    continue
-                # Anything else inside a block (a shorter/other fence, or a
-                # fence with an info string like ```go) is just content.
-                out.append("")
-                continue
-            if fence_char is not None:
-                out.append("")
-            else:
-                out.append(line)
+        # Fence tracking is shared with the blank-line helpers, so FMT-002 and
+        # FMT-011 agree with the prose checks about where code begins and ends.
+        for line, masked in zip(lines[start:], fence_mask(lines[start:]), strict=True):
+            out.append("" if masked else line)
 
         # Now mask inline code spans across the (non-fenced) joined text so that
         # spans spanning multiple lines are handled. We rebuild line by line.
@@ -1961,15 +1924,15 @@ class DocValidator:
                     if line.rstrip() != line:
                         doc.errors.append(f"Line {line_num}: Trailing whitespace")
 
-                # Check for multiple blank lines
-                blank_count = 0
-                for line_num, line in enumerate(lines, start=1):
-                    if not line.strip():
-                        blank_count += 1
-                        if blank_count > 2:
-                            doc.errors.append(f"Line {line_num}: More than 2 consecutive blank lines")
-                    else:
-                        blank_count = 0
+                # FMT-002: runs of more than two blank lines, one finding per
+                # line past the second so the numbers line up with FMT-001.
+                # Blank lines inside a code fence or the frontmatter block are
+                # content, not formatting, and are neither reported here nor
+                # collapsed by FMT-011 - the two share `blank_line_runs` so a
+                # fixing run cannot leave a finding the fixer thinks it fixed.
+                for run in blank_line_runs(content):
+                    for line_num in run.excess_lines:
+                        doc.errors.append(blank_line_finding_message(line_num))
 
             except Exception as e:
                 doc.errors.append(f"Error checking formatting: {e}")

@@ -18,6 +18,7 @@ import frontmatter
 from docuchango.fixes.tags import normalize_tag
 from docuchango.fixes.whitespace import ensure_required_fields, normalize_empty_values, trim_string_values
 from docuchango.fixes.yaml_utils import dumps as frontmatter_dumps
+from docuchango.markdown import blank_line_fix_message, collapse_blank_lines
 from docuchango.text_io import (
     FMT_012_FIX_MESSAGE,
     carriage_return_lines,
@@ -300,7 +301,11 @@ def fix_date_format(file_path: Path, dry_run: bool = False) -> tuple[bool, str]:
 
 
 def add_missing_frontmatter(
-    file_path: Path, dry_run: bool = False, schema: str | None = None, project_id: str | None = None
+    file_path: Path,
+    dry_run: bool = False,
+    schema: str | None = None,
+    project_id: str | None = None,
+    content: str | None = None,
 ) -> tuple[bool, str]:
     """Add missing frontmatter block to a document.
 
@@ -311,12 +316,16 @@ def add_missing_frontmatter(
         project_id: ``project.id`` of the config that governs this file, used
             for the generated ``project_id`` (FM-010). Falls back to the
             ``my-project`` placeholder when no single config governs it.
+        content: The document text to prepend the block to, when the caller has
+            already read and repaired it (FMT-011 collapses blank lines before
+            the frontmatter block is generated). Read from disk when omitted.
 
     Returns:
         Tuple of (changed, message)
     """
     try:
-        content = read_text(file_path)
+        if content is None:
+            content = read_text(file_path)
 
         # Check if frontmatter already exists
         if content.strip().startswith("---"):
@@ -626,6 +635,11 @@ def fix_frontmatter_metadata(
     except Exception as e:
         return False, [f"Error reading file: {e}"]
 
+    # FMT-011: collapse runs of blank lines before parsing, so the line numbers
+    # in the messages are the ones FMT-002 reported for the file on disk and
+    # both the re-serialized and the verbatim write below carry the repair.
+    content, blank_runs = collapse_blank_lines(content)
+
     try:
         post = frontmatter.loads(content)
     except Exception as e:
@@ -641,12 +655,17 @@ def fix_frontmatter_metadata(
     if crlf_findings:
         messages.append(line_ending_fix_message(crlf_findings))
 
-    # A BOM or a carriage return is repaired by rewriting the file at all,
-    # because `content` is already BOM-free and universal-newline normalized.
-    rewrite_only = bom_removed or bool(crlf_findings)
+    messages.extend(blank_line_fix_message(run) for run in blank_runs)
+
+    # A BOM, a carriage return or a collapsed blank-line run is repaired by
+    # rewriting the file at all, because `content` is already BOM-free,
+    # universal-newline normalized and collapsed.
+    rewrite_only = bom_removed or bool(crlf_findings) or bool(blank_runs)
 
     if not post.metadata:
-        changed, message = add_missing_frontmatter(file_path, dry_run=dry_run, schema=schema, project_id=project_id)
+        changed, message = add_missing_frontmatter(
+            file_path, dry_run=dry_run, schema=schema, project_id=project_id, content=content
+        )
         if changed:
             messages.append(message)
         elif rewrite_only and not dry_run:

@@ -1,0 +1,12 @@
+summary: >-
+  An ADR whose only runs of blank lines are inside a backtick and a tilde code
+  fence. A gap in sample output is content, so neither FMT-002 reports it nor
+  FMT-011 collapses it, and the document validates clean.
+messages: []
+fixed: false
+fix_messages: []
+forbidden:
+  - "More than 2 consecutive blank lines"
+  - "FMT-011: Collapsed"
+dry_run_exit_code: 0
+exit_code: 0
