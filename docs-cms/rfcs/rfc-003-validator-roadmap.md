@@ -74,12 +74,12 @@ reported.
 | FM-006 | Recognized non-ISO date formats normalized | Implemented | fix | `fixes/frontmatter.py` |
 | FM-010 | `project_id` does not match `project.id` of the governing config | Planned | fix/report | see below |
 | FM-011 | `created` or `updated` is not an ISO 8601 date or datetime | Planned | report | see below |
-| ID-001 | Top-level filename does not match the configured pattern (files in subfolders are support material and are not scanned) | Implemented | report | `check_ids`, `_scan_document_folder` |
+| ID-001 | Top-level filename does not match the configured pattern (files in subfolders are support material and are not scanned, unless `structure.scan_subfolders` or a per-type override enables ID-011) | Implemented | report | `check_ids`, `_scan_document_folder` |
 | ID-002 | `id` does not match the filename; an ADR amendment `adr-NNN-amendment-MM-*` is expected to carry id `adr-NNN-aMM` | Implemented | report | `check_ids`, `_scan_document_folder` |
 | ID-003 | `id` does not match the number in the title | Implemented | report | `check_ids` |
 | ID-004 | Duplicate `id` across documents | Implemented | report | `check_ids` |
 | ID-010 | Gap or non-contiguous numbering within a document type | Planned | report | see below |
-| ID-011 | Validate numbered documents nested in subfolders of a document folder, opt-in via `structure.doc_types.<type>.recursive: true` | Planned | report | see below |
+| ID-011 | Validate numbered documents nested in subfolders of a document folder, opt-in via `structure.scan_subfolders` (and per-type via `structure.doc_types.<type>.scan_subfolders`) | Implemented | report | `scan_documents`, `_build_scan_entries`, `_scan_document_folder`, `schemas.py` (`DocsProjectStructure.scan_subfolders`, `DocTypeConfig.scan_subfolders`) |
 | LNK-001 | Broken internal link, including bare relative, suffix-less and directory targets | Implemented | report | `validate_links`, `_resolve_link_target` |
 | LNK-002 | Link that resolves outside the repository root, reported once per link with line number and target | Implemented | report | `check_cross_plugin_links` |
 | LNK-010 | Rewrite a broken internal link when the target exists elsewhere | Planned | fix | see below |
@@ -97,6 +97,16 @@ reported.
 | RD-001 | Paragraph outside the configured readability thresholds | Implemented | report | `check_readability` |
 | BLD-001 | TypeScript config error | Implemented | report | `check_typescript_config` |
 | BLD-002 | Docusaurus build error | Implemented | report | `check_docusaurus_build` |
+
+**ID-011 Nested documents (shipped).** Documents inside subfolders of a
+document folder (`adr/archive/`, `rfcs/2024/`) were treated as support
+material and not scanned at all, so a duplicate `doc_uuid`, a mismatched `id`
+or a broken link in one of them was never reported. `structure.scan_subfolders`
+(default `false`, preserving the old behavior) now opts a whole layout into
+scanning nested files with the same id/uuid/link/filename rules as top-level
+files, matched against the file name and not the subfolder path.
+`structure.doc_types.<type>.scan_subfolders` overrides the structure default
+for one document type. Report only.
 
 ### Planned validators
 
@@ -121,13 +131,6 @@ and report the missing numbers between the lowest and highest. Report only,
 and mention `docuchango bulk compress-ids` in the message. Gaps are common
 and often deliberate after a deleted proposal, so this should be opt-in via
 `structure.doc_types.<type>.report_numbering_gaps: true` and default to off.
-
-**ID-011 Nested documents.** Documents inside subfolders of a document
-folder (`adr/archive/`, `rfcs/2024/`) are treated as support material and
-not scanned at all, so a duplicate `doc_uuid`, a mismatched `id` or a broken
-link in one of them is never reported. An opt-in
-`structure.doc_types.<type>.recursive: true` would scan them with the same
-rules as top-level files. Report only.
 
 **MDX-011 Indented code blocks.** `_mask_code` masks fenced blocks and
 inline spans before the prose checks run, but not 4-space indented code

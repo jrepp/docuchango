@@ -1,0 +1,11 @@
+summary: >-
+  The same nested adr/archive/adr-005-old.md as ID-011-nested-scanned, but
+  with structure.scan_subfolders left at its default (false): the nested
+  file is treated as support material and produces no findings.
+messages: []
+forbidden:
+  - "ID mismatch: frontmatter has 'adr-099' but filename suggests 'adr-005'"
+  - "Duplicate UUID '66666666-6666-4666-8666-666666666666'"
+fixed: false
+dry_run_exit_code: 0
+exit_code: 0

@@ -1094,3 +1094,111 @@ doc_uuid: 11111111-1111-4111-8111-111111111111
             assert "Fix the config or remove it from subprojects" in output
             assert [context.config.project.id for context in validator.project_configs] == ["parent-project"]
             assert [doc.file_path.name for doc in validator.documents] == ["adr-001-parent-decision.md"]
+
+    def test_scan_subfolders_default_skips_nested_file(self):
+        """By default, a file nested under a document folder is not scanned."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            docs_cms = repo_root / "docs-cms"
+            adr_dir = docs_cms / "adr"
+            archive_dir = adr_dir / "archive"
+            archive_dir.mkdir(parents=True)
+
+            (docs_cms / "docs-project.yaml").write_text(
+                yaml.dump(
+                    {
+                        "project": {"id": "nested-project", "name": "Nested Project"},
+                        "structure": {"document_folders": ["adr"]},
+                    }
+                )
+            )
+            write_valid_adr(archive_dir / "adr-002-old.md", project_id="nested-project", adr_id="adr-002")
+
+            validator = DocValidator(repo_root, verbose=False)
+            validator.scan_documents()
+
+            assert [doc.file_path.name for doc in validator.documents] == []
+
+    def test_scan_subfolders_structure_level_enables_nested_file(self):
+        """structure.scan_subfolders: true scans nested files with the standard layout."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            docs_cms = repo_root / "docs-cms"
+            adr_dir = docs_cms / "adr"
+            archive_dir = adr_dir / "archive"
+            archive_dir.mkdir(parents=True)
+
+            (docs_cms / "docs-project.yaml").write_text(
+                yaml.dump(
+                    {
+                        "project": {"id": "nested-project", "name": "Nested Project"},
+                        "structure": {"document_folders": ["adr"], "scan_subfolders": True},
+                    }
+                )
+            )
+            write_valid_adr(archive_dir / "adr-002-old.md", project_id="nested-project", adr_id="adr-002")
+
+            validator = DocValidator(repo_root, verbose=False)
+            validator.scan_documents()
+
+            assert [doc.file_path.name for doc in validator.documents] == ["adr-002-old.md"]
+
+    def test_scan_subfolders_per_type_override_wins_over_structure_default(self):
+        """A doc_types.<type>.scan_subfolders override wins over the structure default."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            docs_cms = repo_root / "docs-cms"
+            adr_dir = docs_cms / "adr"
+            rfc_dir = docs_cms / "rfcs"
+            (adr_dir / "archive").mkdir(parents=True)
+            (rfc_dir / "archive").mkdir(parents=True)
+
+            (docs_cms / "docs-project.yaml").write_text(
+                yaml.dump(
+                    {
+                        "project": {"id": "override-project", "name": "Override Project"},
+                        "structure": {
+                            "scan_subfolders": False,
+                            "doc_types": {
+                                "adr": {
+                                    "schema": "adr",
+                                    "folders": ["adr"],
+                                    "filename_pattern": r"^(adr)-(\d{3})-(.+)\.md$",
+                                    "scan_subfolders": True,
+                                },
+                                "rfc": {
+                                    "schema": "rfc",
+                                    "folders": ["rfcs"],
+                                    "filename_pattern": r"^(rfc)-(\d{3})-(.+)\.md$",
+                                },
+                            },
+                        },
+                    }
+                )
+            )
+            write_valid_adr(adr_dir / "archive" / "adr-002-old.md", project_id="override-project", adr_id="adr-002")
+            (rfc_dir / "archive" / "rfc-002-old.md").write_text(
+                """---
+title: Archived RFC Nested Below rfcs
+status: Accepted
+author: Team
+created: 2025-01-01
+tags: [testing]
+id: rfc-002
+project_id: override-project
+doc_uuid: 22222222-2222-4222-8222-222222222222
+---
+
+# Archived RFC
+"""
+            )
+
+            validator = DocValidator(repo_root, verbose=False)
+            validator.scan_documents()
+
+            doc_names = {doc.file_path.name for doc in validator.documents}
+            # The per-type override enables nested scanning for ADRs only; RFC
+            # has no override, so it defers to the structure-level default
+            # (false) and its nested file is skipped.
+            assert "adr-002-old.md" in doc_names
+            assert "rfc-002-old.md" not in doc_names

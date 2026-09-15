@@ -148,11 +148,16 @@ wrap the text in backticks, then validate again.
 - Names that do not match `type-NNN-slug.md` or the configured pattern,
   unless `enforce_filename_pattern: false` is set for that folder
 
-Only files directly inside a document folder are treated as documents. A file
-in a subfolder (`prd/testing/notes.md`, `memos/private/draft.md`) is support
-material: it is skipped, not validated and not renamed. An ADR amendment
-(`adr-043-amendment-01-cap.md`) is expected to carry the amendment id
-`adr-043-a1`.
+By default, only files directly inside a document folder are treated as
+documents. A file in a subfolder (`prd/testing/notes.md`,
+`memos/private/draft.md`) is support material: it is skipped, not validated
+and not renamed. Set `structure.scan_subfolders: true` (or the per-type
+`structure.doc_types.<type>.scan_subfolders` override) to scan nested files
+with the same rules as top-level ones; the filename pattern and expected id
+are still matched against the file name, not the subfolder path. See
+[Configuring docuchango](CONFIGURATION.md#scanning-nested-subfolders). An ADR
+amendment (`adr-043-amendment-01-cap.md`) is expected to carry the amendment
+id `adr-043-a1`, in a subfolder or not.
 
 There is no gap or sequence check: a jump from `adr-004` to `adr-009` is not
 reported. Filename problems are always left to you, because renaming can break

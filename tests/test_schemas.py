@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from docuchango.schemas import (
     ADRFrontmatter,
     DocsProjectConfig,
+    DocTypeConfig,
     GenericDocFrontmatter,
     MemoFrontmatter,
     PRDFrontmatter,
@@ -512,3 +513,60 @@ class TestDocsProjectConfig:
         assert config.structure.memo_dir == "notes"
         assert config.structure.prd_dir == "requirements"
         assert config.structure.document_folders == ["decisions", "proposals", "requirements"]
+
+
+class TestScanSubfolders:
+    """Test structure.scan_subfolders and its per-type override."""
+
+    def test_scan_subfolders_defaults_to_false(self):
+        """The structure-level default preserves the historical behavior."""
+        config = DocsProjectConfig(
+            project={"id": "default-project", "name": "Default Project"},
+        )
+        assert config.structure.scan_subfolders is False
+
+    def test_scan_subfolders_can_be_enabled_at_structure_level(self):
+        """The structure-level flag applies to the standard adr/rfc/memo/prd layout."""
+        config = DocsProjectConfig(
+            project={"id": "nested-project", "name": "Nested Project"},
+            structure={"scan_subfolders": True},
+        )
+        assert config.structure.scan_subfolders is True
+
+    def test_doc_type_scan_subfolders_defaults_to_none(self):
+        """A doc_types entry defaults to unset, so it defers to the structure default."""
+        cfg = DocTypeConfig(folders=["adr"])
+        assert cfg.scan_subfolders is None
+
+    def test_doc_type_scan_subfolders_overrides_structure_default(self):
+        """A per-type override wins over the structure-level default when set."""
+        config = DocsProjectConfig(
+            project={"id": "override-project", "name": "Override Project"},
+            structure={
+                "scan_subfolders": False,
+                "doc_types": {
+                    "adr": {"schema": "adr", "folders": ["adr"], "scan_subfolders": True},
+                    "rfc": {"schema": "rfc", "folders": ["rfcs"]},
+                },
+            },
+        )
+        assert config.structure.scan_subfolders is False
+        assert config.structure.doc_types is not None
+        assert config.structure.doc_types["adr"].scan_subfolders is True
+        # No override set: this type defers to the structure-level default.
+        assert config.structure.doc_types["rfc"].scan_subfolders is None
+
+    def test_doc_type_scan_subfolders_can_disable_when_structure_enables(self):
+        """A per-type override of False also wins, even when the structure default is True."""
+        config = DocsProjectConfig(
+            project={"id": "mixed-project", "name": "Mixed Project"},
+            structure={
+                "scan_subfolders": True,
+                "doc_types": {
+                    "adr": {"schema": "adr", "folders": ["adr"], "scan_subfolders": False},
+                },
+            },
+        )
+        assert config.structure.scan_subfolders is True
+        assert config.structure.doc_types is not None
+        assert config.structure.doc_types["adr"].scan_subfolders is False

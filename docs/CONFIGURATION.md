@@ -66,6 +66,39 @@ structure:
 Each root is scanned for the same `doc_types` folders. To scan roots that
 should not share one set of folders and rules, use `subprojects` instead.
 
+## Scanning nested subfolders
+
+By default, only files directly inside a document folder (`adr/`, `rfcs/`,
+`memos/`, `prd/`, or a `doc_types` folder) are treated as numbered documents.
+A file nested one level deeper, such as `adr/archive/adr-005-old.md` or
+`rfcs/2024/rfc-012-legacy.md`, is treated as support material: it is not
+checked against the filename pattern, its `id` and `doc_uuid` are not
+checked, and its links are not validated.
+
+Set `structure.scan_subfolders: true` to scan nested files with the same
+rules as top-level files. The filename pattern and the expected `id` are
+still matched against the file name only, not the subfolder path, so
+`adr/archive/adr-005-old.md` is still expected to carry `id: adr-005`.
+
+```yaml
+structure:
+  scan_subfolders: true
+```
+
+The default is `false`, which keeps the historical behavior. A `doc_types`
+entry can override the structure-level default for just that type with its
+own `scan_subfolders: true` or `scan_subfolders: false`:
+
+```yaml
+structure:
+  scan_subfolders: false
+  doc_types:
+    adr:
+      schema: adr
+      folders: [adr]
+      scan_subfolders: true  # only ADRs scan their subfolders
+```
+
 ## Sub-projects
 
 Rather than one large root config, a parent can include configs that belong
@@ -134,6 +167,7 @@ structure:
 | `enforce_filename_pattern` | Report a mismatch as an error (`true`) or ignore it (`false`). |
 | `require_frontmatter` | Set `false` to allow plain Markdown files with no frontmatter block - but only for `schema: generic`. An `adr`, `rfc`, `memo` or `prd` lane still reports a missing block regardless of this setting. |
 | `naming_standard` | A named filename rule instead of `filename_pattern`; see below. |
+| `scan_subfolders` | Overrides `structure.scan_subfolders` for this type. Leave unset to use the structure-level default. |
 
 ## Naming standards
 

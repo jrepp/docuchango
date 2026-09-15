@@ -72,6 +72,14 @@ class DocTypeConfig(BaseModel):
         default=None,
         description="Named naming standard to apply to document names (e.g., 'kebab-case', 'snake_case', 'date-numeric'). Overrides filename_pattern if both are set.",
     )
+    scan_subfolders: bool | None = Field(
+        default=None,
+        description=(
+            "Whether Markdown files nested in subfolders of this type's folders are scanned with the "
+            "same id/uuid/link/filename rules as top-level files. Overrides structure.scan_subfolders "
+            "for this document type when set; leave unset to use the structure-level default."
+        ),
+    )
     model_config = ConfigDict(populate_by_name=True)
 
     frontmatter_schema: Literal["adr", "rfc", "memo", "prd", "generic"] = Field(
@@ -115,6 +123,16 @@ class DocsProjectStructure(BaseModel):
     docs_roots: list[str] = Field(
         default_factory=lambda: ["."],
         description="Optional list of roots (relative to the config file directory) to scan for folders. Useful for monorepos.",
+    )
+    scan_subfolders: bool = Field(
+        default=False,
+        description=(
+            "Whether Markdown files nested in subfolders of adr_dir/rfc_dir/memo_dir/prd_dir (and of "
+            "any doc_types folder that does not set its own scan_subfolders) are scanned with the same "
+            "id/uuid/link/filename rules as top-level files. Default: false, so nested files (for "
+            "example adr/archive/ or rfcs/2024/) are treated as support material and skipped, matching "
+            "the historical behavior."
+        ),
     )
     doc_types: dict[str, DocTypeConfig] | None = Field(
         default=None,
