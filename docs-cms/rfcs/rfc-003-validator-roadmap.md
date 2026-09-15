@@ -79,7 +79,7 @@ reported.
 | ID-003 | `id` does not match the number in the title | Implemented | report | `check_ids` |
 | ID-004 | Duplicate `id` across documents | Implemented | report | `check_ids` |
 | ID-010 | Gap or non-contiguous numbering within a document type | Planned | report | see below |
-| ID-011 | Validate numbered documents nested in subfolders of a document folder, opt-in via `structure.doc_types.<type>.recursive: true` | Planned | report | see below |
+| ID-011 | Validate numbered documents nested in subfolders of a document folder, opt-in via `structure.scan_subfolders` (and per-type via `structure.doc_types.<type>.scan_subfolders`) | Implemented | report | `scan_documents`, `_build_scan_entries`, `_scan_document_folder`, `schemas.py` (`DocsProjectStructure.scan_subfolders`, `DocTypeConfig.scan_subfolders`) |
 | LNK-001 | Broken internal link, including bare relative, suffix-less and directory targets | Implemented | report | `validate_links`, `_resolve_link_target` |
 | LNK-002 | Link that resolves outside the repository root, reported once per link with line number and target | Implemented | report | `check_cross_plugin_links` |
 | LNK-010 | Rewrite a broken internal link when the target exists elsewhere | Planned | fix | see below |

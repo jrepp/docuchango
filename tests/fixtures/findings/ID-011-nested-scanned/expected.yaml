@@ -1,0 +1,10 @@
+summary: >-
+  With structure.scan_subfolders enabled, a nested adr/archive/adr-005-old.md
+  is scanned like a top-level document: its id does not match its filename,
+  and it duplicates the doc_uuid of the top-level adr-005-original.md.
+messages:
+  - "ID mismatch: frontmatter has 'adr-099' but filename suggests 'adr-005'"
+  - "Duplicate UUID '66666666-6666-4666-8666-666666666666'"
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1

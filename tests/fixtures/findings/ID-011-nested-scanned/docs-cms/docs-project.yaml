@@ -1,0 +1,18 @@
+version: "1"
+project:
+  id: fixture-project
+  name: Fixture Project
+  description: Synthetic project used by the finding regression fixtures
+structure:
+  adr_dir: adr
+  rfc_dir: rfcs
+  memo_dir: memos
+  document_folders:
+    - adr
+    - rfcs
+    - memos
+  scan_subfolders: true
+security:
+  allow_external_paths: false
+readability:
+  enabled: false
