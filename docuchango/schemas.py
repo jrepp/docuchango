@@ -128,7 +128,7 @@ class DocsProjectStructure(BaseModel):
         description=(
             "Named naming standards that can be referenced by doc_types. "
             "Keys are standard names (e.g., 'kebab-case', 'snake_case'), values are regex patterns. "
-            "Example: {'kebab-case': '^[a-z0-9]+(-[a-z0-9]+)*\\.md$', 'date-numeric': '^\\d{4}-\\d{2}-\\d{2}-.+$"
+            "Example: {'kebab-case': '^[a-z0-9]+(-[a-z0-9]+)*\\.md$', 'date-numeric': '^\\d{4}-\\d{2}-\\d{2}-.+$'}"
         ),
     )
 
