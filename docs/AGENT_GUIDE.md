@@ -10,7 +10,11 @@ a template, in the draft state for its type unless a human has approved it:
 `status: Proposed` for an ADR, `status: Draft` for an RFC or PRD, and no
 `status` field at all for a memo. Run `docuchango validate --dry-run`, then
 `docuchango validate`, before you commit, and report anything it could not
-fix. The rest of this guide is detail on how to do each of those well.
+fix. `validate` is atomic: if any issue remains after fixing, it withholds
+every fix from that run and leaves your tree untouched rather than writing
+some of them, so a failing run never mixes an unrelated fix into your
+change. Those withheld fixes land once you resolve the issues it reports.
+The rest of this guide is detail on how to do each of those well.
 
 ## Core Principle: Trust the CMS
 

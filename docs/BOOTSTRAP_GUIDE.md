@@ -116,6 +116,13 @@ issues in the dry run, even though the second command fixes them silently.
 Anything left in the report after a real run, such as an `id` that does not
 match its filename or a broken link, needs a person.
 
+The second command is atomic by default: if anything is still wrong once
+fixing finishes, every fix from that run is withheld and your files are left
+exactly as they were, listed in the report as "withheld" instead of
+"applied". Fix the reported issue and run `docuchango validate` again to get
+both the withheld fixes and a clean pass. Pass `--no-atomic` if you want the
+fixable parts written immediately, issues or not.
+
 ### 6. Tell your agents
 
 Create `AGENTS.md` at the repository root so coding agents treat `docs-cms/`

@@ -4,6 +4,13 @@ Everything `docuchango validate` checks, grouped by area. Each area lists
 what is detected, what is repaired automatically when you run without
 `--dry-run`, and what is reported for a person to fix.
 
+A fixing run is atomic by default. If any issue remains once fixing
+finishes, every fix from that run is withheld and the tree is left exactly
+as it was before the run started. The report still lists what would have
+changed, so "repaired automatically" below means what the run would write if
+nothing else were wrong, not a guarantee that this run wrote it. Pass
+`--no-atomic` to keep partial fixes on disk even when other issues remain.
+
 Checks that are planned but not yet built, and the finding ID assigned to
 every check, are tracked in the
 [validator roadmap](../docs-cms/rfcs/rfc-003-validator-roadmap.md).
@@ -198,7 +205,7 @@ and in CI jobs that do not have Node installed.
 | Code | Meaning |
 |------|---------|
 | 0 | Every document valid, or every issue fixed |
-| 1 | Issues remain after the fixes for this run were applied (or, in `--dry-run`, simulated) |
+| 1 | Issues remain after the fixes for this run were applied (or, in `--dry-run`, simulated); under the default atomic run, the fixes this run would have made were withheld and the tree is untouched |
 | 2 | The run itself failed: the validator could not be imported or raised, or the command line was wrong (a bad `--repo-root`, an unknown option) |
 
 Treat 2 as "docuchango could not tell you anything", not as a documentation
@@ -212,3 +219,11 @@ parseable `created` string, is proposed as a normalization without causing a
 failing exit code either way. `--dry-run` never writes to the working tree,
 so use it in CI to fail the build on whatever would still be wrong afterwards
 - not as a guarantee that every fixable issue also fails the build.
+
+Exit code 1 from a plain `validate` run also means nothing was written, as
+long as the run stayed atomic (the default). If any issue remains after
+fixing, `validate` restores every file its fixers touched during that run
+before it reports, so a failing run cannot leave a half-fixed document in
+your working tree. Run again once the reported issues are resolved and the
+withheld fixes land with them, or pass `--no-atomic` to keep the partial
+fixes on disk right away.
