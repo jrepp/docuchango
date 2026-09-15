@@ -45,13 +45,29 @@ summary: One or two sentences on what the documents do wrong.
 messages:
   - "Frontmatter field 'status'"
 
-# Does `validate` without --dry-run repair the finding?
-#   true  -> the messages above must be gone from the second run's output
+# Does `validate` without --dry-run write the fix to disk, so the messages
+# above are gone from the fixing run's output?
+#   true  -> the messages above must be gone from the fixing run's output
 #   false -> they must still be reported
+#
+# `fixed` means "written", not "fixable". `validate` is atomic by default: if
+# any issue remains after fixing, every fix from that run is withheld and the
+# tree is left untouched, even for findings the fixer knows how to repair. So
+# a fixture that pairs one fixable finding with one `validate` cannot fix
+# needs `fixed: false` under the default atomic run, because the fix is
+# withheld, not written. Add `atomic: false` alongside `fixed: true` only when
+# the case is specifically about the withheld fix landing once atomicity is
+# turned off; that runs the fixing pass with --no-atomic instead.
 fixed: false
 
-# Substrings expected in the "Fixes applied" section. Only useful when
-# `fixed: true`.
+# Run the fixing pass with `--no-atomic` instead of the default atomic run.
+# Only useful together with `fixed: true` on a fixture that combines a
+# fixable and an unfixable finding; leave it out otherwise.
+atomic: true
+
+# Substrings expected in the "Fixes applied" (or "Fixes withheld", under the
+# default atomic run when issues remain) section. Only useful when
+# `fixed: true`, or to check the withheld-fix wording when `fixed: false`.
 fix_messages: []
 
 # Substrings that must NOT appear in the --dry-run output. Use this to pin
