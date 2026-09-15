@@ -434,6 +434,7 @@ def validate(
         validator.extract_links()
         validator.validate_links()
         validator.check_project_ids()
+        validator.check_date_formats()
         validator.check_ids()
         validator.check_uuids()
         validator.check_code_blocks()

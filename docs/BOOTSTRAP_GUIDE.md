@@ -210,7 +210,7 @@ Every type requires:
 |-------|------|
 | `id` | Lowercase `type-NNN`, must match the filename prefix |
 | `title` | Plain title without the id |
-| `created` | ISO 8601 date or timestamp; a handful of other formats are recognized and normalized, anything else is accepted as-is (strict rejection is planned, see the [validator roadmap](../docs-cms/rfcs/rfc-003-validator-roadmap.md)) |
+| `created` | `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM:SSZ`; a handful of other formats are recognized and normalized to the first of those, and anything else is reported as `FM-011` (see the [validation reference](VALIDATION_REFERENCE.md)) |
 | `tags` | List of lowercase, hyphenated tags; defaults to `[]` and is filled in automatically if missing |
 | `project_id` | The `project.id` of the config that governs the document; `validate` reports a mismatch as `FM-010` and fills in an empty or `my-project` placeholder |
 | `doc_uuid` | UUID v4, generated once and never changed |
