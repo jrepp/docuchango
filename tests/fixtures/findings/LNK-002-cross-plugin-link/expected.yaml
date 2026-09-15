@@ -1,6 +1,8 @@
-summary: An ADR with a relative link that climbs out of the docs root.
+summary: >-
+  An ADR with a relative link that climbs out of the repository root. The
+  same link is also reported as broken (LNK-001), since it cannot resolve.
 messages:
-  - "Found 1 cross-plugin link(s) - use absolute GitHub URLs instead"
+  - "Line 14: Link '../../../../other-plugin/docs/intro.md' points outside the repository"
 # LNK-011 (planned) would rewrite these to absolute repository URLs.
 fixed: false
 dry_run_exit_code: 1

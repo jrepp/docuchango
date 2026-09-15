@@ -3,7 +3,7 @@ summary: >-
   the per-type Pydantic model rejects the frontmatter.
 messages:
   - "Frontmatter field 'status'"
-  - "Input should be 'Proposed', 'Accepted', 'Implemented', 'Deprecated' or 'Superseded'"
+  - "Input should be 'Proposed', 'Accepted', 'Rejected', 'Implemented', 'Deprecated' or 'Superseded'"
 # fixes/frontmatter.py only rewrites values it recognises as aliases of a legal
 # status. An unrecognised value such as "Bogus" stays a report.
 fixed: false

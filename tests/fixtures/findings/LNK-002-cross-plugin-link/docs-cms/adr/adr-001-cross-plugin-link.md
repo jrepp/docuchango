@@ -11,4 +11,4 @@ doc_uuid: eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee
 
 # ADR-001: Cross Plugin Relative Link
 
-See [the other plugin](../../other-plugin/docs/intro.md) for background.
+See [the other plugin](../../../../other-plugin/docs/intro.md) for background.
