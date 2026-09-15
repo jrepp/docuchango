@@ -4,6 +4,10 @@ Everything `docuchango validate` checks, grouped by area. Each area lists
 what is detected, what is repaired automatically when you run without
 `--dry-run`, and what is reported for a person to fix.
 
+Checks that are planned but not yet built, and the finding ID assigned to
+every check, are tracked in the
+[validator roadmap](../docs-cms/rfcs/rfc-003-validator-roadmap.md).
+
 ## Frontmatter
 
 **Detected**
