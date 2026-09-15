@@ -1,8 +1,12 @@
-summary: An ADR with four consecutive blank lines between two paragraphs.
+summary: >-
+  An ADR with four consecutive blank lines between two paragraphs. FMT-002 is
+  the report; FMT-011 is the repair, so a fixing run collapses the run to two
+  and the finding is gone.
 messages:
-  - "Line 17: More than 2 consecutive blank lines"
-  - "Line 18: More than 2 consecutive blank lines"
-# FMT-011 (planned) would collapse these runs; today the check only reports.
-fixed: false
+  - "FMT-002: Line 17: More than 2 consecutive blank lines"
+  - "FMT-002: Line 18: More than 2 consecutive blank lines"
+fixed: true
+fix_messages:
+  - "FMT-011: Collapsed 4 blank lines to 2 at line 15"
 dry_run_exit_code: 1
-exit_code: 1
+exit_code: 0

@@ -1,0 +1,19 @@
+summary: >-
+  An ADR with a run of five blank lines and a run of three between paragraphs.
+  A dry run reports each excess line as FMT-002; a fixing run collapses both
+  runs back to two and reports FMT-011 once per run.
+messages:
+  - "FMT-002: Line 17: More than 2 consecutive blank lines"
+  - "FMT-002: Line 18: More than 2 consecutive blank lines"
+  - "FMT-002: Line 19: More than 2 consecutive blank lines"
+  - "FMT-002: Line 23: More than 2 consecutive blank lines"
+fixed: true
+fix_messages:
+  - "FMT-011: Collapsed 5 blank lines to 2 at line 15"
+  - "FMT-011: Collapsed 3 blank lines to 2 at line 21"
+# The two blank lines after "Third paragraph" are legal and are left alone, so
+# the run at line 25 is never reported or touched.
+forbidden:
+  - "Line 25: More than 2 consecutive blank lines"
+dry_run_exit_code: 1
+exit_code: 0

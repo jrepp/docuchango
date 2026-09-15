@@ -179,7 +179,11 @@ wrap the text in backticks, then validate again.
 **Detected**
 
 - Trailing whitespace
-- More than two consecutive blank lines
+- More than two consecutive blank lines (`FMT-002`), reported one line at a
+  time as `FMT-002: Line 17: More than 2 consecutive blank lines`. A blank
+  line inside a code fence or inside the frontmatter block is content -- a
+  deliberate gap in sample output, a blank line in a YAML block scalar -- and
+  is not counted
 - A UTF-8 byte-order mark at the start of a file (`FMT-012`), which otherwise
   hides the frontmatter from the parser and gets the document reported as
   having none
@@ -205,12 +209,12 @@ wrap the text in backticks, then validate again.
   converted whole rather than left half and half, and a bare `\r` is treated
   the same as `\r\n`. Only the terminators change, so the rewrite is lossless,
   and it runs first so every other fixer in the same run sees LF content
-
-**Left to you**
-
-- Runs of more than two blank lines, which are reported but not collapsed
-  (collapsing them is planned - see the
-  [validator roadmap](../docs-cms/rfcs/rfc-003-validator-roadmap.md), FMT-011)
+- Collapses a run of three or more blank lines back to two
+  (`FMT-011: Collapsed 5 blank lines to 2 at line 15`, one message per run),
+  which is the repair for every FMT-002 finding above. It skips exactly what
+  the check skips: runs inside a fenced code block (backtick or tilde) and
+  inside the frontmatter block are left alone. The two blank lines a legal run already
+  has are never touched, so the fix is idempotent
 
 ## Filenames
 

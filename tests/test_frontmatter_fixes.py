@@ -1071,3 +1071,77 @@ class TestProjectIdPlaceholderFix:
         assert changed
         assert self._project_id(doc) == "real-project"
         assert fix_frontmatter_metadata(doc, project_id="real-project") == (False, [])
+
+
+class TestBlankLineCollapse:
+    """FMT-011 in the Phase 1 fixer that ``validate`` actually calls."""
+
+    FRONTMATTER = (
+        "---\n"
+        "id: adr-001\n"
+        'title: "ADR-001: Blank Lines"\n'
+        "status: {status}\n"
+        "created: 2026-01-02\n"
+        "tags: [testing]\n"
+        "project_id: fixture-project\n"
+        "doc_uuid: 5c3a9f2e-1b7d-4f6a-9c21-0d8e4b6a7f31\n"
+        "---\n"
+    )
+
+    def _adr(self, tmp_path, body, status="Accepted"):
+        doc = tmp_path / "adr" / "adr-001-test.md"
+        doc.parent.mkdir(parents=True, exist_ok=True)
+        doc.write_text(self.FRONTMATTER.format(status=status) + body, encoding="utf-8")
+        return doc
+
+    def test_run_is_collapsed_and_reported(self, tmp_path):
+        doc = self._adr(tmp_path, "\n# Test\n\nA.\n\n\n\n\nB.\n")
+
+        changed, messages = fix_frontmatter_metadata(doc, schema="adr")
+
+        assert changed
+        assert messages == ["FMT-011: Collapsed 4 blank lines to 2 at line 14"]
+        assert doc.read_text(encoding="utf-8").endswith("A.\n\n\nB.\n")
+
+    def test_collapse_survives_a_metadata_rewrite(self, tmp_path):
+        """A status fix re-serializes the document; the collapsed body sticks."""
+        doc = self._adr(tmp_path, "\n# Test\n\nA.\n\n\n\n\nB.\n", status="accepted")
+
+        changed, messages = fix_frontmatter_metadata(doc, schema="adr")
+
+        assert changed
+        assert "FMT-011: Collapsed 4 blank lines to 2 at line 14" in messages
+        post = frontmatter.loads(doc.read_text(encoding="utf-8"))
+        assert post.metadata["status"] == "Accepted"
+        assert post.content.endswith("A.\n\n\nB.")
+
+    def test_dry_run_writes_nothing(self, tmp_path):
+        doc = self._adr(tmp_path, "\n# Test\n\nA.\n\n\n\n\nB.\n")
+        before = doc.read_bytes()
+
+        changed, messages = fix_frontmatter_metadata(doc, dry_run=True, schema="adr")
+
+        assert changed
+        assert messages == ["FMT-011: Collapsed 4 blank lines to 2 at line 14"]
+        assert doc.read_bytes() == before
+
+    def test_generated_frontmatter_keeps_the_collapsed_body(self, tmp_path):
+        """The block is prepended to the repaired text, not to the file on disk."""
+        doc = tmp_path / "adr" / "adr-001-test.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text("# ADR-001: Test\n\nA.\n\n\n\n\nB.\n", encoding="utf-8")
+
+        changed, messages = fix_frontmatter_metadata(doc, schema="adr")
+
+        assert changed
+        assert "FMT-011: Collapsed 4 blank lines to 2 at line 4" in messages
+        assert doc.read_text(encoding="utf-8").endswith("A.\n\n\nB.\n")
+
+    def test_second_run_is_a_no_op(self, tmp_path):
+        doc = self._adr(tmp_path, "\n# Test\n\nA.\n\n\n\n\nB.\n")
+
+        fix_frontmatter_metadata(doc, schema="adr")
+        after_first = doc.read_bytes()
+
+        assert fix_frontmatter_metadata(doc, schema="adr") == (False, [])
+        assert doc.read_bytes() == after_first

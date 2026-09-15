@@ -1,9 +1,10 @@
-"""Auto-fixes for whitespace issues in frontmatter.
+"""Auto-fixes for whitespace issues in frontmatter and document body.
 
 This module provides fixes for:
 - Trailing/leading whitespace in string values
 - Empty string vs null normalization
 - Required field enhancement
+- Runs of more than two blank lines in the body (FMT-011)
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from pathlib import Path
 import frontmatter
 
 from docuchango.fixes.yaml_utils import dumps as frontmatter_dumps
+from docuchango.markdown import blank_line_fix_message, collapse_blank_lines
 from docuchango.text_io import (
     FMT_012_FIX_MESSAGE,
     carriage_return_lines,
@@ -150,6 +152,10 @@ def fix_whitespace_and_fields(file_path: Path, dry_run: bool = False) -> tuple[b
 
     try:
         content, bom_removed = read_document(file_path)
+        # FMT-011: collapse before parsing, so the reported line numbers are
+        # the ones FMT-002 reports for the file on disk and both write paths
+        # below carry the repair.
+        content, blank_runs = collapse_blank_lines(content)
         post = frontmatter.loads(content)
     except Exception as e:
         return False, [f"Error reading file: {e}"]
@@ -162,9 +168,11 @@ def fix_whitespace_and_fields(file_path: Path, dry_run: bool = False) -> tuple[b
     if crlf_findings:
         messages.append(line_ending_fix_message(crlf_findings))
 
-    # `content` is already BOM-free and universal-newline normalized, so any
-    # rewrite at all repairs both FMT-012 and FMT-010.
-    rewrite_only = bom_removed or bool(crlf_findings)
+    messages.extend(blank_line_fix_message(run) for run in blank_runs)
+
+    # `content` is already BOM-free, universal-newline normalized and
+    # collapsed, so any rewrite at all repairs FMT-012, FMT-010 and FMT-011.
+    rewrite_only = bom_removed or bool(crlf_findings) or bool(blank_runs)
 
     if not post.metadata:
         if rewrite_only:
@@ -209,8 +217,8 @@ def fix_whitespace_and_fields(file_path: Path, dry_run: bool = False) -> tuple[b
         return True, messages
 
     if rewrite_only:
-        # Nothing else to repair: rewrite the original content without the BOM
-        # and with LF line endings.
+        # Nothing else to repair: rewrite the content without the BOM, with LF
+        # line endings and with the blank-line runs collapsed.
         if not dry_run:
             try:
                 write_text(file_path, content)

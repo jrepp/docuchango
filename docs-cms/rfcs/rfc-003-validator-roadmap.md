@@ -91,9 +91,9 @@ reported.
 | MDX-010 | Escape `<` and `>` and repair common JSX-incompatible Markdown | Planned | fix | see below |
 | MDX-011 | Mask 4-space indented code blocks before the prose checks (only fenced blocks and inline spans are masked today) | Planned | report | see below |
 | FMT-001 | Trailing whitespace | Implemented | fix | `check_formatting`, `fixes/code_blocks.py` |
-| FMT-002 | More than two consecutive blank lines | Implemented | report | `check_formatting` |
+| FMT-002 | More than two consecutive blank lines, outside code fences and frontmatter; FMT-011 is the repair | Implemented | report | `check_formatting`, `markdown.py` (`blank_line_runs`, `blank_line_finding_message`) |
 | FMT-010 | CRLF or mixed line endings | Implemented | fix | `check_formatting`, `text_io.py` (`find_carriage_returns`, `carriage_return_lines`, `write_text`), `fixes/frontmatter.py`, `fixes/whitespace.py` |
-| FMT-011 | Collapse runs of blank lines | Planned | fix | see below |
+| FMT-011 | Collapse runs of blank lines | Implemented | fix | `markdown.py` (`collapse_blank_lines`, `fence_mask`, `frontmatter_span`), `fixes/frontmatter.py`, `fixes/whitespace.py` |
 | FMT-012 | UTF-8 byte-order mark before the frontmatter | Implemented | fix | `check_formatting`, `text_io.py`, `fixes/frontmatter.py`, `fixes/whitespace.py` |
 | CB-001 | Code fence without a language, or unclosed fence | Implemented | fix/report | `check_code_blocks`, `fixes/code_blocks.py` |
 | IDX-001 | Document index missing, unlinked, or missing bucket headings | Implemented | report | `check_document_indexes` |
@@ -161,6 +161,45 @@ the rest of the run sees LF content. Writes in the fixers go through
 `\n` to `os.linesep` and would put the carriage returns straight back on
 Windows. The atomic snapshot is taken as bytes before Phase 1, so a withheld
 run restores a CRLF file byte for byte.
+
+**FMT-011 Blank-line collapse (shipped).** FMT-002 has reported a run of more
+than two blank lines since the first release and nothing ever collapsed one, so
+the finding was pure noise on a document nobody was going to hand-edit. FMT-011
+reduces any run of three or more blank lines to two, and FMT-002 stays the
+report, which is what a `--dry-run` shows.
+
+The two are now the same code. `docuchango/markdown.py` holds `fence_mask` and
+`frontmatter_span` - the fence and frontmatter scanners that
+`DocValidator._mask_code` used to keep to itself - and builds `blank_line_runs`
+on top of them; `check_formatting` reports one
+`FMT-002: Line N: More than 2 consecutive blank lines` per line past the second
+of each run, and `collapse_blank_lines` rewrites exactly the runs that function
+returns. Sharing the scan is not tidiness: under the default atomic run, a fix
+the check still reports rolls the whole run back, so a fixer that disagreed with
+its check by one line would withhold every fix in the tree.
+
+A blank line inside a code fence is content - a deliberate gap in a shell
+transcript, a blank line in a Python sample - and is neither reported nor
+collapsed; backtick and tilde fences are both tracked, with the same
+same-character/at-least-as-long closing rule the prose masking uses. Blank lines
+inside the frontmatter block are skipped for the same reason: they may be part
+of a YAML block scalar. The collapse runs in `fix_frontmatter_metadata` before
+the document is parsed, so the line numbers in the messages are the ones FMT-002
+reported for the file on disk, and both write paths - the re-serialized one and
+the verbatim `rewrite_only` one that FMT-010 and FMT-012 added - carry the
+repair. `fix_whitespace_and_fields` does the same. Phase 1 reports one
+`FMT-011: Collapsed 5 blank lines to 2 at line 15` per run rather than a
+per-file summary, matching how FMT-001 and FMT-002 name the line.
+
+Trailing blank lines at end of file are collapsed like any other run, and are
+not otherwise touched: `frontmatter.dumps` already strips the body's trailing
+whitespace whenever any metadata fix re-serializes a document, and FMT-011 does
+not fight that.
+
+FMT-002 is also the first existing check to take the ID prefix its message was
+promised in the "Error message format" section below: it had to be touched
+anyway to stop counting blank lines inside fences, and the fixture messages
+moved with it.
 
 **RD-001 Sub-project readability (shipped).** `check_readability` read the
 root config only, so a sub-project could not enable, disable or tune
@@ -234,9 +273,6 @@ to `docs-project.yaml`; when it is absent the check stays a report (LNK-002).
 **MDX-010 MDX escapes.** Wire `fixes/mdx_syntax.py` into Phase 1 for the
 patterns `check_mdx_compatibility` already detects. Content inside code
 fences and inline code is never touched.
-
-**FMT-011 Blank-line collapse.** Reduce runs of three or more blank lines to
-two, outside code fences. This turns the existing FMT-002 report into a fix.
 
 ### Error message format
 
