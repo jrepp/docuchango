@@ -142,6 +142,32 @@ def _discover_doc_files(root: Path) -> list[Path]:
     return sorted(set(files))
 
 
+def _restore_snapshot(snapshot: dict[Path, bytes | None]) -> bool:
+    """Restore files to the exact bytes captured before fixes ran.
+
+    ``snapshot`` maps each discovered document to its original bytes, or to
+    ``None`` if the path did not exist yet (in which case a fixer that
+    created it gets that file deleted again). Returns whether anything was
+    actually restored, so callers only report "withheld" when writes really
+    happened.
+    """
+    restored = False
+    for file_path, original in snapshot.items():
+        try:
+            current: bytes | None = file_path.read_bytes()
+        except OSError:
+            current = None
+        if current == original:
+            continue
+        restored = True
+        if original is None:
+            file_path.unlink(missing_ok=True)
+        else:
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            file_path.write_bytes(original)
+    return restored
+
+
 def _guess_doc_type_from_path(file_path: Path) -> str | None:
     """Best-effort document type inference from path segments."""
     parts = [p.lower() for p in file_path.parts]
@@ -180,16 +206,35 @@ def main():
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
 @click.option("--skip-build", is_flag=True, help="Skip Docusaurus build validation")
 @click.option("--dry-run", is_flag=True, help="Report issues without applying fixes")
+@click.option(
+    "--atomic/--no-atomic",
+    default=True,
+    help=(
+        "Roll back all fixes if issues remain after fixing (default). "
+        "--no-atomic keeps partial fixes on disk even when issues remain."
+    ),
+)
 def validate(
     repo_root: Path,
     verbose: bool,
     skip_build: bool,
     dry_run: bool,
+    atomic: bool,
 ):
     """Validate and fix documentation files.
 
     By default, automatically fixes issues where possible. Use --dry-run to
     only report issues without making changes.
+
+    Fixing runs are atomic by default: if issues remain after Phase 1 fixes
+    are applied, every change made during the run is rolled back and the
+    tree is left exactly as it was on disk, so a failing run never leaves a
+    half-fixed document behind. The report still lists what would have
+    changed, labeled "withheld" rather than "applied". Withheld fixes are
+    applied automatically once the listed issues are resolved. Pass
+    --no-atomic to restore the old behaviour and keep partial fixes on disk
+    even when issues remain. --dry-run never writes to disk, so --atomic has
+    no effect together with it.
 
     Validates and fixes:
     - YAML frontmatter (status values, dates, missing fields)
@@ -223,6 +268,19 @@ def validate(
     # Track fixes applied and remaining issues
     fixes_applied: list[tuple[Path, str]] = []
     remaining_issues: list[tuple[Path, str]] = []
+
+    # Snapshot every discovered document before Phase 1 writes anything, so an
+    # atomic run can restore the tree exactly if issues remain in Phase 2.
+    # `None` means the path did not exist yet (a fixer created it); restoring
+    # such a path deletes it again. --dry-run never writes, so it needs none
+    # of this.
+    snapshot: dict[Path, bytes | None] = {}
+    if not dry_run and atomic:
+        for file_path in all_files:
+            try:
+                snapshot[file_path] = file_path.read_bytes()
+            except OSError:
+                snapshot[file_path] = None
 
     # Phase 1: Apply automatic fixes
     if all_files:
@@ -307,6 +365,12 @@ def validate(
             traceback.print_exc()
         sys.exit(2)
 
+    # Atomicity: if fixing still leaves issues, roll every write in this run
+    # back so the tree is either fully fixed and valid, or untouched.
+    withheld = False
+    if not dry_run and atomic and remaining_issues and _restore_snapshot(snapshot):
+        withheld = True
+
     # Phase 3: Display results (simplified when no issues)
     if not fixes_applied and not remaining_issues:
         # Clean output when everything is valid
@@ -320,10 +384,15 @@ def validate(
 
     console.print(f"Scanned {len(all_files)} files\n")
 
-    # Show fixes applied
+    # Show fixes applied (or withheld, if the atomic rollback fired)
     if fixes_applied:
-        action = "would be applied" if dry_run else "applied"
-        console.print(f"[bold green]✓ Fixes {action}: {len(fixes_applied)}[/bold green]")
+        if withheld:
+            marker, style, action = "⚠", "yellow", "withheld"
+        elif dry_run:
+            marker, style, action = "✓", "green", "would be applied"
+        else:
+            marker, style, action = "✓", "green", "applied"
+        console.print(f"[bold {style}]{marker} Fixes {action}: {len(fixes_applied)}[/bold {style}]")
         seen_files: set[Path] = set()
         for file_path, msg in fixes_applied:
             rel_path = file_path.relative_to(repo_root)
@@ -351,7 +420,8 @@ def validate(
     # Summary line
     summary_parts = []
     if files_with_fixes:
-        summary_parts.append(f"{files_with_fixes} {'fixable' if dry_run else 'fixed'}")
+        label = "fixable" if dry_run else ("withheld" if withheld else "fixed")
+        summary_parts.append(f"{files_with_fixes} {label}")
     if files_with_issues:
         summary_parts.append(f"{files_with_issues} with issues")
     if summary_parts:
@@ -359,6 +429,13 @@ def validate(
 
     if dry_run and fixes_applied:
         console.print("[yellow]Run without --dry-run to apply fixes[/yellow]\n")
+
+    if withheld:
+        console.print(
+            f"[yellow]{len(fixes_applied)} fix(es) withheld; the tree was left untouched.[/yellow]\n"
+            "[yellow]They will be applied once the issues above are resolved, "
+            "or immediately with --no-atomic.[/yellow]\n"
+        )
 
     if remaining_issues:
         console.print("[bold red]❌ Validation failed[/bold red]")

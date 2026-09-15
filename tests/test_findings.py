@@ -151,6 +151,17 @@ class FindingCase:
         return bool(self.expected.get("fixed", False))
 
     @property
+    def atomic(self) -> bool:
+        """Whether the fixing pass runs with ``--atomic`` (the default).
+
+        A fixture that pairs a fixable finding with one that ``validate``
+        cannot fix needs ``atomic: false`` to see the fix actually written;
+        under the default atomic run it is withheld and ``fixed`` must be
+        ``false`` instead. See the "fixed" section of README.md.
+        """
+        return bool(self.expected.get("atomic", True))
+
+    @property
     def dry_run_exit_code(self) -> int:
         return int(self.expected["dry_run_exit_code"])
 
@@ -286,10 +297,14 @@ def _stage(case: FindingCase, tmp_path: Path) -> Path:
     return root
 
 
-def _run_validate(root: Path, dry_run: bool) -> Result:
+def _run_validate(root: Path, dry_run: bool, atomic: bool = True) -> Result:
     args = ["--repo-root", str(root), "--skip-build"]
     if dry_run:
         args.append("--dry-run")
+    elif not atomic:
+        # Only meaningful for a non-dry-run pass: --dry-run never writes, so
+        # atomicity has nothing to roll back either way.
+        args.append("--no-atomic")
     # A wide console keeps Rich from hard-wrapping long finding messages.
     return CliRunner().invoke(validate, args, env={"COLUMNS": "200"}, catch_exceptions=False)
 
@@ -354,7 +369,7 @@ def test_finding_fix_behaviour(case: FindingCase, tmp_path: Path) -> None:
     """``validate`` repairs the finding, or keeps reporting it, as declared."""
     root = _stage(case, tmp_path)
 
-    result = _run_validate(root, dry_run=False)
+    result = _run_validate(root, dry_run=False, atomic=case.atomic)
 
     assert result.exit_code == case.exit_code, (
         f"{case.name}: exit code {result.exit_code}, expected {case.exit_code}\n{result.output}"
@@ -377,9 +392,9 @@ def test_finding_fix_is_idempotent(case: FindingCase, tmp_path: Path) -> None:
     """Running ``validate`` twice reaches a fixed point."""
     root = _stage(case, tmp_path)
 
-    _run_validate(root, dry_run=False)
+    _run_validate(root, dry_run=False, atomic=case.atomic)
     after_first = _tree_snapshot(root)
-    _run_validate(root, dry_run=False)
+    _run_validate(root, dry_run=False, atomic=case.atomic)
 
     assert _tree_snapshot(root) == after_first, f"{case.name}: a second validate run changed files again"
 

@@ -23,7 +23,11 @@ write documentation together and need it to stay trustworthy.
   in with a default - all on a real run; `--dry-run` reports these as plain
   issues rather than previewing them. What it cannot fill in safely, such as
   `title` or `deciders`, it reports, and extra blank lines are reported but
-  never collapsed.
+  never collapsed. A fixing run is atomic by default: if any issue remains
+  once fixing finishes, every fix from that run is withheld and the tree is
+  left exactly as it was. The report still lists the withheld fixes, and they
+  land once the remaining issues are resolved. Pass `--no-atomic` to keep
+  partial fixes on disk instead.
 - **Agent-ready.** Ships a guide that tells coding agents how to read,
   cite and extend the docs. Point `AGENTS.md` at it and you are done.
 - **Fast and CI-friendly.** Scanning and fixing a hundred documents takes
@@ -195,7 +199,10 @@ remains in the committed files, whether or not `validate` could fix it for
 you - a bad status value fails the build even though it is auto-correctable,
 while an unusually formatted but schema-accepted date does not, because
 nothing rejects it. Run `docuchango validate` (no `--dry-run`) locally or in
-a pre-commit hook to clear fixable issues before they reach CI.
+a pre-commit hook to clear fixable issues before they reach CI. That run is
+atomic: if an issue outside its reach remains, it writes nothing and reports
+the fixes it withheld alongside the issue you still need to resolve, so you
+never end up with an unrelated fix mixed into your working tree.
 
 ## Going further
 

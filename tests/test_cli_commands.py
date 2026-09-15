@@ -424,6 +424,111 @@ doc_uuid: 12345678-1234-4123-8123-123456789abd
         assert "Duplicate ID 'adr-001'" in result.output
 
 
+class TestValidateAtomicFixes:
+    """Regression tests for atomic fixing: a run either fixes everything and
+    exits 0, or leaves the tree exactly as it found it and exits 1.
+
+    See the bug report this closes: validate used to write Phase 1 fixes to
+    disk immediately, so a run that failed in Phase 2 could leave a partially
+    rewritten tree behind even though the overall run failed.
+    """
+
+    @staticmethod
+    def _write_fixable(path: Path) -> str:
+        """An ADR with a bare code fence: fully fixed by fix_code_blocks."""
+        content = """---
+id: adr-001
+title: "Fixable ADR"
+status: Accepted
+created: 2025-01-01
+deciders: Core Team
+tags: [testing]
+project_id: test-project
+doc_uuid: 12345678-1234-4123-8123-123456789aaa
+---
+
+# Fixable ADR
+
+```
+plain text with no language
+```
+"""
+        path.write_text(content, encoding="utf-8")
+        return content
+
+    @staticmethod
+    def _write_unfixable(path: Path) -> str:
+        """An ADR with an invalid status literal: no fixer corrects this."""
+        content = """---
+id: adr-002
+title: "Unfixable ADR"
+status: Bogus
+created: 2025-01-01
+deciders: Core Team
+tags: [testing]
+project_id: test-project
+doc_uuid: 12345678-1234-4123-8123-123456789bbb
+---
+
+# Unfixable ADR
+
+Nothing here can be auto-fixed.
+"""
+        path.write_text(content, encoding="utf-8")
+        return content
+
+    def test_atomic_default_withholds_fixes_when_issues_remain(self, tmp_path):
+        """A mixed tree exits 1 and is left byte-identical under the default."""
+        adr_dir = tmp_path / "docs-cms" / "adr"
+        adr_dir.mkdir(parents=True)
+        fixable_file = adr_dir / "adr-001-fixable.md"
+        unfixable_file = adr_dir / "adr-002-unfixable.md"
+        fixable_before = self._write_fixable(fixable_file)
+        unfixable_before = self._write_unfixable(unfixable_file)
+
+        runner = CliRunner()
+        result = runner.invoke(validate, ["--repo-root", str(tmp_path), "--skip-build"])
+
+        assert result.exit_code == 1
+        assert "withheld" in result.output.lower()
+        assert fixable_file.read_bytes() == fixable_before.encode("utf-8"), (
+            "the fixable file must be left byte-identical when the run fails and stays atomic"
+        )
+        assert unfixable_file.read_bytes() == unfixable_before.encode("utf-8")
+
+        # --no-atomic on the same, still-untouched tree keeps today's
+        # behaviour: the fixable file is written even though the run fails.
+        result = runner.invoke(validate, ["--repo-root", str(tmp_path), "--skip-build", "--no-atomic"])
+
+        assert result.exit_code == 1
+        assert "applied" in result.output.lower()
+        assert fixable_file.read_bytes() != fixable_before.encode("utf-8"), (
+            "--no-atomic must write the fix for the fixable file even though the unfixable issue remains"
+        )
+
+    def test_atomic_fully_fixable_tree_is_fixed_and_exits_zero(self, tmp_path):
+        """A tree with only fixable issues is fixed in place and exits 0."""
+        adr_dir = tmp_path / "docs-cms" / "adr"
+        adr_dir.mkdir(parents=True)
+        fixable_file = adr_dir / "adr-001-fixable.md"
+        before = self._write_fixable(fixable_file)
+
+        runner = CliRunner()
+        result = runner.invoke(validate, ["--repo-root", str(tmp_path), "--skip-build"])
+
+        assert result.exit_code == 0
+        assert "withheld" not in result.output.lower()
+        after_first = fixable_file.read_bytes()
+        assert after_first != before.encode("utf-8")
+
+        # A second run is a no-op: the fix already landed and validation
+        # is clean, so nothing is left to fix or withhold.
+        result = runner.invoke(validate, ["--repo-root", str(tmp_path), "--skip-build"])
+
+        assert result.exit_code == 0
+        assert fixable_file.read_bytes() == after_first
+
+
 class TestMainCommandGroup:
     """Test the main command group."""
 
