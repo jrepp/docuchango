@@ -86,9 +86,9 @@ reported.
 | LNK-002 | Link that resolves outside the repository root, reported once per link with line number and target | Implemented | report | `check_cross_plugin_links` |
 | LNK-010 | Rewrite a broken internal link when the target exists elsewhere | Implemented | fix | `cli.validate` (Phase 1), `fixes/internal_links.py` (`build_index`, `fix_internal_links`, `fix_links_in_tree`), `links.py`, `markdown.py` (`mask_code`) |
 | LNK-011 | Rewrite cross-plugin links to absolute repository URLs | Planned | fix | see below |
-| MDX-001 | `<` that opens a JSX-shaped tag which is not a valid HTML element, PascalCase component, self-closing tag or CommonMark autolink (bare prose placeholders such as `<token>`). Comparisons such as `<5ms` or `a < b` are not findings | Implemented | report | `check_mdx_compatibility`, `_is_safe_mdx_tag`, `_mask_code` |
+| MDX-001 | `<` that opens a JSX-shaped tag which is not a valid HTML element, PascalCase component, self-closing tag or CommonMark autolink (bare prose placeholders such as `<token>`). Comparisons such as `<5ms` or `a < b` are not findings; MDX-010 is the repair | Implemented | report | `check_mdx_compatibility`, `markdown.py` (`mdx_tags`, `is_safe_mdx_tag`, `mask_code`, `mdx_finding_message`) |
 | MDX-002 | MDX compilation error | Implemented | report | `check_mdx_compilation` |
-| MDX-010 | Escape `<` and `>` and repair common JSX-incompatible Markdown | Planned | fix | see below |
+| MDX-010 | Escape `<` and `>` and repair common JSX-incompatible Markdown | Implemented | fix | `markdown.py` (`escape_mdx_tags`, `mdx_tags`, `mdx_fix_message`), `fixes/mdx_syntax.py` (`fix_mdx_issues`, `fix_mdx_syntax`), `cli.validate` |
 | MDX-011 | Mask 4-space indented code blocks before the prose checks (only fenced blocks and inline spans are masked today) | Planned | report | see below |
 | FMT-001 | Trailing whitespace | Implemented | fix | `check_formatting`, `fixes/code_blocks.py` |
 | FMT-002 | More than two consecutive blank lines, outside code fences and frontmatter; FMT-011 is the repair | Implemented | report | `check_formatting`, `markdown.py` (`blank_line_runs`, `blank_line_finding_message`) |
@@ -347,24 +347,70 @@ standalone entry point survives as `python -m docuchango.fixes.internal_links
 instead of resolving `docs-cms` relative to the installed package, which
 pointed at site-packages for anything but a source checkout.
 
+**MDX-010 MDX escapes (shipped).** MDX-001 has reported a bare `<token>` in
+prose since the check was reworked in PR #71, and `fixes/mdx_syntax.py` sat in
+the tree unwired the whole time - fixing something else entirely. Its regex
+backtick-wrapped `<10ms`, `<1 minute` and `<100%`, which is exactly the class
+of text MDX-001 decided is *not* a finding: a `<` before a digit or a space is
+a comparison and MDX never reads it as JSX. It also carried its own
+`in_code_block` tracker that knew about backtick fences only, and gave up on
+any line that mixed a backtick with a `<`. So the fixer repaired what was not
+broken, missed every actual finding, and disagreed with the check about where
+code is. All three are gone: the `<digit` rewriting, the ReDoS-bounded unit
+pattern it needed, and the standalone `main()` that resolved `docs-cms`
+relative to the installed package.
+
+What replaces it is the same shape FMT-002/FMT-011 took. `markdown.py` now
+holds `mask_code`, `is_safe_mdx_tag` and the tag-candidate pattern that
+`DocValidator` used to keep to itself, and builds `mdx_tags` on top of them;
+`check_mdx_compatibility` reports one `MDX-001` per tag that function returns
+and `escape_mdx_tags` rewrites exactly those tags. The fixer is a wrapper over
+that function, so it repairs what the check reports, no more and no less. As
+with FMT-011, sharing the scan is not tidiness: under the default atomic run a
+fixer that disagreed with its check by one candidate would withhold every fix
+in the tree.
+
+The repair is `<` to `&lt;` and `>` to `&gt;` across the candidate, which the
+`[^<>]*` bound makes unambiguous: the only `<` is the opening one and the only
+`>` is the closing one, and nothing in between is rewritten. `&` is left alone,
+which is what makes a second run a no-op - `&lt;token&gt;` has no `<` left to
+match. Phase 1 reports one
+`MDX-010: Line 19: Escaped '<token>' in prose as '&lt;token&gt;'` per
+candidate, and MDX-001 stays the report, which is what a `--dry-run` shows.
+
+Nothing MDX-001 tolerates is touched: content inside fenced blocks (backtick
+and tilde), inside inline code spans including multi-line ones, and inside the
+frontmatter block is masked before the scan; comparisons, known HTML elements,
+PascalCase components, explicitly self-closing tags and CommonMark autolinks
+are dropped by `is_safe_mdx_tag`. The fixer widens and narrows MDX-001's
+judgment by exactly nothing, because it does not have its own.
+
+It runs after `fix_code_blocks` in Phase 1, because what counts as prose
+depends on the fences: CB-001's repair closes an unclosed fence and strips the
+stray info string off a closing one, and masking a document whose fences are
+still broken would treat everything after the break as code. The cost is that
+an MDX-010 line number is the line in the partly repaired file, which can
+differ from the line MDX-001 reported for the file on disk when the same run
+also inserted a blank line around a fence. Correct masking is worth more than a
+message that agrees with a dry run of a different document. MDX-011 is
+untouched and stays `Planned`: an indented code block is still masked as prose
+by both the check and the fix, so a `<token>` in one is reported and escaped
+together, which is at least consistent.
+
 ### Planned validators
 
 Each entry lists what it detects, what it may fix, and the constraint that
 keeps it safe.
 
-**MDX-011 Indented code blocks.** `_mask_code` masks fenced blocks and
+**MDX-011 Indented code blocks.** `markdown.mask_code` masks fenced blocks and
 inline spans before the prose checks run, but not 4-space indented code
-blocks, so a `<token>` placeholder inside one is reported. Correct handling
-needs list-continuation context, because a 4-space indent inside a list
-item is a paragraph, not code.
+blocks, so a `<token>` placeholder inside one is reported - and, since
+MDX-010, escaped as well. Correct handling needs list-continuation context,
+because a 4-space indent inside a list item is a paragraph, not code.
 
 **LNK-011 Cross-plugin link rewrite.** Wire `fixes/cross_plugin_links.py`
 into Phase 1. Needs a repository base URL, so add `project.repository_url`
 to `docs-project.yaml`; when it is absent the check stays a report (LNK-002).
-
-**MDX-010 MDX escapes.** Wire `fixes/mdx_syntax.py` into Phase 1 for the
-patterns `check_mdx_compatibility` already detects. Content inside code
-fences and inline code is never touched.
 
 ### Error message format
 

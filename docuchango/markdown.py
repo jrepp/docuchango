@@ -16,6 +16,15 @@ of a YAML block scalar, so neither is reported and neither is collapsed. The
 report and the fix share :func:`blank_line_runs` so they can never disagree
 about which run is a finding: under the default atomic run, a fix the check
 still reports would roll the whole run back.
+
+``MDX-001`` and ``MDX-010`` are the same story one level up. :func:`mdx_tags`
+is the single scan for a JSX-shaped ``<...>`` in prose that MDX cannot
+compile: ``DocValidator.check_mdx_compatibility`` turns each hit into an
+``MDX-001`` report, and :func:`escape_mdx_tags` -- which
+``docuchango.fixes.mdx_syntax`` wraps for Phase 1 -- escapes exactly those
+hits and nothing else. Sharing the scan is what makes the fix idempotent and
+keeps the atomic run from withholding every fix in the tree over a
+one-candidate disagreement.
 """
 
 from __future__ import annotations
@@ -259,3 +268,294 @@ def mask_code(content: str, strip_frontmatter: bool = False) -> list[str]:
     joined = re.sub(r"`(?:[^`\n]|\n(?!\s*\n))+?`", _blank, joined)
 
     return joined.split("\n")
+
+
+# Known HTML elements that are valid raw markup in MDX and must not be
+# flagged (e.g. '<a href=...>', '<br/>', '<sup>', '<div>').
+KNOWN_HTML_TAGS = frozenset(
+    {
+        # Content / text
+        "a",
+        "abbr",
+        "address",
+        "article",
+        "aside",
+        "b",
+        "bdi",
+        "bdo",
+        "blockquote",
+        "br",
+        "button",
+        "canvas",
+        "caption",
+        "cite",
+        "code",
+        "col",
+        "colgroup",
+        "data",
+        "datalist",
+        "dd",
+        "del",
+        "details",
+        "dfn",
+        "dialog",
+        "div",
+        "dl",
+        "dt",
+        "em",
+        "embed",
+        "fieldset",
+        "figcaption",
+        "figure",
+        "footer",
+        "form",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "head",
+        "header",
+        "hgroup",
+        "hr",
+        "i",
+        "iframe",
+        "img",
+        "input",
+        "ins",
+        "kbd",
+        "label",
+        "legend",
+        "li",
+        "link",
+        "main",
+        "map",
+        "mark",
+        "menu",
+        "meta",
+        "meter",
+        "nav",
+        "noscript",
+        "object",
+        "ol",
+        "optgroup",
+        "option",
+        "output",
+        "p",
+        "param",
+        "picture",
+        "pre",
+        "progress",
+        "q",
+        "rp",
+        "rt",
+        "ruby",
+        "s",
+        "samp",
+        "script",
+        "section",
+        "select",
+        "slot",
+        "small",
+        "source",
+        "span",
+        "strong",
+        "style",
+        "sub",
+        "summary",
+        "sup",
+        "table",
+        "tbody",
+        "td",
+        "template",
+        "textarea",
+        "tfoot",
+        "th",
+        "thead",
+        "time",
+        "title",
+        "tr",
+        "track",
+        "u",
+        "ul",
+        "var",
+        "video",
+        "wbr",
+        # Media / SVG / MathML (commonly embedded raw)
+        "audio",
+        "svg",
+        "path",
+        "g",
+        "circle",
+        "rect",
+        "line",
+        "polyline",
+        "polygon",
+        "ellipse",
+        "text",
+        "defs",
+        "use",
+        "symbol",
+        "math",
+    }
+)
+
+# CommonMark autolinks: '<scheme:rest>' (absolute URI) and '<local@domain>'
+# (email). Both are valid Markdown and must never be reported as JSX.
+AUTOLINK_PATTERN = re.compile(
+    r"<(?:[A-Za-z][A-Za-z0-9+.\-]{1,31}:[^<>\s]*"
+    r"|[^\s<>@]+@[A-Za-z0-9](?:[A-Za-z0-9\-]*[A-Za-z0-9])?"
+    r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9\-]*[A-Za-z0-9])?)+)>"
+)
+
+
+def is_safe_mdx_tag(tag_text: str) -> bool:
+    """Return True if a '<...>' occurrence is safe/valid in MDX.
+
+    Safe cases:
+    - Known HTML elements (<a>, <br/>, <sup>, ...), open or close.
+    - JSX components: PascalCase names or self-closing tags with a proper
+      structure (e.g. <Outlet />, <SuspenseWrapper>).
+
+    - CommonMark autolinks: '<https://example.com>' and '<user@host>'.
+      Markdown resolves these before MDX sees a JSX tag, so they are valid.
+
+    Risky (returns False): bare placeholders in prose that are not valid
+    elements, e.g. <agentName>, <token>, <your-secret>, <log-name>.
+    """
+    # CommonMark autolinks are resolved by the Markdown parser and never
+    # reach the JSX parser. An absolute-URI autolink is '<scheme:rest>' with
+    # no whitespace; an email autolink is '<local@domain>'.
+    if AUTOLINK_PATTERN.fullmatch(tag_text):
+        return True
+
+    # The name charset must match the candidate pattern, otherwise a
+    # placeholder such as '<time-out>' or '<a-b>' would be truncated to a
+    # known HTML prefix ('time', 'a') and wrongly treated as safe.
+    m = re.match(r"</?([A-Za-z][A-Za-z0-9._-]*)", tag_text)
+    if not m:
+        return False
+    name = m.group(1)
+
+    # Known HTML element (case-insensitive) -> always safe.
+    if name.lower() in KNOWN_HTML_TAGS:
+        return True
+
+    # JSX component convention: starts with an uppercase letter.
+    if name[0].isupper():
+        return True
+
+    # Self-closing tag with valid structure, with or without attributes,
+    # e.g. '<thing />' or '<widget role="img" />'. Any explicitly
+    # self-closed tag is safe MDX regardless of the element name.
+    return bool(re.match(r"<[A-Za-z][A-Za-z0-9._-]*(\s[^<>]*)?/>", tag_text))
+
+
+# A '<' only starts a tag when a letter (or '/') follows IMMEDIATELY, with no
+# whitespace. '< threshold' or 'a < b' are comparisons and are safe; only
+# '<word...' is a tag candidate. The tag name may be a single character
+# ('<x>') and may contain underscores ('<api_key>'), matching JSX
+# identifier-shaped names. The candidate is bounded by the matching '>' so the
+# whole tag is available when deciding safety, and so the escape can cover it.
+TAG_CANDIDATE_PATTERN = re.compile(r"</?[A-Za-z][A-Za-z0-9._-]*[^<>]*/?>")
+
+#: The name at the head of a tag candidate, used for the message wording.
+_TAG_NAME_PATTERN = re.compile(r"</?([A-Za-z][A-Za-z0-9._-]*)")
+
+
+@dataclass(frozen=True)
+class MdxTag:
+    """One JSX-shaped ``<...>`` in prose that MDX cannot compile (MDX-001)."""
+
+    #: 1-based line number, counted over the whole document.
+    line_number: int
+    #: Half-open character span of the candidate within its (unmasked) line.
+    start: int
+    end: int
+    #: The candidate exactly as written, from the ``<`` to the matching ``>``.
+    text: str
+
+    @property
+    def name(self) -> str:
+        """The element name MDX-001 names in its message, e.g. ``token``."""
+        match = _TAG_NAME_PATTERN.match(self.text)
+        return match.group(1) if match else self.text
+
+    @property
+    def escaped(self) -> str:
+        """The candidate with its angle brackets escaped as HTML entities.
+
+        ``TAG_CANDIDATE_PATTERN`` bounds the match with ``[^<>]*``, so the only
+        ``<`` is the opening one and the only ``>`` is the closing one; nothing
+        in between is rewritten. An ``&`` is left alone, which is what keeps
+        the fix idempotent: an already-escaped ``&lt;token&gt;`` carries no
+        ``<`` at all and is never a candidate again.
+        """
+        return self.text.replace("<", "&lt;").replace(">", "&gt;")
+
+
+def mdx_tags(content: str) -> list[MdxTag]:
+    """Every JSX-shaped candidate in prose that MDX-001 reports and MDX-010 escapes.
+
+    Code fences, inline code spans and the frontmatter block are masked out by
+    :func:`mask_code` first, so only prose is inspected. Known HTML elements,
+    PascalCase JSX components, explicitly self-closing tags and CommonMark
+    autolinks are dropped by :func:`is_safe_mdx_tag`.
+
+    Args:
+        content: The whole document, frontmatter included, read with LF line
+            endings (see :mod:`docuchango.text_io`).
+
+    Returns:
+        The unsafe candidates in file order. The spans are offsets into the
+        *unmasked* lines: :func:`mask_code` blanks a masked region character by
+        character, so a line that can match at all has the same length masked
+        and unmasked.
+    """
+    tags: list[MdxTag] = []
+    for line_number, line in enumerate(mask_code(content, strip_frontmatter=True), start=1):
+        for match in TAG_CANDIDATE_PATTERN.finditer(line):
+            text = match.group(0)
+            if is_safe_mdx_tag(text):
+                continue
+            tags.append(MdxTag(line_number=line_number, start=match.start(), end=match.end(), text=text))
+    return tags
+
+
+def escape_mdx_tags(content: str) -> tuple[str, list[MdxTag]]:
+    """Escape the angle brackets of every MDX-001 candidate (MDX-010).
+
+    Args:
+        content: The whole document, frontmatter included.
+
+    Returns:
+        Tuple of (rewritten content, the tags that were escaped). The content
+        is returned unchanged, and the list is empty, when there is nothing to
+        escape, so the caller can use the list as the "did this change
+        anything" flag.
+    """
+    tags = mdx_tags(content)
+    if not tags:
+        return content, []
+    lines = content.split("\n")
+    # Rewrite right to left so an earlier span's offsets stay valid after a
+    # later one on the same line has grown by six characters.
+    for tag in reversed(tags):
+        line = lines[tag.line_number - 1]
+        lines[tag.line_number - 1] = line[: tag.start] + tag.escaped + line[tag.end :]
+    return "\n".join(lines), tags
+
+
+def mdx_finding_message(tag: MdxTag) -> str:
+    """The MDX-001 message the validator reports for one unsafe candidate."""
+    return (
+        f"MDX-001: Line {tag.line_number}: Unescaped '<{tag.name}>' looks like a JSX tag "
+        f"but is not a valid HTML/JSX element. Wrap it in backticks (`<{tag.name}>`) "
+        f"or escape the angle brackets as &lt;{tag.name}&gt;"
+    )
+
+
+def mdx_fix_message(tag: MdxTag) -> str:
+    """The MDX-010 message a fixer reports after escaping one candidate."""
+    return f"MDX-010: Line {tag.line_number}: Escaped '{tag.text}' in prose as '{tag.escaped}'"

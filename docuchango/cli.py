@@ -332,6 +332,7 @@ def validate(
     - Whitespace (trim values, remove empty fields)
     - Timestamps (created/updated from git history)
     - Code blocks (languages, blank lines, closing fences)
+    - MDX escapes (angle brackets in prose that MDX reads as a JSX tag)
     - Internal links, rewritten when exactly one scanned document matches
     - Internal link reachability
     - Markdown formatting issues
@@ -340,6 +341,7 @@ def validate(
     from docuchango.fixes.code_blocks import fix_code_blocks
     from docuchango.fixes.frontmatter import fix_frontmatter_metadata
     from docuchango.fixes.internal_links import build_index, fix_internal_links
+    from docuchango.fixes.mdx_syntax import fix_mdx_syntax
     from docuchango.fixes.timestamps import update_document_timestamps
 
     try:
@@ -422,6 +424,28 @@ def validate(
                     if verbose:
                         rel_path = file_path.relative_to(repo_root)
                         console.print(f"  [red]✗[/red] {rel_path}: Error in Code blocks - {e}")
+
+                # MDX-010 runs after the code-block fixer on purpose. It only
+                # rewrites prose, and what counts as prose depends on the
+                # fences: fix_code_blocks closes an unclosed fence and strips
+                # the stray info string off a closing one (CB-001), so running
+                # it first means the masking here sees the repaired document
+                # rather than one where everything after a broken fence still
+                # looks like code. The cost is that a line number in an
+                # MDX-010 message is the line in the partly repaired file,
+                # which can differ from the line MDX-001 reported for the file
+                # on disk when the same run also inserted a blank line around
+                # a fence; correct masking is worth more than a message that
+                # agrees with a dry run of a different document.
+                try:
+                    changed, messages = fix_mdx_syntax(file_path)
+                    if changed and messages:
+                        for msg in messages:
+                            fixes_applied.append((file_path, f"[MDX syntax] {msg}"))
+                except Exception as e:
+                    if verbose:
+                        rel_path = file_path.relative_to(repo_root)
+                        console.print(f"  [red]✗[/red] {rel_path}: Error in MDX syntax - {e}")
 
         # LNK-010 runs after the per-file pass because it needs the whole
         # scanned set: a link is only rewritten when exactly one discovered
