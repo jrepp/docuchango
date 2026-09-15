@@ -1,6 +1,6 @@
 [project]
 name = "docuchango"
-version = "1.19.0-rc.9"
+version = "1.19.0-rc.10"
 description = "Docusaurus validation and repair framework for opinionated micro-CMS documentation, designed for human-agent collaboration workflows"
 readme = "README.md"
 requires-python = ">=3.10,<3.16"

@@ -2,6 +2,20 @@
 
 <!-- version list -->
 
+## v1.19.0-rc.10 (2026-09-15)
+
+### Bug Fixes
+
+- **fixes**: Derive frontmatter doc type from configured schema
+  ([#83](https://github.com/jrepp/docuchango/pull/83),
+  [`6f70b3a`](https://github.com/jrepp/docuchango/commit/6f70b3aa5c193f5cc26ddb5911161d17095cd37e))
+
+### Testing
+
+- **readability**: Add RD-001 sub-project fixture cases
+  ([`e74085f`](https://github.com/jrepp/docuchango/commit/e74085f144bc90f88bc2830fcbc9edab4b215f9a))
+
+
 ## v1.19.0-rc.9 (2026-09-15)
 
 
