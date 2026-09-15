@@ -328,3 +328,80 @@ class TestInitCommand:
             assert "Copying templates..." in result.output
             assert "Successfully initialized" in result.output
             assert "Next steps:" in result.output
+
+
+class TestInitCommandTemplateSubstitutionSafety:
+    """docs-project.yaml's placeholder values ("my-project", "My Project", the sample
+    date) are substituted using a two-pass marker scheme specifically so that a
+    project id/name containing another placeholder's text (e.g. a project id ending
+    in a year, or a project name that itself contains "My Project") can't get
+    corrupted by a later substitution pass matching text the earlier pass just wrote.
+    These tests exercise the real `init` command with such values.
+    """
+
+    @pytest.fixture
+    def runner(self):
+        """Create a Click test runner."""
+        return CliRunner()
+
+    def test_project_id_containing_a_year_is_not_corrupted_by_date_substitution(self, runner, tmp_path):
+        """A project id like 'my-project-2025' must survive unchanged even though the
+        date substitution also writes digit strings into the same file."""
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            result = runner.invoke(
+                main,
+                ["init", "--project-id", "my-project-2025", "--project-name", "Infrastructure"],
+            )
+
+            assert result.exit_code == 0
+
+            content = (Path("docs-cms") / "docs-project.yaml").read_text()
+
+            assert "id: my-project-2025" in content
+            # The id must appear exactly once, and never with a date fragment fused on.
+            assert content.count("my-project-2025") == 1
+
+    def test_project_name_containing_the_default_placeholder_text_is_not_double_substituted(self, runner, tmp_path):
+        """A project name like 'My Project Management' contains the literal default
+        placeholder 'My Project'. It must end up applied verbatim everywhere the
+        placeholder appeared (including the description field), not partially
+        re-matched by a later substitution pass."""
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            result = runner.invoke(
+                main,
+                ["init", "--project-id", "infra-2024", "--project-name", "My Project Management"],
+            )
+
+            assert result.exit_code == 0
+
+            content = (Path("docs-cms") / "docs-project.yaml").read_text()
+
+            assert "id: infra-2024" in content
+            assert "name: My Project Management" in content
+            assert "description: Documentation for My Project Management" in content
+
+    def test_init_with_problematic_values_produces_a_clean_config(self, runner, tmp_path):
+        """End-to-end check with a project id/name pair that would trigger substitution
+        collisions in a naive sequential-replace implementation."""
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            result = runner.invoke(
+                main,
+                [
+                    "init",
+                    "--project-id",
+                    "my-project-2025",
+                    "--project-name",
+                    "My Project 2025",
+                ],
+            )
+
+            assert result.exit_code == 0
+
+            config_file = Path("docs-cms") / "docs-project.yaml"
+            assert config_file.exists()
+
+            content = config_file.read_text(encoding="utf-8")
+
+            assert "id: my-project-2025" in content
+            assert "name: My Project 2025" in content
+            assert "my-project-2025-11-05" not in content  # No date fused onto the id

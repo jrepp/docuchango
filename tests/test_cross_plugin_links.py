@@ -301,3 +301,20 @@ class TestCrossPluginLinksMain:
         main()
 
         assert "Fixed 0 files with cross-plugin links" in capsys.readouterr().out
+
+
+class TestCrossPluginLinksSourceEncoding:
+    """Guard against a regression where read_text()/write_text() drop the explicit
+    encoding="utf-8" argument. On this platform the OS default encoding is already
+    UTF-8, so a behavioral round-trip test would still pass even without the explicit
+    argument (Windows with a non-UTF-8 code page is where it would actually matter).
+    This test inspects the source directly so it fails immediately if the argument is
+    ever removed, regardless of which platform CI runs on.
+    """
+
+    def test_fix_cross_plugin_links_specifies_utf8_encoding(self):
+        """Test that fix_cross_plugin_links's file I/O declares encoding="utf-8"."""
+        import inspect
+
+        source = inspect.getsource(fix_cross_plugin_links)
+        assert 'encoding="utf-8"' in source
