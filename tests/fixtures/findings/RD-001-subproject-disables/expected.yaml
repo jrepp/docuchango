@@ -1,0 +1,15 @@
+summary: >-
+  A monorepo whose root config enables readability with a strict Flesch
+  minimum and whose sub-project disables it. Both documents carry the same
+  unreadable paragraph, but only the root's is scored.
+requires:
+  - textstat
+messages:
+  - "adr/adr-003-root-paragraph.md"
+  - "Line 14: Flesch Reading Ease score"
+  - "below minimum 90.0"
+forbidden:
+  - "adr-004-service-paragraph.md"
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1

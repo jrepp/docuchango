@@ -1,0 +1,16 @@
+version: "1"
+project:
+  id: service-a
+  name: Service A
+  description: Sub-project that switches readability on with a strict minimum
+structure:
+  adr_dir: adr
+  rfc_dir: rfcs
+  memo_dir: memos
+  document_folders:
+    - adr
+security:
+  allow_external_paths: false
+readability:
+  enabled: true
+  flesch_reading_ease_min: 90.0

@@ -1,0 +1,17 @@
+version: "1"
+project:
+  id: fixture-project
+  name: Fixture Project
+  description: Root project with readability switched off
+structure:
+  adr_dir: adr
+  rfc_dir: rfcs
+  memo_dir: memos
+  document_folders:
+    - adr
+security:
+  allow_external_paths: false
+readability:
+  enabled: false
+subprojects:
+  - services/service-a
