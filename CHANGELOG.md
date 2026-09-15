@@ -2,6 +2,42 @@
 
 <!-- version list -->
 
+## v1.19.0-rc.4 (2026-09-15)
+
+### Documentation
+
+- Correct dry-run and CI claims in the bootstrap guide
+  ([`4fa1bfd`](https://github.com/jrepp/docuchango/commit/4fa1bfd596f6a66ef6c1a4ffe96c17997972c38c))
+
+- Correct scanning, schema, and index claims in configuration guide
+  ([`cba6128`](https://github.com/jrepp/docuchango/commit/cba612811f4131c84913dc521dd722a1e98721c2))
+
+- Document structure.scan_subfolders
+  ([`8053642`](https://github.com/jrepp/docuchango/commit/8053642a891d3a9a6f592290608a3b013989c22c))
+
+- Fix README claims about fixes, CI, and Python support
+  ([`c3e7bad`](https://github.com/jrepp/docuchango/commit/c3e7badfd3b6b159ada1442e8d26aec9c177e9e3))
+
+- Narrow validation reference to match actual fix and check behavior
+  ([`a2b1411`](https://github.com/jrepp/docuchango/commit/a2b1411f4a15cad928bcd15abcc373d628503a13))
+
+- Update stale invalid-status example in prd-001
+  ([`a93e5e6`](https://github.com/jrepp/docuchango/commit/a93e5e620fd5148708f19748dcf10826864e60ef))
+
+### Features
+
+- **config**: Add structure.scan_subfolders to opt into scanning nested docs
+  ([`615e0b6`](https://github.com/jrepp/docuchango/commit/615e0b62267aa1fd48e9730ec96a9d7ae7256dcc))
+
+### Testing
+
+- Cover CONFIGURATION.md and VALIDATION_REFERENCE.md for stale CLI references
+  ([`2be933d`](https://github.com/jrepp/docuchango/commit/2be933d4ccaf68cacc5e08621db20f7055055195))
+
+- Cover scan_subfolders config and flip ID-011 to Implemented
+  ([`2891232`](https://github.com/jrepp/docuchango/commit/28912328ef5b716c545c4f6f338c6f5e83a9c895))
+
+
 ## v1.19.0-rc.3 (2026-09-15)
 
 ### Bug Fixes
