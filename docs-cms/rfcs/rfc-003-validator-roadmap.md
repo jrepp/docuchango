@@ -75,7 +75,7 @@ reported.
 | FM-005 | Missing `tags`, `project_id` or `doc_uuid` filled in | Implemented | fix | `fixes/whitespace.py` `ensure_required_fields` |
 | FM-006 | Recognized non-ISO date formats normalized | Implemented | fix | `fixes/frontmatter.py` |
 | FM-010 | `project_id` does not match the `project.id` of the config that governs the document's folder | Implemented | fix/report | `check_project_ids`, `_config_context_for_path`, `cli._discover_doc_claims`, `fixes/frontmatter.py` (`_fix_project_id_metadata`, `PROJECT_ID_PLACEHOLDER`) |
-| FM-011 | `created` or `updated` is not an ISO 8601 date or datetime | Planned | report | see below |
+| FM-011 | `created` or `updated` is not `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM:SSZ` | Implemented | report | `check_date_formats`, `is_accepted_date_format`, `frontmatter_date_source`, `Document.date_source` |
 | ID-001 | Top-level filename does not match the configured pattern (files in subfolders are support material and are not scanned, unless `structure.scan_subfolders` or a per-type override enables ID-011) | Implemented | report | `check_ids`, `_scan_document_folder` |
 | ID-002 | `id` does not match the filename; an ADR amendment `adr-NNN-amendment-MM-*` is expected to carry id `adr-NNN-aMM` | Implemented | report | `check_ids`, `_scan_document_folder` |
 | ID-003 | `id` does not match the number in the title | Implemented | report | `check_ids` |
@@ -261,15 +261,47 @@ its own. Missing numbers are printed as a compact range list
 file is at fault - the CLI shows it at the repository root, the same place a
 `SCAN-001` or a blocked config path lands. Report only.
 
+**FM-011 Date format (shipped).** `created` is typed
+`datetime | date | str` in every schema and `updated` is in no schema at all,
+so a date in any shape whatsoever passed FM-002, and FM-006 rewrote only the
+formats it recognized and said nothing about the rest. `check_date_formats`
+now accepts exactly the two forms the bundled templates use - `YYYY-MM-DD` and
+`YYYY-MM-DDTHH:MM:SSZ` - and reports everything else as
+`FM-011: Frontmatter field 'created': '2024-1-5' is not YYYY-MM-DD or
+YYYY-MM-DDTHH:MM:SSZ`, naming the field and the value as written. The shape is
+matched with a regex and the digits are then parsed, so a well-shaped but
+impossible `2024-13-45` is reported too. Report only: FM-006 already rewrites
+what can be rewritten with confidence, and guessing whether `01/02/2024` is
+January or February is exactly what it refuses to do.
+
+The check reads the scalars out of the document source with `yaml.compose`
+rather than off the parsed metadata, because the parse erases the distinction
+the check is about. YAML resolves an unquoted `2024-01-05` to a
+`datetime.date` and both `2024-01-05T10:00:00Z` and `2024-01-05T10:00:00+00:00`
+to the same aware `datetime`, so only the source text can tell the accepted
+`Z` form from the offset form. A UTC offset is not accepted: this RFC names
+`Z`, and `Z` is what `fixes/timestamps.py` writes wherever docuchango
+generates a timestamp itself. Quoting makes no difference - `'2026-05-30'`
+and `2026-05-30` are the same value and both pass.
+
+Two inputs are skipped so nothing is said twice. A field that is absent, and a
+field written `created:` with no value at all, which YAML resolves to `None`:
+FM-002 owns a missing or null `created`, and FM-005 fills one in. An explicit
+empty string is reported, as `(empty)`, because the schema accepts it. A value
+YAML never parses at all - an unquoted `created: 2024-13-45`, which PyYAML
+raises on - never reaches this check either; the document fails to parse and is
+reported as such.
+
+Phase 1 runs before the checks, so a format FM-006 recognizes is already ISO
+8601 by the time Phase 2 looks and FM-011 stays silent; a `--dry-run` reports
+both FM-006's proposed rewrite and the FM-011 finding, since nothing has been
+written, which is how FMT-012 presents the same pairing. A format FM-006
+cannot identify is an FM-011 report in either mode.
+
 ### Planned validators
 
 Each entry lists what it detects, what it may fix, and the constraint that
 keeps it safe.
-
-**FM-011 Date format.** Accept `YYYY-MM-DD` and `YYYY-MM-DDTHH:MM:SSZ`, the
-two forms the templates use. Anything else that FM-006 did not recognize is
-reported with the value seen. No new fixing: FM-006 already rewrites the
-formats it can identify with confidence.
 
 **MDX-011 Indented code blocks.** `_mask_code` masks fenced blocks and
 inline spans before the prose checks run, but not 4-space indented code

@@ -1,0 +1,12 @@
+summary: >-
+  An ADR whose `created` is `2026/09/14`, one of the formats FM-006 rewrites
+  with confidence. A dry run reports the FM-011 finding alongside the rewrite
+  FM-006 proposes, because nothing has been written yet; the fixing run
+  repairs the value in Phase 1, so FM-011 is silent in Phase 2.
+messages:
+  - "FM-011: Frontmatter field 'created': '2026/09/14' is not YYYY-MM-DD or YYYY-MM-DDTHH:MM:SSZ"
+fix_messages:
+  - "Converted created from '2026/09/14' to '2026-09-14'"
+fixed: true
+dry_run_exit_code: 1
+exit_code: 0

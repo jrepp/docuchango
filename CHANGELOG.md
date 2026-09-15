@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.19.0-rc.15 (2026-09-15)
+
+### Features
+
+- **validate**: Implement FM-011 date format check
+  ([`c943806`](https://github.com/jrepp/docuchango/commit/c9438065603d05715cbc126f0cf05c2a5e206b8c))
+
+
 ## v1.19.0-rc.14 (2026-09-15)
 
 ### Bug Fixes

@@ -94,6 +94,78 @@ from docuchango.text_io import (
 # ...) is never a filesystem path and must not be resolved as one.
 _URI_SCHEME_PATTERN = re.compile(r"[A-Za-z][A-Za-z0-9+.\-]*:")
 
+#: Frontmatter fields FM-011 checks. The legacy ``date`` field is excluded:
+#: Phase 1 migrates it to ``created`` before Phase 2 could report it.
+DATE_FIELDS = ("created", "updated")
+
+#: The two forms the bundled templates use, named in FM-011 messages.
+FM_011_ACCEPTED_FORMS = "YYYY-MM-DD or YYYY-MM-DDTHH:MM:SSZ"
+
+#: ``YYYY-MM-DD`` and ``YYYY-MM-DDTHH:MM:SSZ``, paired with the ``strptime``
+#: format that confirms the digits are a real point in time. A UTC offset
+#: (``+00:00``) is deliberately not accepted: RFC-003 names ``Z``, and ``Z`` is
+#: what docuchango writes wherever it generates a timestamp itself.
+_FM_011_FORMS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"\d{4}-\d{2}-\d{2}"), "%Y-%m-%d"),
+    (re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z"), "%Y-%m-%dT%H:%M:%SZ"),
+)
+
+#: The YAML block between the opening and closing ``---`` of a document.
+_FRONTMATTER_BLOCK_PATTERN = re.compile(r"\A---[ \t]*\n(.*?)^---[ \t]*$", re.DOTALL | re.MULTILINE)
+
+
+def is_accepted_date_format(value: str) -> bool:
+    """Whether a ``created``/``updated`` value is one of the two FM-011 forms.
+
+    The shape is matched with a regex and the digits are then parsed, so
+    ``2024-13-45`` is rejected even though it has the right shape.
+    """
+    for pattern, fmt in _FM_011_FORMS:
+        if not pattern.fullmatch(value):
+            continue
+        try:
+            datetime.strptime(value, fmt)
+        except ValueError:
+            return False
+        return True
+    return False
+
+
+def frontmatter_date_source(content: str, metadata: dict[str, Any]) -> dict[str, str]:
+    """Return the :data:`DATE_FIELDS` scalars of ``content`` exactly as written.
+
+    YAML resolves an unquoted ``2024-01-05`` to a ``datetime.date`` and both
+    ``2024-01-05T10:00:00Z`` and ``2024-01-05T10:00:00+00:00`` to the same
+    aware ``datetime``, so the parsed value cannot tell the accepted ``Z`` form
+    from the offset form. The source text can, which is why FM-011 reads the
+    scalars back out of the document with ``yaml.compose``: it parses without
+    constructing values, and hands back the original text with quoting and
+    trailing comments already stripped.
+
+    A field is omitted when it is absent, when its value is ``null`` (which the
+    schema check owns for ``created``) and when it is not a scalar at all.
+    """
+    match = _FRONTMATTER_BLOCK_PATTERN.match(content)
+    if match is None:
+        return {}
+    try:
+        node = yaml.compose(match.group(1), Loader=yaml.SafeLoader)
+    except yaml.YAMLError:
+        return {}
+    if not isinstance(node, yaml.MappingNode):
+        return {}
+
+    source: dict[str, str] = {}
+    for key_node, value_node in node.value:
+        if not isinstance(key_node, yaml.ScalarNode) or key_node.value not in DATE_FIELDS:
+            continue
+        if not isinstance(value_node, yaml.ScalarNode):
+            continue
+        if metadata.get(key_node.value) is None:
+            continue
+        source[key_node.value] = value_node.value
+    return source
+
 
 class LinkType(Enum):
     """Types of links in markdown documents"""
@@ -124,6 +196,11 @@ class Document:
     # the document has no frontmatter at all), which FM-002/FM-005 already
     # own, so FM-010 leaves it alone.
     project_id: str | None = None
+    # Source text of the `created`/`updated` frontmatter scalars, keyed by
+    # field name, for FM-011. Absent, null and non-scalar values are left out:
+    # the parse cannot distinguish a `Z` timestamp from a `+00:00` one, so the
+    # check reads the document source (see `frontmatter_date_source`).
+    date_source: dict[str, str] = field(default_factory=dict)
     links: list["Link"] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     _content_cache: str | None = None  # Cached file content to avoid multiple reads
@@ -775,6 +852,7 @@ class DocValidator:
                     doc_id=metadata.get("id", ""),
                     expected_id=expected_id,
                     project_id=self._frontmatter_project_id(metadata),
+                    date_source=frontmatter_date_source(content, metadata),
                     _content_cache=content,
                 )
 
@@ -806,6 +884,7 @@ class DocValidator:
                 expected_id=expected_id,
                 doc_uuid=metadata.get("doc_uuid", ""),
                 project_id=self._frontmatter_project_id(metadata),
+                date_source=frontmatter_date_source(content, metadata),
                 _content_cache=content,
             )
 
@@ -2033,6 +2112,44 @@ class DocValidator:
         else:
             self.log(f"   ✗ Found {mismatches} project_id mismatch(es)")
 
+    def check_date_formats(self):
+        """Validate `created` and `updated` date formats (FM-011).
+
+        Only two forms are accepted, the ones the bundled templates use:
+        `YYYY-MM-DD` and `YYYY-MM-DDTHH:MM:SSZ`. Everything else is reported
+        with the value as written, including a UTC offset (`+00:00`) and a
+        timestamp with no zone at all, because RFC-003 names `Z` and `Z` is
+        what docuchango writes wherever it generates a timestamp.
+
+        Phase 1 runs first, so a value FM-006 recognizes (`2026/09/14`,
+        `14.09.2026`, `September 14, 2026`, ...) is already ISO 8601 by the
+        time this runs and nothing is reported; a `--dry-run` reports both
+        FM-006's proposed rewrite and this finding, the way FMT-012 does. A
+        format FM-006 cannot identify stays a report in either mode: guessing
+        the intent of `01/02/2024` is exactly what the fixer refuses to do.
+
+        A field that is absent or explicitly null is skipped: the schema check
+        (FM-002) owns a missing `created`, and `updated` is not in any schema.
+        """
+        self.log("\n📅 Checking date formats...")
+
+        findings = 0
+        for doc in self.documents:
+            for field_name in DATE_FIELDS:
+                value = doc.date_source.get(field_name)
+                if value is None or is_accepted_date_format(value):
+                    continue
+                shown = f"'{value}'" if value.strip() else "(empty)"
+                error = f"FM-011: Frontmatter field '{field_name}': {shown} is not {FM_011_ACCEPTED_FORMS}"
+                doc.errors.append(error)
+                self.log(f"   ✗ {doc.file_path.name}: {error}")
+                findings += 1
+
+        if findings == 0:
+            self.log(f"   ✓ All created/updated values are {FM_011_ACCEPTED_FORMS}")
+        else:
+            self.log(f"   ✗ Found {findings} unrecognized date format(s)")
+
     def _display_path(self, path: Path) -> str:
         """Render a path relative to the repository root when it is inside it."""
         try:
@@ -2353,6 +2470,7 @@ class DocValidator:
         self.extract_links()
         self.validate_links()
         self.check_project_ids()  # FM-010: project_id vs the governing config
+        self.check_date_formats()  # FM-011: created/updated date formats
         self.check_ids()  # Validate document IDs
         self.check_numbering_gaps()  # ID-010: opt-in numbering gap report
         self.check_uuids()  # Validate document UUID uniqueness
