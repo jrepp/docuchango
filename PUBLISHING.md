@@ -19,7 +19,8 @@ On every run, `.github/workflows/release.yml`:
 
 1. Runs `python-semantic-release`, which reads the conventional commits since
    the last release, bumps `project.version` in `pyproject.toml`, updates
-   `CHANGELOG.md`, commits `chore(release): X.Y.Z`, and tags.
+   `CHANGELOG.md`, refreshes `uv.lock`, commits `chore(release): X.Y.Z`, and
+   tags.
 2. Creates the GitHub release. The notes are the changelog section for the
    version, followed by GitHub's generated "What's Changed" list of merged PRs.
    For a stable release the notes roll up every rc section since the previous
@@ -32,6 +33,16 @@ On every run, `.github/workflows/release.yml`:
 
 If no commit since the last release warrants a bump (only `docs:`, `chore:`,
 `ci:` etc.), the workflow exits without releasing.
+
+`uv.lock` records the project's own version, so it has to move with every
+bump. `build_command` is `uv lock && uv build` and `assets = ["uv.lock"]`:
+semantic-release writes the new version to `pyproject.toml`, runs the build
+command, then commits the files it rewrote plus everything in `assets`, so the
+restamped lock lands in the same `chore(release):` commit. Plain `uv lock` (no
+`--upgrade`) only restamps the version; it never moves dependencies. CI syncs
+with `uv sync --locked`, so a lock left behind by a dependency change fails the
+PR instead of dirtying every checkout. You never need to commit a lock bump by
+hand after a release.
 
 Version bumps follow `pyproject.toml` `[tool.semantic_release]`:
 
