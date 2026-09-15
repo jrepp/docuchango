@@ -215,6 +215,9 @@ def validate(
     if dry_run:
         console.print("[yellow]DRY RUN - No changes will be made[/yellow]\n")
 
+    # Discovered document paths are resolved, so the root must be too or
+    # Path.relative_to raises for a root that goes through a symlink.
+    repo_root = repo_root.resolve()
     all_files = _discover_doc_files(repo_root)
 
     # Track fixes applied and remaining issues
@@ -348,7 +351,7 @@ def validate(
     # Summary line
     summary_parts = []
     if files_with_fixes:
-        summary_parts.append(f"{files_with_fixes} fixed")
+        summary_parts.append(f"{files_with_fixes} {'fixable' if dry_run else 'fixed'}")
     if files_with_issues:
         summary_parts.append(f"{files_with_issues} with issues")
     if summary_parts:

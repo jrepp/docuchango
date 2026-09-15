@@ -273,11 +273,11 @@ def _tree_snapshot(root: Path) -> dict[str, bytes]:
 def _stage(case: FindingCase, tmp_path: Path) -> Path:
     """Copy a fixture into ``tmp_path`` as a standalone repository root.
 
-    ``tmp_path`` is resolved because the CLI compares resolved document paths
-    against the ``--repo-root`` it was handed; on macOS an unresolved
-    ``/var/folders/...`` root makes ``Path.relative_to`` raise.
+    ``tmp_path`` is deliberately not resolved: on macOS it goes through the
+    ``/var`` symlink, which is exactly the shape of ``--repo-root`` that
+    ``validate`` must handle without raising.
     """
-    root = tmp_path.resolve() / "repo"
+    root = tmp_path / "repo"
     shutil.copytree(case.path, root)
     (root / "expected.yaml").unlink(missing_ok=True)
     if not any(root.rglob("docs-project.yaml")):
