@@ -1,0 +1,14 @@
+summary: >-
+  An ADR whose `created` is `2024-1-5`. The zero padding is missing, so YAML
+  leaves the value a plain string and FM-006 has no format to rewrite it from:
+  FM-011 reports it with the value as written, in the dry run and in the
+  fixing run alike. The second ADR carries both accepted forms and pins them
+  as findings the check must not produce.
+messages:
+  - "FM-011: Frontmatter field 'created': '2024-1-5' is not YYYY-MM-DD or YYYY-MM-DDTHH:MM:SSZ"
+forbidden:
+  - "FM-011: Frontmatter field 'created': '2026-01-02T09:35:12Z'"
+  - "FM-011: Frontmatter field 'updated'"
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1

@@ -52,6 +52,7 @@ Neither `--dry-run` nor `--skip-build` suppresses the check.
 - `id` that does not match the number in the title
 - Duplicate `id` or `doc_uuid` across documents
 - `FM-010`: `project_id` that does not match the `project.id` of the config that governs the document
+- `FM-011`: a `created` or `updated` value that is not `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM:SSZ`
 - Binary or non-UTF-8 files in a document folder
 
 The `id`/`doc_uuid` mismatch and duplicate checks above apply only to the
@@ -64,6 +65,15 @@ config, not the root one, so a document under a sub-project is measured
 against the sub-project's ID. A document whose frontmatter has no `project_id`
 key at all is left to the schema check above, and a document that no config
 governs is skipped.
+
+`FM-011` accepts exactly the two forms the bundled templates use:
+`YYYY-MM-DD` and `YYYY-MM-DDTHH:MM:SSZ`. Quoting makes no difference, but a
+UTC offset does: `2026-09-14T09:35:12+00:00` is reported, because only `Z` is
+accepted. So is a timestamp with no zone, a date with no zero padding
+(`2026-9-4`) and a well-shaped but impossible date (`2026-13-45`) - the digits
+are parsed, not only matched. A field that is absent or written with no value
+at all is left to the schema check above; an explicit empty string is reported
+as `(empty)`.
 
 **Fixed automatically**
 
@@ -103,8 +113,10 @@ generated and an invalid status is reported instead of mapped.
 - Malformed UUIDs
 - `id` and filename or title mismatches
 - Duplicate ids or UUIDs
-- Dates in a format the fixer does not recognize: `created` accepts any
-  string, so an unrecognized date is neither rewritten nor reported
+- Dates in a format the fixer does not recognize. `FM-011` reports the field
+  and the value as written; rewriting it is left to you, because guessing
+  whether `01/02/2026` is January or February is exactly what the fixer
+  refuses to do
 - A `project_id` that is neither empty nor the `my-project` placeholder but
   still does not match the governing config. A different value may be
   deliberate, so `FM-010` reports it and never rewrites it; set the right

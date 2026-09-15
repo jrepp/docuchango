@@ -449,3 +449,145 @@ class TestProjectIdMatch:
         assert len(findings) == 1
         assert "service-a" in findings[0]
         assert "root-project" in findings[0]
+
+
+class TestDateFormats:
+    """FM-011: `created` and `updated` accept two forms and nothing else."""
+
+    CONFIG = (
+        'version: "1"\n'
+        "project:\n"
+        "  id: root-project\n"
+        "  name: Root Project\n"
+        "  description: Root project of the test tree\n"
+        "structure:\n"
+        "  adr_dir: adr\n"
+        "  rfc_dir: rfcs\n"
+        "  memo_dir: memos\n"
+        "  document_folders:\n"
+        "    - adr\n"
+        "security:\n"
+        "  allow_external_paths: false\n"
+        "readability:\n"
+        "  enabled: false\n"
+    )
+
+    @staticmethod
+    def _adr(date_lines: str) -> str:
+        return (
+            "---\n"
+            "id: adr-001\n"
+            'title: "ADR-001: Test"\n'
+            "status: Accepted\n"
+            f"{date_lines}"
+            "tags: []\n"
+            'deciders: "Engineering Team"\n'
+            "project_id: root-project\n"
+            "doc_uuid: 4f2f2b3e-0e2c-4b0a-9a4f-2a8b1c9d0e11\n"
+            "---\n"
+            "\n"
+            "# ADR-001: Test\n"
+        )
+
+    def _tree(self, tmp_path: Path, date_lines: str) -> Path:
+        docs_cms = tmp_path / "docs-cms"
+        (docs_cms / "adr").mkdir(parents=True)
+        (docs_cms / "docs-project.yaml").write_text(self.CONFIG, encoding="utf-8")
+        (docs_cms / "adr" / "adr-001-test.md").write_text(self._adr(date_lines), encoding="utf-8")
+        return tmp_path
+
+    def _findings(self, tmp_path: Path, date_lines: str) -> list[str]:
+        root = self._tree(tmp_path, date_lines)
+        validator = DocValidator(repo_root=root, verbose=False)
+        validator.scan_documents()
+        validator.check_date_formats()
+        return [error for doc in validator.documents for error in doc.errors if "FM-011" in error]
+
+    def test_yaml_native_date_is_accepted(self, tmp_path: Path) -> None:
+        """An unquoted `2026-01-02` parses to a date object and is valid."""
+        assert self._findings(tmp_path, "created: 2026-01-02\n") == []
+
+    def test_quoted_date_is_accepted(self, tmp_path: Path) -> None:
+        """Quoting is a YAML detail, not a different value."""
+        assert self._findings(tmp_path, "created: '2026-01-02'\n") == []
+
+    def test_utc_timestamp_is_accepted(self, tmp_path: Path) -> None:
+        """The `Z` datetime form the templates use is valid."""
+        assert self._findings(tmp_path, "created: 2026-01-02T09:35:12Z\n") == []
+
+    def test_updated_is_checked_too(self, tmp_path: Path) -> None:
+        """`updated` is in no schema, so FM-011 is the only check that sees it."""
+        findings = self._findings(tmp_path, "created: 2026-01-02\nupdated: 02/01/2026\n")
+
+        assert len(findings) == 1
+        assert "'updated'" in findings[0]
+        assert "'02/01/2026'" in findings[0]
+
+    def test_utc_offset_is_reported(self, tmp_path: Path) -> None:
+        """`+00:00` parses to the same datetime as `Z`, but only `Z` is accepted."""
+        findings = self._findings(tmp_path, "created: 2026-01-02T09:35:12+00:00\n")
+
+        assert len(findings) == 1
+        assert "'2026-01-02T09:35:12+00:00'" in findings[0]
+        assert "YYYY-MM-DD or YYYY-MM-DDTHH:MM:SSZ" in findings[0]
+
+    def test_timestamp_without_a_zone_is_reported(self, tmp_path: Path) -> None:
+        """A naive datetime is neither of the two accepted forms."""
+        findings = self._findings(tmp_path, "created: 2026-01-02T09:35:12\n")
+
+        assert len(findings) == 1
+        assert "'2026-01-02T09:35:12'" in findings[0]
+
+    def test_impossible_calendar_date_is_reported(self, tmp_path: Path) -> None:
+        """The shape is right, so only parsing the digits catches this one."""
+        findings = self._findings(tmp_path, "created: '2026-13-45'\n")
+
+        assert len(findings) == 1
+        assert "'2026-13-45'" in findings[0]
+
+    def test_unpadded_date_is_reported(self, tmp_path: Path) -> None:
+        """YAML leaves `2026-1-2` a string, and FM-006 has no format for it."""
+        findings = self._findings(tmp_path, "created: 2026-1-2\n")
+
+        assert len(findings) == 1
+        assert "'2026-1-2'" in findings[0]
+
+    def test_garbage_string_is_reported(self, tmp_path: Path) -> None:
+        """Anything that is not a date at all is reported with the value seen."""
+        findings = self._findings(tmp_path, "created: yesterday\n")
+
+        assert len(findings) == 1
+        assert "'yesterday'" in findings[0]
+
+    def test_empty_string_is_reported(self, tmp_path: Path) -> None:
+        """The schema accepts `""` as a string, so FM-011 is what catches it."""
+        findings = self._findings(tmp_path, "created: ''\n")
+
+        assert len(findings) == 1
+        assert "(empty)" in findings[0]
+
+    def test_null_value_is_left_to_the_schema(self, tmp_path: Path) -> None:
+        """`created:` with no value fails FM-002, so FM-011 does not double-report."""
+        root = self._tree(tmp_path, "created:\n")
+        validator = DocValidator(repo_root=root, verbose=False)
+        validator.scan_documents()
+        validator.check_date_formats()
+
+        errors = validator.documents[0].errors
+        assert any("created" in error for error in errors), "FM-002 must still report the null value"
+        assert not any("FM-011" in error for error in errors)
+
+    def test_missing_field_is_left_to_the_schema(self, tmp_path: Path) -> None:
+        """An absent `created` is FM-002's finding and FM-005's repair."""
+        root = self._tree(tmp_path, "")
+        validator = DocValidator(repo_root=root, verbose=False)
+        validator.scan_documents()
+        validator.check_date_formats()
+
+        errors = validator.documents[0].errors
+        assert any("created" in error and "Field required" in error for error in errors)
+        assert not any("FM-011" in error for error in errors)
+
+    def test_legacy_date_field_is_not_reported(self, tmp_path: Path) -> None:
+        """Phase 1 migrates `date` to `created`, so FM-011 leaves it alone."""
+        assert self._findings(tmp_path, "created: 2026-01-02\ndate: 02/01/2026\n") == []
