@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 try:
-    import textstat  # type: ignore[import-untyped]
+    import textstat  # type: ignore[import-untyped, import-not-found]
 
     TEXTSTAT_AVAILABLE = True
 except ImportError:

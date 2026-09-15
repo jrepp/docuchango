@@ -146,3 +146,4 @@ cython_debug/
 # Project specific
 test_install.py.backup
 *.backup
+.claude/settings.local.json

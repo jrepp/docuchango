@@ -66,8 +66,15 @@ every check, are tracked in the
 
 - Internal links to files that do not exist
 - Relative paths (`./x`, `../x`) that do not resolve
+- Bare relative paths (`adr/adr-012-trust.md`, `other-doc`) that do not
+  resolve against the linking document's folder; a suffix-less target is
+  also tried with `.md`, and a link to an existing folder (`../adr/`) is
+  valid as written
 - Cross-references to ADRs or RFCs that do not exist
-- Links that climb several `../` levels across plugin boundaries
+- Links that resolve outside the repository root, reported one per link with
+  its line number and target. A link that points elsewhere *inside* the
+  repository, such as `../../internal/notes.md` or the repository `README.md`,
+  is legitimate and is not reported
 
 **Left to you**
 
@@ -79,9 +86,18 @@ Fix them by hand, or with your own tooling, and validate again.
 
 **Detected**
 
-- Unescaped `<` or `>` before a number, which MDX reads as JSX
-- Other characters that break MDX parsing
+- A `<` that starts something MDX reads as a JSX tag but that is not a valid
+  element: a bare placeholder in prose such as `<token>`, `<agentName>` or
+  `<time-out>`
 - MDX or JSX compilation errors
+
+A `<` or `>` is only a tag when a letter follows immediately, so comparisons
+(`<5ms`, `>90%`, `a < b`, `< threshold`) are not reported. Known HTML
+elements (`<br/>`, `<sup>`, `<div class="x">`), PascalCase JSX components
+(`<Outlet />`), self-closing tags and CommonMark autolinks
+(`<https://example.com>`, `<team@example.com>`) are all valid and are not
+reported either. Code fences, inline code spans and the frontmatter block are
+excluded from the check.
 
 **Left to you**
 
@@ -109,6 +125,12 @@ wrap the text in backticks, then validate again.
 
 - Names that do not match `type-NNN-slug.md` or the configured pattern,
   unless `enforce_filename_pattern: false` is set for that folder
+
+Only files directly inside a document folder are treated as documents. A file
+in a subfolder (`prd/testing/notes.md`, `memos/private/draft.md`) is support
+material: it is skipped, not validated and not renamed. An ADR amendment
+(`adr-043-amendment-01-cap.md`) is expected to carry the amendment id
+`adr-043-a1`.
 
 There is no gap or sequence check: a jump from `adr-004` to `adr-009` is not
 reported. Filename problems are always left to you, because renaming can break
