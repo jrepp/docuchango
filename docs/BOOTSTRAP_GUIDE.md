@@ -178,7 +178,7 @@ Every type requires:
 | `title` | Plain title without the id |
 | `created` | ISO 8601 date or timestamp |
 | `tags` | List of lowercase, hyphenated tags |
-| `project_id` | Must equal `project.id` in the config |
+| `project_id` | Copy `project.id` by convention; docuchango does not compare them |
 | `doc_uuid` | UUID v4, generated once and never changed |
 
 Per type:
