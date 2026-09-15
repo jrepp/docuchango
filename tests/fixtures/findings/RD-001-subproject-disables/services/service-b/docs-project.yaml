@@ -1,0 +1,15 @@
+version: "1"
+project:
+  id: service-b
+  name: Service B
+  description: Sub-project that switches readability off
+structure:
+  adr_dir: adr
+  rfc_dir: rfcs
+  memo_dir: memos
+  document_folders:
+    - adr
+security:
+  allow_external_paths: false
+readability:
+  enabled: false
