@@ -1,349 +1,369 @@
-"""Tests for internal_links.py fix module."""
+"""LNK-010: candidate-based internal link rewriting.
 
-import sys
-
-from docuchango.fixes import internal_links
-from docuchango.fixes.internal_links import fix_links_in_content, fix_links_in_file, main, process_directory
-
-
-class TestInternalLinksContent:
-    """Test content-level link fixing."""
-
-    def test_fix_rfc_link_with_date_prefix(self):
-        """Test removing date prefix from RFC link."""
-        content = "[RFC](../rfcs/2025-10-13-rfc-001-test.md)"
-        fixed, count = fix_links_in_content(content)
-        assert count == 1
-        assert "[RFC](../rfcs/rfc-001-test.md)" in fixed
-        assert "2025-10-13" not in fixed
-
-    def test_fix_adr_link_with_date_prefix(self):
-        """Test removing date prefix from ADR link."""
-        content = "[ADR](./2025-10-15-adr-003-decision.md)"
-        fixed, count = fix_links_in_content(content)
-        assert count == 1
-        assert "[ADR](./adr-003-decision.md)" in fixed
-        assert "2025-10-15" not in fixed
-
-    def test_fix_memo_link_with_date_prefix(self):
-        """Test removing date prefix from MEMO link."""
-        content = "[Memo](../memos/2025-11-01-memo-005-note.md)"
-        fixed, count = fix_links_in_content(content)
-        assert count == 1
-        assert "[Memo](../memos/memo-005-note.md)" in fixed
-
-    def test_fix_link_without_directory_prefix(self):
-        """Test link without directory path."""
-        content = "[Link](2025-10-13-rfc-001-test.md)"
-        fixed, count = fix_links_in_content(content)
-        assert count == 1
-        assert "[Link](rfc-001-test.md)" in fixed
-
-    def test_fix_link_with_anchor(self):
-        """Test link with URL anchor preserved."""
-        content = "[Link](../rfcs/2025-10-13-rfc-001-test.md#section)"
-        fixed, count = fix_links_in_content(content)
-        assert count == 1
-        assert "[Link](../rfcs/rfc-001-test.md#section)" in fixed
-        assert "#section" in fixed
-
-    def test_multiple_links_in_content(self):
-        """Test fixing multiple links."""
-        content = """[RFC 1](2025-10-13-rfc-001-test.md)
-[RFC 2](../rfcs/2025-10-14-rfc-002-other.md)
-[ADR](./2025-10-15-adr-003-decision.md)"""
-        fixed, count = fix_links_in_content(content)
-        assert count == 3
-        assert "rfc-001-test.md" in fixed
-        assert "rfc-002-other.md" in fixed
-        assert "adr-003-decision.md" in fixed
-        assert "2025-10" not in fixed
-
-    def test_no_changes_needed(self):
-        """Test content with no date-prefixed links."""
-        content = "[Already correct](../rfcs/rfc-001-test.md)"
-        fixed, count = fix_links_in_content(content)
-        assert count == 0
-        assert fixed == content
-
-    def test_preserve_link_text(self):
-        """Test that link text is preserved."""
-        content = "[My Important RFC Document](2025-10-13-rfc-001-test.md)"
-        fixed, count = fix_links_in_content(content)
-        assert "[My Important RFC Document]" in fixed
-
-    def test_preserve_non_doc_links(self):
-        """Test that non-document links are preserved."""
-        content = """[External](https://example.com)
-[RFC](2025-10-13-rfc-001-test.md)
-[Image](./image.png)"""
-        fixed, count = fix_links_in_content(content)
-        assert count == 1  # Only RFC link fixed
-        assert "https://example.com" in fixed
-        assert "./image.png" in fixed
-
-    def test_different_date_formats(self):
-        """Test various date formats."""
-        content = """[Link1](2025-01-01-rfc-001-test.md)
-[Link2](2025-12-31-adr-999-test.md)"""
-        fixed, count = fix_links_in_content(content)
-        assert count == 2
-        assert "rfc-001-test.md" in fixed
-        assert "adr-999-test.md" in fixed
-
-    def test_complex_paths(self):
-        """Test complex relative paths."""
-        content = "[Link](../../rfcs/2025-10-13-rfc-001-test.md)"
-        fixed, count = fix_links_in_content(content)
-        assert count == 1
-        assert "[Link](../../rfcs/rfc-001-test.md)" in fixed
-
-    def test_unicode_in_link_text(self):
-        """Test Unicode characters in link text."""
-        content = "[RFC → ✓](2025-10-13-rfc-001-test.md)"
-        fixed, count = fix_links_in_content(content)
-        assert count == 1
-        assert "→" in fixed
-        assert "✓" in fixed
-
-    def test_multiple_anchors(self):
-        """Test links with different anchors."""
-        content = """[Link1](2025-10-13-rfc-001-test.md#intro)
-[Link2](2025-10-13-rfc-001-test.md#conclusion)"""
-        fixed, count = fix_links_in_content(content)
-        assert count == 2
-        assert "rfc-001-test.md#intro" in fixed
-        assert "rfc-001-test.md#conclusion" in fixed
-
-
-class TestInternalLinksFile:
-    """Test file-level link fixing."""
-
-    def test_fix_links_in_file(self, tmp_path):
-        """Test fixing links in a file."""
-        test_file = tmp_path / "test.md"
-        content = "[RFC](2025-10-13-rfc-001-test.md)"
-        test_file.write_text(content, encoding="utf-8")
-
-        fixes = fix_links_in_file(test_file, dry_run=False)
-        assert fixes == 1
-
-        result = test_file.read_text(encoding="utf-8")
-        assert "rfc-001-test.md" in result
-        assert "2025-10-13" not in result
-
-    def test_dry_run_mode(self, tmp_path, capsys):
-        """Test dry-run mode doesn't modify files."""
-        test_file = tmp_path / "test.md"
-        content = "[RFC](2025-10-13-rfc-001-test.md)"
-        test_file.write_text(content, encoding="utf-8")
-
-        fixes = fix_links_in_file(test_file, dry_run=True)
-        assert fixes == 1
-
-        # File should not be modified
-        result = test_file.read_text(encoding="utf-8")
-        assert result == content
-        assert "2025-10-13" in result
-
-        # Should print dry-run message
-        captured = capsys.readouterr()
-        assert "DRY RUN" in captured.out
-
-    def test_no_changes_in_file(self, tmp_path):
-        """Test file with no changes needed."""
-        test_file = tmp_path / "test.md"
-        content = "[RFC](rfc-001-test.md)"
-        test_file.write_text(content, encoding="utf-8")
-
-        fixes = fix_links_in_file(test_file, dry_run=False)
-        assert fixes == 0
-
-    def test_error_handling_nonexistent_file(self, tmp_path, capsys):
-        """Test error handling for nonexistent file."""
-        test_file = tmp_path / "nonexistent.md"
-
-        fixes = fix_links_in_file(test_file, dry_run=False)
-        assert fixes == 0
-
-        captured = capsys.readouterr()
-        assert "Error" in captured.out
-
-    def test_unicode_content_preserved(self, tmp_path):
-        """Test Unicode content is preserved."""
-        test_file = tmp_path / "test.md"
-        content = """# Title → ✓
-
-[RFC](2025-10-13-rfc-001-test.md)
-
-Content: 中文 ✗
+``docuchango.fixes.internal_links`` rewrites a broken link when exactly one
+document in the scanned set carries the target's filename. These tests cover
+the fixer in isolation; ``tests/test_link_validation.py`` covers the same rule
+end to end through ``docuchango validate``, and
+``tests/fixtures/findings/LNK-010-*`` pins the CLI output.
 """
-        test_file.write_text(content, encoding="utf-8")
 
-        fix_links_in_file(test_file, dry_run=False)
-        result = test_file.read_text(encoding="utf-8")
+from __future__ import annotations
 
-        assert "→" in result
-        assert "✓" in result
-        assert "中文" in result
-        assert "✗" in result
+from pathlib import Path
 
-    def test_empty_file(self, tmp_path):
-        """Test empty file handling."""
-        test_file = tmp_path / "test.md"
-        test_file.write_text("", encoding="utf-8")
+from docuchango.fixes.internal_links import (
+    build_index,
+    fix_internal_links,
+    fix_links_in_tree,
+    main,
+)
+from docuchango.links import document_index
 
-        fixes = fix_links_in_file(test_file, dry_run=False)
-        assert fixes == 0
+DOC = """---
+id: rfc-001
+title: "RFC-001: Linking"
+---
 
+# RFC-001: Linking
 
-class TestInternalLinksDirectory:
-    """Test directory-level processing."""
-
-    def test_process_directory(self, tmp_path):
-        """Test processing multiple files in directory."""
-        docs_dir = tmp_path / "docs"
-        docs_dir.mkdir()
-
-        # Create files with links to fix
-        file1 = docs_dir / "file1.md"
-        file1.write_text("[RFC](2025-10-13-rfc-001-test.md)", encoding="utf-8")
-
-        file2 = docs_dir / "file2.md"
-        file2.write_text("[ADR](2025-10-15-adr-003-decision.md)", encoding="utf-8")
-
-        stats = process_directory(docs_dir, dry_run=False)
-
-        assert stats["files_checked"] == 2
-        assert stats["files_modified"] == 2
-        assert stats["total_fixes"] == 2
-
-    def test_process_directory_skips_readme(self, tmp_path):
-        """Test that README.md is skipped."""
-        docs_dir = tmp_path / "docs"
-        docs_dir.mkdir()
-
-        readme = docs_dir / "README.md"
-        readme.write_text("[Link](2025-10-13-rfc-001-test.md)", encoding="utf-8")
-
-        stats = process_directory(docs_dir, dry_run=False)
-
-        assert stats["files_checked"] == 0
-        # README should be skipped
-        assert "2025-10-13" in readme.read_text(encoding="utf-8")
-
-    def test_process_directory_skips_templates(self, tmp_path):
-        """Test that template files are skipped."""
-        docs_dir = tmp_path / "docs"
-        docs_dir.mkdir()
-
-        template = docs_dir / "template-doc.md"
-        template.write_text("[Link](2025-10-13-rfc-001-test.md)", encoding="utf-8")
-
-        stats = process_directory(docs_dir, dry_run=False)
-
-        assert stats["files_checked"] == 0
-
-    def test_process_directory_recursive(self, tmp_path):
-        """Test recursive directory processing."""
-        docs_dir = tmp_path / "docs"
-        sub_dir = docs_dir / "subfolder"
-        sub_dir.mkdir(parents=True)
-
-        file1 = docs_dir / "file1.md"
-        file1.write_text("[RFC](2025-10-13-rfc-001-test.md)", encoding="utf-8")
-
-        file2 = sub_dir / "file2.md"
-        file2.write_text("[ADR](2025-10-15-adr-003-decision.md)", encoding="utf-8")
-
-        stats = process_directory(docs_dir, dry_run=False)
-
-        assert stats["files_checked"] == 2
-        assert stats["files_modified"] == 2
-
-    def test_process_nonexistent_directory(self, tmp_path):
-        """Test processing nonexistent directory."""
-        docs_dir = tmp_path / "nonexistent"
-
-        stats = process_directory(docs_dir, dry_run=False)
-
-        assert stats["files_checked"] == 0
-        assert stats["files_modified"] == 0
-        assert stats["total_fixes"] == 0
-
-    def test_process_directory_mixed_files(self, tmp_path):
-        """Test directory with mix of files needing and not needing fixes."""
-        docs_dir = tmp_path / "docs"
-        docs_dir.mkdir()
-
-        # Needs fix
-        file1 = docs_dir / "file1.md"
-        file1.write_text("[RFC](2025-10-13-rfc-001-test.md)", encoding="utf-8")
-
-        # Already correct
-        file2 = docs_dir / "file2.md"
-        file2.write_text("[RFC](rfc-002-test.md)", encoding="utf-8")
-
-        # No links
-        file3 = docs_dir / "file3.md"
-        file3.write_text("# Just text", encoding="utf-8")
-
-        stats = process_directory(docs_dir, dry_run=False)
-
-        assert stats["files_checked"] == 3
-        assert stats["files_modified"] == 1
-        assert stats["total_fixes"] == 1
-
-    def test_process_directory_dry_run(self, tmp_path):
-        """Test directory processing in dry-run mode."""
-        docs_dir = tmp_path / "docs"
-        docs_dir.mkdir()
-
-        file1 = docs_dir / "file1.md"
-        content = "[RFC](2025-10-13-rfc-001-test.md)"
-        file1.write_text(content, encoding="utf-8")
-
-        stats = process_directory(docs_dir, dry_run=True)
-
-        assert stats["files_modified"] == 1
-        # File should not be modified in dry-run
-        assert file1.read_text(encoding="utf-8") == content
+{body}
+"""
 
 
-class TestInternalLinksMain:
-    """Test the main() entry point, which discovers docs-cms relative to the module file."""
+def _write(path: Path, body: str) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(DOC.format(body=body), encoding="utf-8")
+    return path
 
-    def _point_at(self, monkeypatch, tmp_path):
-        """Make main() treat tmp_path as the repo root containing docs-cms/."""
-        monkeypatch.setattr(internal_links, "__file__", str(tmp_path / "fixes" / "internal_links.py"))
 
-    def test_main_fixes_links_and_prints_summary(self, tmp_path, monkeypatch, capsys):
-        """main() processes docs-cms and prints a summary of files checked/modified."""
-        self._point_at(monkeypatch, tmp_path)
-        docs_cms = tmp_path / "docs-cms"
-        docs_cms.mkdir()
-        target = docs_cms / "guide.md"
-        target.write_text("[RFC](2025-10-13-rfc-001-test.md)", encoding="utf-8")
+def _tree(tmp_path: Path, body: str, *targets: str) -> tuple[Path, Path, list[Path]]:
+    """A repo with one linking RFC and a target document per ``targets``."""
+    source = _write(tmp_path / "docs-cms" / "rfcs" / "rfc-001-linking.md", body)
+    documents = [source] + [_write(tmp_path / rel, "Target.") for rel in targets]
+    return tmp_path, source, documents
 
-        monkeypatch.setattr(sys, "argv", ["internal_links"])
-        main()
 
-        assert "rfc-001-test.md" in target.read_text(encoding="utf-8")
-        out = capsys.readouterr().out
-        assert "Files checked:  1" in out
-        assert "Files modified: 1" in out
+def _fix(tmp_path: Path, source: Path, documents: list[Path], dry_run: bool = False) -> tuple[bool, list[str]]:
+    return fix_internal_links(source, build_index(documents, tmp_path), tmp_path, dry_run=dry_run)
 
-    def test_main_dry_run_leaves_files_untouched(self, tmp_path, monkeypatch, capsys):
-        """main() --dry-run reports what would change without writing files."""
-        self._point_at(monkeypatch, tmp_path)
-        docs_cms = tmp_path / "docs-cms"
-        docs_cms.mkdir()
-        target = docs_cms / "guide.md"
-        content = "[RFC](2025-10-13-rfc-001-test.md)"
-        target.write_text(content, encoding="utf-8")
 
-        monkeypatch.setattr(sys, "argv", ["internal_links", "--dry-run"])
-        main()
+class TestUniqueCandidate:
+    """Exactly one scanned document matches, so the link is rewritten."""
 
-        assert target.read_text(encoding="utf-8") == content
-        assert "DRY RUN MODE" in capsys.readouterr().out
+    def test_candidate_at_a_different_depth(self, tmp_path: Path) -> None:
+        root, source, documents = _tree(
+            tmp_path,
+            "See [the decision](./adr-003-decision.md).",
+            "docs-cms/adr/adr-003-decision.md",
+        )
+
+        changed, messages = _fix(root, source, documents)
+
+        assert changed
+        assert messages == ["LNK-010: Line 8: Rewrote link './adr-003-decision.md' to '../adr/adr-003-decision.md'"]
+        assert "(../adr/adr-003-decision.md)" in source.read_text(encoding="utf-8")
+
+    def test_candidate_deeper_than_the_linking_document(self, tmp_path: Path) -> None:
+        root, source, documents = _tree(
+            tmp_path,
+            "See [the note](./memo-004-note.md).",
+            "docs-cms/rfcs/archive/memo-004-note.md",
+        )
+
+        changed, messages = _fix(root, source, documents)
+
+        assert changed
+        assert "to './archive/memo-004-note.md'" in messages[0]
+
+    def test_candidate_in_a_subproject_folder(self, tmp_path: Path) -> None:
+        root, source, documents = _tree(
+            tmp_path,
+            "See [the service decision](./adr-002-service.md).",
+            "services/service-d/adr/adr-002-service.md",
+        )
+
+        changed, messages = _fix(root, source, documents)
+
+        assert changed
+        assert "to '../../services/service-d/adr/adr-002-service.md'" in messages[0]
+
+    def test_anchor_is_preserved(self, tmp_path: Path) -> None:
+        root, source, documents = _tree(
+            tmp_path,
+            "See [context](./adr-003-decision.md#context).",
+            "docs-cms/adr/adr-003-decision.md",
+        )
+
+        changed, _ = _fix(root, source, documents)
+
+        assert changed
+        assert "(../adr/adr-003-decision.md#context)" in source.read_text(encoding="utf-8")
+
+    def test_query_is_preserved(self, tmp_path: Path) -> None:
+        root, source, documents = _tree(
+            tmp_path,
+            "See [context](./adr-003-decision.md?plain=1).",
+            "docs-cms/adr/adr-003-decision.md",
+        )
+
+        _fix(root, source, documents)
+
+        assert "(../adr/adr-003-decision.md?plain=1)" in source.read_text(encoding="utf-8")
+
+    def test_suffix_less_target_matches_the_markdown_file(self, tmp_path: Path) -> None:
+        root, source, documents = _tree(
+            tmp_path,
+            "See [the decision](./adr-003-decision).",
+            "docs-cms/adr/adr-003-decision.md",
+        )
+
+        changed, _ = _fix(root, source, documents)
+
+        assert changed
+        assert "(../adr/adr-003-decision.md)" in source.read_text(encoding="utf-8")
+
+    def test_bare_relative_target_is_rewritten(self, tmp_path: Path) -> None:
+        root, source, documents = _tree(
+            tmp_path,
+            "See [the decision](adr/adr-003-decision.md).",
+            "docs-cms/adr/adr-003-decision.md",
+        )
+
+        changed, _ = _fix(root, source, documents)
+
+        assert changed
+        assert "(../adr/adr-003-decision.md)" in source.read_text(encoding="utf-8")
+
+    def test_two_broken_links_on_one_line(self, tmp_path: Path) -> None:
+        root, source, documents = _tree(
+            tmp_path,
+            "See [one](./adr-003-decision.md) and [two](./adr-004-other.md).",
+            "docs-cms/adr/adr-003-decision.md",
+            "docs-cms/adr/adr-004-other.md",
+        )
+
+        changed, messages = _fix(root, source, documents)
+
+        assert changed
+        assert len(messages) == 2
+        body = source.read_text(encoding="utf-8")
+        assert "[one](../adr/adr-003-decision.md)" in body
+        assert "[two](../adr/adr-004-other.md)" in body
+
+
+class TestLinksLeftAlone:
+    """Every case LNK-010 declines, leaving the link to LNK-001."""
+
+    def test_zero_candidates(self, tmp_path: Path) -> None:
+        root, source, documents = _tree(tmp_path, "See [gone](./adr-999-missing.md).")
+        before = source.read_text(encoding="utf-8")
+
+        changed, messages = _fix(root, source, documents)
+
+        assert not changed
+        assert messages == []
+        assert source.read_text(encoding="utf-8") == before
+
+    def test_two_candidates(self, tmp_path: Path) -> None:
+        root, source, documents = _tree(
+            tmp_path,
+            "See [setup](./setup.md).",
+            "docs-cms/guides/setup.md",
+            "docs-cms/handbook/setup.md",
+        )
+        before = source.read_text(encoding="utf-8")
+
+        changed, messages = _fix(root, source, documents)
+
+        assert not changed
+        assert messages == []
+        assert source.read_text(encoding="utf-8") == before
+
+    def test_link_inside_a_code_fence(self, tmp_path: Path) -> None:
+        body = "```markdown\nSee [the decision](./adr-003-decision.md).\n```"
+        root, source, documents = _tree(tmp_path, body, "docs-cms/adr/adr-003-decision.md")
+        before = source.read_text(encoding="utf-8")
+
+        changed, messages = _fix(root, source, documents)
+
+        assert not changed
+        assert messages == []
+        assert source.read_text(encoding="utf-8") == before
+
+    def test_link_inside_an_inline_code_span(self, tmp_path: Path) -> None:
+        root, source, documents = _tree(
+            tmp_path,
+            "Write `[the decision](./adr-003-decision.md)` in your document.",
+            "docs-cms/adr/adr-003-decision.md",
+        )
+        before = source.read_text(encoding="utf-8")
+
+        changed, _ = _fix(root, source, documents)
+
+        assert not changed
+        assert source.read_text(encoding="utf-8") == before
+
+    def test_link_that_already_resolves(self, tmp_path: Path) -> None:
+        root, source, documents = _tree(
+            tmp_path,
+            "See [the decision](../adr/adr-003-decision.md).",
+            "docs-cms/adr/adr-003-decision.md",
+        )
+
+        changed, messages = _fix(root, source, documents)
+
+        assert not changed
+        assert messages == []
+
+    def test_external_and_anchor_links(self, tmp_path: Path) -> None:
+        body = "[site](https://example.com/adr-003-decision.md) and [top](#context) and [mail](mailto:a@b.c)"
+        root, source, documents = _tree(tmp_path, body, "docs-cms/adr/adr-003-decision.md")
+
+        changed, _ = _fix(root, source, documents)
+
+        assert not changed
+
+    def test_reference_style_link_is_not_rewritten(self, tmp_path: Path) -> None:
+        body = "See [the decision][adr] for details.\n\n[adr]: ./adr-003-decision.md"
+        root, source, documents = _tree(tmp_path, body, "docs-cms/adr/adr-003-decision.md")
+
+        changed, _ = _fix(root, source, documents)
+
+        assert not changed
+
+    def test_target_with_a_link_title_is_not_rewritten(self, tmp_path: Path) -> None:
+        body = 'See [the decision](./adr-003-decision.md "The Decision").'
+        root, source, documents = _tree(tmp_path, body, "docs-cms/adr/adr-003-decision.md")
+
+        changed, _ = _fix(root, source, documents)
+
+        assert not changed
+
+    def test_candidate_outside_the_repository_root_is_not_a_candidate(self, tmp_path: Path) -> None:
+        repo = tmp_path / "repo"
+        outside = _write(tmp_path / "outside" / "adr-003-decision.md", "Target.")
+        source = _write(repo / "docs-cms" / "rfcs" / "rfc-001-linking.md", "See [it](./adr-003-decision.md).")
+
+        changed, messages = fix_internal_links(source, build_index([source, outside], repo), repo)
+
+        assert not changed
+        assert messages == []
+
+
+class TestIdempotence:
+    """A second run has nothing left to do."""
+
+    def test_second_run_is_a_no_op(self, tmp_path: Path) -> None:
+        root, source, documents = _tree(
+            tmp_path,
+            "See [the decision](./adr-003-decision.md#context).",
+            "docs-cms/adr/adr-003-decision.md",
+        )
+
+        changed, _ = _fix(root, source, documents)
+        assert changed
+        after_first = source.read_text(encoding="utf-8")
+
+        changed, messages = _fix(root, source, documents)
+
+        assert not changed
+        assert messages == []
+        assert source.read_text(encoding="utf-8") == after_first
+
+
+class TestDryRun:
+    """``--dry-run`` reports the rewrite without writing it."""
+
+    def test_dry_run_reports_but_does_not_write(self, tmp_path: Path) -> None:
+        root, source, documents = _tree(
+            tmp_path,
+            "See [the decision](./adr-003-decision.md).",
+            "docs-cms/adr/adr-003-decision.md",
+        )
+        before = source.read_text(encoding="utf-8")
+
+        changed, messages = _fix(root, source, documents, dry_run=True)
+
+        assert changed
+        assert len(messages) == 1
+        assert source.read_text(encoding="utf-8") == before
+
+
+class TestIndex:
+    """The candidate index."""
+
+    def test_document_index_groups_by_filename(self, tmp_path: Path) -> None:
+        index = document_index([tmp_path / "a" / "x.md", tmp_path / "b" / "x.md", tmp_path / "a" / "y.md"])
+
+        assert sorted(index) == ["x.md", "y.md"]
+        assert index["x.md"] == sorted(index["x.md"])
+        assert len(index["x.md"]) == 2
+
+    def test_build_index_drops_documents_outside_the_root(self, tmp_path: Path) -> None:
+        repo = tmp_path / "repo"
+        (repo / "adr").mkdir(parents=True)
+        inside = repo / "adr" / "in.md"
+        inside.write_text("x", encoding="utf-8")
+        outside = tmp_path / "out.md"
+        outside.write_text("x", encoding="utf-8")
+
+        index = build_index([inside, outside], repo)
+
+        assert set(index) == {"in.md"}
+
+
+class TestTreeAndMain:
+    """The whole-tree helper and the standalone entry point."""
+
+    def test_fix_links_in_tree_reports_each_rewrite(self, tmp_path: Path) -> None:
+        root, source, documents = _tree(
+            tmp_path,
+            "See [the decision](./adr-003-decision.md).",
+            "docs-cms/adr/adr-003-decision.md",
+        )
+
+        results = fix_links_in_tree(root, documents)
+
+        assert [path for path, _ in results] == [source]
+        assert "Rewrote link './adr-003-decision.md'" in results[0][1]
+
+    def test_main_takes_a_repo_root(self, tmp_path: Path, capsys) -> None:
+        config = tmp_path / "docs-cms" / "docs-project.yaml"
+        config.parent.mkdir(parents=True, exist_ok=True)
+        config.write_text(
+            "version: '1'\n"
+            "project:\n  id: p\n  name: P\n  description: d\n"
+            "structure:\n  adr_dir: adr\n  rfc_dir: rfcs\n  memo_dir: memos\n"
+            "  document_folders: [adr, rfcs, memos]\n",
+            encoding="utf-8",
+        )
+        source = _write(tmp_path / "docs-cms" / "rfcs" / "rfc-001-linking.md", "See [it](./adr-003-decision.md).")
+        _write(tmp_path / "docs-cms" / "adr" / "adr-003-decision.md", "Target.")
+
+        assert main(["--repo-root", str(tmp_path)]) == 0
+
+        assert "(../adr/adr-003-decision.md)" in source.read_text(encoding="utf-8")
+        assert "1 link(s) rewritten" in capsys.readouterr().out
+
+    def test_main_dry_run_leaves_files_untouched(self, tmp_path: Path, capsys) -> None:
+        config = tmp_path / "docs-cms" / "docs-project.yaml"
+        config.parent.mkdir(parents=True, exist_ok=True)
+        config.write_text(
+            "version: '1'\n"
+            "project:\n  id: p\n  name: P\n  description: d\n"
+            "structure:\n  adr_dir: adr\n  rfc_dir: rfcs\n  memo_dir: memos\n"
+            "  document_folders: [adr, rfcs, memos]\n",
+            encoding="utf-8",
+        )
+        source = _write(tmp_path / "docs-cms" / "rfcs" / "rfc-001-linking.md", "See [it](./adr-003-decision.md).")
+        _write(tmp_path / "docs-cms" / "adr" / "adr-003-decision.md", "Target.")
+        before = source.read_text(encoding="utf-8")
+
+        assert main(["--repo-root", str(tmp_path), "--dry-run"]) == 0
+
+        assert source.read_text(encoding="utf-8") == before
+        assert "1 link(s) would be rewritten" in capsys.readouterr().out
+
+    def test_main_on_a_tree_with_no_documents(self, tmp_path: Path, capsys) -> None:
+        assert main(["--repo-root", str(tmp_path)]) == 0
+        assert "No documents found" in capsys.readouterr().out

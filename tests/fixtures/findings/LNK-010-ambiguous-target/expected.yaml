@@ -1,0 +1,16 @@
+summary: >-
+  An ADR links to `./setup.md` and two scanned documents carry that filename,
+  one under `guides/` and one under `handbook/`. Which one was meant is a
+  judgement call, so LNK-010 leaves the link alone and LNK-001 keeps reporting
+  it with both candidates named. The two copies sit in `generic` lanes so the
+  shared filename is not also an ID or UUID duplicate.
+messages:
+  - "LNK-001: Line 14: Broken link './setup.md'"
+  - "2 scanned documents are named 'setup.md': ../guides/setup.md, ../handbook/setup.md"
+  - "LNK-010 rewrites a broken link only when exactly one document matches"
+# Two candidates: nothing is rewritten, in either mode.
+fixed: false
+forbidden:
+  - "LNK-010: Line 14: Rewrote link"
+dry_run_exit_code: 1
+exit_code: 1

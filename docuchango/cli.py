@@ -332,12 +332,14 @@ def validate(
     - Whitespace (trim values, remove empty fields)
     - Timestamps (created/updated from git history)
     - Code blocks (languages, blank lines, closing fences)
+    - Internal links, rewritten when exactly one scanned document matches
     - Internal link reachability
     - Markdown formatting issues
     - Consistent ADR/RFC numbering
     """
     from docuchango.fixes.code_blocks import fix_code_blocks
     from docuchango.fixes.frontmatter import fix_frontmatter_metadata
+    from docuchango.fixes.internal_links import build_index, fix_internal_links
     from docuchango.fixes.timestamps import update_document_timestamps
 
     try:
@@ -421,6 +423,22 @@ def validate(
                         rel_path = file_path.relative_to(repo_root)
                         console.print(f"  [red]✗[/red] {rel_path}: Error in Code blocks - {e}")
 
+        # LNK-010 runs after the per-file pass because it needs the whole
+        # scanned set: a link is only rewritten when exactly one discovered
+        # document carries the target's filename, so the candidate index has
+        # to be built before any document is looked at.
+        link_index = build_index(all_files, repo_root)
+        for file_path in all_files:
+            try:
+                changed, messages = fix_internal_links(file_path, link_index, repo_root, dry_run=dry_run)
+                if changed and messages:
+                    for msg in messages:
+                        fixes_applied.append((file_path, f"[Internal links] {msg}"))
+            except Exception as e:
+                if verbose:
+                    rel_path = file_path.relative_to(repo_root)
+                    console.print(f"  [red]✗[/red] {rel_path}: Error in Internal links - {e}")
+
     # Phase 2: Run validation to find remaining issues
     documents_scanned = 0
     try:
@@ -460,7 +478,7 @@ def validate(
                 remaining_issues.append(
                     (
                         link.source_doc,
-                        f"Line {link.line_number}: Broken link '{link.target}' - {link.error_message}",
+                        f"LNK-001: Line {link.line_number}: Broken link '{link.target}' - {link.error_message}",
                     )
                 )
 
