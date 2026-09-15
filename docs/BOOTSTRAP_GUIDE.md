@@ -1,364 +1,263 @@
 # docs-cms Bootstrap Guide
 
-This guide shows you how to bootstrap a working `docs-cms` system for agent-driven knowledge management and collaboration.
+This guide takes a repository from nothing to a validated `docs-cms/` in six
+steps, then explains the pieces you just created. It is the guide
+`docuchango bootstrap` prints.
 
 ## What is docs-cms?
 
-`docs-cms` is an opinionated micro-CMS (Content Management System) designed for human-agent collaboration. It provides:
+`docs-cms` is a folder of Markdown documents with structured frontmatter,
+kept in git next to the code it describes. It holds four kinds of document:
 
-- **Structured Knowledge Base**: Organized documentation with consistent schema validation
-- **Agent Grounding**: Agents can read and understand your project's context, decisions, and architecture
-- **Version Control**: All documentation lives in git with full history
-- **Validation**: Automated checks for frontmatter, links, formatting, and code blocks
-- **Self-Documenting**: The CMS itself explains how to use it through examples
+| Type | Answers | Example |
+|------|---------|---------|
+| ADR (Architecture Decision Record) | Why did we decide this? | `adr-007-adopt-postgres.md` |
+| RFC (Request for Comments) | What are we proposing to change? | `rfc-003-event-sourcing.md` |
+| Memo | What did we learn or plan? | `memo-012-load-test-results.md` |
+| PRD (Product Requirements Document) | What are we building and for whom? | `prd-002-self-serve-signup.md` |
 
-## Why Use docs-cms?
+Docuchango validates and repairs that folder. Humans get one searchable
+place for decisions. Coding agents get durable project memory they can read
+before acting and extend as they work.
 
-### For Humans
-- Single source of truth for project decisions and architecture
-- Easy to search and navigate
-- Consistent format across all documents
-- Automated validation catches errors early
+## Setup
 
-### For Agents
-- **Context Grounding**: Agents read the CMS to understand your project
-- **Decision History**: ADRs document why choices were made
-- **Active Knowledge**: Agents maintain and update documentation
-- **Collaborative**: Agents can propose new docs, updates, and fixes
-
-## Quick Start
-
-### 1. Initialize docs-cms
-
-Use the CLI to create the project structure, configuration, schema, and templates:
+### 1. Install
 
 ```bash
-docuchango init --project-id my-project --project-name "My Project"
+uv tool install docuchango      # or: pip install docuchango
+docuchango --version
 ```
 
-For an existing repository, inspect `docs-cms/` first and avoid overwriting human-authored documents. If the project already has a `docs-cms` directory, add only missing configuration or guidance files.
+`uvx docuchango ...` also works without installing anything.
 
-### 2. Review Configuration
+### 2. Initialize
 
-Review `docs-cms/docs-project.yaml` and keep project-specific values accurate:
+```bash
+docuchango init --project-id my-app --project-name "My App"
+```
+
+This creates `docs-cms/` with a config file, its JSON schema, a README,
+empty `adr/`, `rfcs/`, `memos/` and `prd/` folders, and a template for each
+type under `templates/`. If the target folder already has files in it, `init`
+stops and changes nothing; `--force` runs anyway and overwrites the files it
+generates, so back up a config you have edited before using it. Use `--path`
+to put it somewhere other than `./docs-cms`.
+
+### 3. Review the config
+
+Open `docs-cms/docs-project.yaml`. For a first project the only values to
+check are:
 
 ```yaml
-# yaml-language-server: $schema=./docs-project.schema.json
-version: "1"
 project:
-  id: my-project
-  name: My Project
-  description: Project documentation hub
-
-structure:
-  adr_dir: adr
-  rfc_dir: rfcs
-  memo_dir: memos
-  prd_dir: prd
-  template_dir: templates
-  document_folders:
-    - adr
-    - rfcs
-    - memos
-    - prd
+  id: my-app            # copy this value into each document's project_id
+  name: My App
+  description: Documentation for My App
 ```
 
-Use the local `docs-cms/docs-project.schema.json` file as the config reference. If it is unavailable, use the stable schema URL: `https://jrepp.github.io/docuchango/schemas/docs-project.schema.json`.
+Keeping `project.id` and every document's `project_id` in step is a
+convention, not a rule docuchango enforces: `project_id` is required on every
+document, but its value is never compared with the config.
 
-### 3. Add Agent Instructions
+Everything else has a working default and is documented inline as comments.
+The file points at `docs-project.schema.json`, so editors with a YAML
+language server validate it as you type. When you outgrow the defaults, see
+[CONFIGURATION.md](CONFIGURATION.md).
 
-Create or update a repository-level `AGENTS.md` file so coding agents know that `docs-cms` is the durable project memory:
+### 4. Write the first document
+
+Start with an ADR recording the decision to adopt docs-cms. Copy the
+template, rename it with the next number and a short slug, and fill in the
+frontmatter:
+
+```bash
+cp docs-cms/templates/adr-000-template.md docs-cms/adr/adr-001-adopt-docs-cms.md
+uuidgen | tr '[:upper:]' '[:lower:]'     # paste into doc_uuid
+date -u +%Y-%m-%dT%H:%M:%SZ              # paste into created
+```
+
+```yaml
+---
+id: adr-001
+title: Adopt docs-cms for engineering decisions
+status: Accepted
+created: 2026-09-14T10:00:00Z
+deciders: Platform Team
+tags: [documentation, process]
+project_id: my-app
+doc_uuid: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+---
+```
+
+Then replace the template body with your context, decision and consequences.
+
+### 5. Validate
+
+```bash
+docuchango validate --dry-run    # report only
+docuchango validate              # fix what can be fixed, report the rest
+```
+
+The dry run shows everything docuchango would change or cannot change. The
+second command applies the safe fixes: whitespace, tag normalization, date
+formats, code fence languages, missing defaults. Anything left in the report,
+such as an `id` that does not match its filename, needs a person.
+
+### 6. Tell your agents
+
+Create `AGENTS.md` at the repository root so coding agents treat `docs-cms/`
+as project memory:
 
 ```markdown
 # Agent Instructions
 
-Use `docs-cms/` as durable project memory. Before changing architecture, workflows, documentation policy, validation behavior, templates, or release process, search and read relevant ADRs, RFCs, PRDs, and memos.
+Use `docs-cms/` as durable project memory. Read the relevant ADRs, RFCs,
+PRDs and memos before changing architecture, schemas or process.
 
-When new durable knowledge is created, add or update a `docs-cms` document instead of leaving root-level working notes. Use ADRs for accepted decisions, RFCs for proposals, PRDs for product requirements, and memos for durable findings or plans.
+Record new durable knowledge as a docs-cms document, not as loose notes.
+ADRs for decisions, RFCs for proposals, PRDs for requirements, memos for
+findings. Do not mark an agent-authored decision `Accepted` without explicit
+human approval; use `Proposed` or write a memo.
 
-For this repository itself, remember that docuchango maintains docuchango's own docs-cms. Avoid circular wording such as "the tool validates itself" unless the exact scope is clear: changes to docuchango's product behavior belong in `docs-cms/`, while generated examples under `examples/docs-cms/` remain sample content.
-
-Run `docuchango validate --dry-run` before applying automatic documentation fixes, then run `docuchango validate` and summarize any remaining manual issues.
+After editing docs-cms, run `docuchango validate` and report anything it
+could not fix.
 ```
 
-### 4. Install docuchango
+Agents can print the full agent guide with `docuchango bootstrap --guide agent`.
 
-```bash
-pip install docuchango
-```
+You now have a working docs-cms. Commit it.
 
-### 5. Create Your First Document
-
-```bash
-cp docs-cms/templates/adr-000-template.md docs-cms/adr/adr-001-adopt-docs-cms.md
-uuidgen | tr '[:upper:]' '[:lower:]'
-```
-
-Then fill all placeholder frontmatter fields, update the heading and body, and validate before committing.
-
-### 6. Validate Your Documentation
-
-```bash
-# Preview issues without changing files
-docuchango validate --dry-run
-
-# Validate all documents and auto-fix what can be fixed
-docuchango validate
-
-# Generate a report
-docuchango validate --verbose
-```
-
-## Directory Structure
-
-```
-my-project/
-├── docs-cms/
-│   ├── docs-project.yaml       # Project configuration
-│   ├── docs-project.schema.json # Validation schema for project configuration
-│   ├── adr/                    # Architecture Decision Records
-│   │   ├── adr-001-*.md
-│   │   ├── adr-002-*.md
-│   │   └── ...
-│   ├── rfcs/                   # Request for Comments
-│   │   ├── rfc-001-*.md
-│   │   └── ...
-│   ├── memos/                  # Project memos
-│   │   ├── memo-001-*.md
-│   │   └── ...
-│   └── templates/              # Document templates
-│       ├── adr-template.md
-│       ├── rfc-template.md
-│       └── memo-template.md
-└── README.md
-```
-
-`docs-project.yaml` includes a YAML language-server pointer to
-`docs-project.schema.json`. Use that schema when editing config by hand or from
-an agent prompt. The stable published schema URL is
-`https://jrepp.github.io/docuchango/schemas/docs-project.schema.json`.
-Parent repositories can include nested docs projects with:
+## Add the CI check
 
 ```yaml
-subprojects:
-  - vendor/service-a
-  - vendor/service-b/docs-project.yaml
-```
-
-## Document Types
-
-### Architecture Decision Records (ADRs)
-**Purpose**: Document significant architectural decisions
-
-**When to use:**
-- Choosing technologies or frameworks
-- Defining system architecture
-- Setting coding standards
-- Infrastructure decisions
-
-**Schema**: See `docuchango/schemas.py` - `ADRSchema`
-
-### Request for Comments (RFCs)
-**Purpose**: Propose and discuss significant changes
-
-**When to use:**
-- New features or major changes
-- Design proposals
-- Process changes
-- Cross-cutting concerns
-
-**Schema**: See `docuchango/schemas.py` - `RFCSchema`
-
-### Memos
-**Purpose**: Share information and context
-
-**When to use:**
-- Meeting notes
-- Status updates
-- Investigation results
-- Technical explanations
-
-**Schema**: See `docuchango/schemas.py` - `MemoSchema`
-
-## Frontmatter Fields
-
-All documents require these fields:
-
-```yaml
----
-id: doc-NNN                    # Unique identifier (e.g., adr-001)
-title: Brief title             # Human-readable title
-created: 2026-05-30           # Creation date or timestamp
-tags: [tag1, tag2]            # Categorization tags
-project_id: my-project        # Project identifier
-doc_uuid: uuid-v4-here        # Unique UUID v4
----
-```
-
-Some document types require additional fields. For example, ADRs require `status` and `deciders`, RFCs require `status` and `author`, PRDs require `status`, `author`, and `target_release`, and memos require `author`.
-
-### Generating UUIDs
-
-```bash
-# macOS/Linux
-uuidgen | tr '[:upper:]' '[:lower:]'
-
-# Python
-python -c "import uuid; print(uuid.uuid4())"
-
-# Node.js
-node -e "console.log(require('crypto').randomUUID())"
-```
-
-## Validation
-
-### What Gets Validated
-
-✅ **Frontmatter Schema**
-- Required fields present
-- Correct types and formats
-- Valid UUID v4 format
-- Valid status values
-
-✅ **Links**
-- Internal links resolve
-- No broken references
-- Proper markdown link syntax
-
-✅ **Code Blocks**
-- Properly fenced
-- Language specified
-- Balanced delimiters
-
-✅ **Formatting**
-- No trailing whitespace
-- Blank lines before headings
-- Consistent line endings
-
-### Running Validation
-
-```bash
-# Preview issues without modifying files
-docuchango validate --dry-run
-
-# Verbose output
-docuchango validate --verbose
-
-# Check specific directory
-docuchango validate --repo-root /path/to/project
-
-# Apply automatic fixes
-docuchango validate
-```
-
-## Best Practices
-
-### Naming Conventions
-
-**Files**: `{type}-{number}-{kebab-case-title}.md`
-- ✅ `adr-001-adopt-microservices.md`
-- ✅ `rfc-042-user-authentication.md`
-- ❌ `ADR_001.md` (no underscores, wrong case)
-- ❌ `decision-about-stuff.md` (no type prefix)
-
-**IDs**: `{type}-{number}`
-- ✅ `adr-001`, `rfc-042`, `memo-123`
-- ❌ `ADR-1`, `rfc_042` (wrong format)
-
-### Document Workflow
-
-1. **Create from template**: Copy and modify template
-2. **Add frontmatter**: Fill in all required fields
-3. **Write content**: Use clear, concise language
-4. **Preview issues**: Run `docuchango validate --dry-run`
-5. **Apply fixes**: Run `docuchango validate` or manually fix any remaining issues
-6. **Commit**: Add to git with descriptive message
-7. **Review**: Have team review in PR
-
-### Status Transitions
-
-**ADR Status Flow:**
-```
-Proposed → Accepted → Implemented
-        → Deprecated
-        → Superseded (by adr-XXX)
-```
-
-**RFC Status Flow:**
-```
-Draft → Proposed → Accepted → Implemented
-      → Deprecated
-      → Superseded
-```
-
-**Memo Status:**
-Memos do not require a status. Use them for durable findings, plans, or informational context.
-
-## Integration with CI/CD
-
-### GitHub Actions Example
-
-```yaml
-name: Validate Documentation
-
+name: Validate docs
 on:
   pull_request:
-    paths:
-      - 'docs-cms/**'
-
+    paths: ['docs-cms/**']
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install docuchango
-        run: pip install docuchango
-
-      - name: Validate docs-cms
-        run: docuchango validate --verbose
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v8
+      - run: uvx docuchango validate --dry-run --verbose
 ```
 
-## Next Steps
+`--dry-run` makes the job fail on problems rather than rewriting files in CI.
+`fetch-depth: 0` gives docuchango the git history it uses for timestamps.
 
-1. **Add agent instructions**: Create or update `AGENTS.md` with the repository-specific docs-cms guidance above
-2. **Read the Agent Guide**: See `docs/AGENT_GUIDE.md` for instructions on how agents should interact with docs-cms
-3. **Review Examples**: Check `examples/docs-cms/` for sample documents
-4. **Set up CI**: Add validation to your CI/CD pipeline
-5. **Write Your First ADR**: Document why you adopted docs-cms!
+## Reference
+
+### Layout
+
+```text
+my-app/
+├── AGENTS.md
+└── docs-cms/
+    ├── docs-project.yaml
+    ├── docs-project.schema.json
+    ├── README.md
+    ├── adr/        adr-001-*.md, adr-002-*.md, ...
+    ├── rfcs/       rfc-001-*.md, ...
+    ├── memos/      memo-001-*.md, ...
+    ├── prd/        prd-001-*.md, ...
+    └── templates/  adr-000-template.md, rfc-000-template.md,
+                    memo-000-template.md, prd-000-template.md
+```
+
+### Frontmatter fields
+
+Every type requires:
+
+| Field | Rule |
+|-------|------|
+| `id` | Lowercase `type-NNN`, must match the filename prefix |
+| `title` | Plain title without the id |
+| `created` | ISO 8601 date or timestamp |
+| `tags` | List of lowercase, hyphenated tags |
+| `project_id` | Copy `project.id` by convention; docuchango does not compare them |
+| `doc_uuid` | UUID v4, generated once and never changed |
+
+Per type:
+
+| Type | Extra required | `status` values |
+|------|----------------|-----------------|
+| ADR | `status`, `deciders` | Proposed, Accepted, Implemented, Deprecated, Superseded |
+| RFC | `status`, `author` | Draft, Proposed, Accepted, Implemented, Deprecated, Superseded |
+| Memo | `author` | no status |
+| PRD | `status`, `author`, `target_release` | Draft, In Review, Approved, In Progress, Completed, Cancelled |
+
+`updated` is not stored. Derive it from git when you need it:
+`git log -1 --format=%aI <file>`.
+
+### Filenames and ids
+
+- Files: `{type}-{NNN}-{kebab-case-slug}.md`, for example `rfc-042-user-authentication.md`.
+- Ids: `{type}-{NNN}`, for example `rfc-042`.
+- Lowercase only. No underscores in the prefix.
+
+### Status flows
+
+```text
+ADR:  Proposed → Accepted → Implemented
+                          → Deprecated
+                          → Superseded (by adr-NNN)
+
+RFC:  Draft → Proposed → Accepted → Implemented
+                                  → Deprecated
+                                  → Superseded
+
+PRD:  Draft → In Review → Approved → In Progress → Completed
+                                                 → Cancelled
+```
+
+To replace a decision, write a new ADR and set the old one to `Superseded`.
+By convention the new document carries `supersedes: adr-NNN` and the old one
+`superseded_by: adr-MMM`; extra frontmatter fields like these are allowed.
+Do not rewrite history in the old document.
+
+### Choosing a type
+
+- A choice was made and should be remembered: **ADR**.
+- A change is being proposed and needs discussion: **RFC**.
+- A finding, plan, investigation or status worth keeping: **Memo**.
+- Requirements, users and success criteria for something to build: **PRD**.
 
 ## Troubleshooting
 
-### Common Issues
+Schema problems are reported as `Frontmatter field '<name>': <message>`,
+where the message comes from the schema itself.
 
-**Invalid UUID Format**
-```
-Error: doc_uuid must be a valid UUID v4 format
-Fix: Generate a new UUID with `uuidgen | tr '[:upper:]' '[:lower:]'`
-```
+**`ID mismatch: frontmatter has 'adr-000' but filename suggests 'adr-001'`**
+The template's `id` was not updated after copying. Set `id` to match the
+filename.
 
-**Missing Required Field**
-```
-Error: Field 'project_id' is required
-Fix: Add project_id to frontmatter
-```
+**`Broken link './adr-001-example.md' - File not found`**
+The template body contains an example link. Replace it with a real target or
+remove it.
 
-**Broken Internal Link**
-```
-Error: Link target not found: ../nonexistent.md
-Fix: Update link to point to existing file or create the target
-```
+**`Frontmatter field 'doc_uuid': Value error, doc_uuid must be a valid UUID v4 format. Got: ...`**
+Generate one with `uuidgen | tr '[:upper:]' '[:lower:]'`.
 
-**Invalid Status Value**
-```
-Error: status must be one of the valid values for that document type
-Fix: Use a valid status value from the schema
-```
+**`Frontmatter field 'project_id': Field required`**
+Add it, using the `project.id` from `docs-project.yaml` by convention. For
+many files at once: `docuchango bulk update --set project_id=my-app`.
 
-## Resources
+**`Frontmatter field 'status': Input should be 'Proposed', 'Accepted', ...`**
+Use a value from the table above for that document type. Common variants
+such as `accepted` or `Draft` on an ADR are corrected automatically.
 
-- **Schema Reference**: `docuchango/schemas.py`
-- **Templates**: `docs-cms/templates/`
-- **Examples**: `examples/docs-cms/`
-- **Agent Guide**: `docs/AGENT_GUIDE.md`
-- **GitHub**: https://github.com/jrepp/docuchango
+**Nothing is scanned**
+The folder is not listed in `document_folders`, or the config is not where
+you ran the command. Use `--repo-root` to point at the right directory.
+
+## Next
+
+- [CONFIGURATION.md](CONFIGURATION.md): monorepos, mixed schemas, naming
+  standards, index files.
+- [VALIDATION_REFERENCE.md](VALIDATION_REFERENCE.md): every check and fix.
+- [AGENT_GUIDE.md](AGENT_GUIDE.md): how agents should use the docs-cms.
+- `examples/docs-cms/`: a complete sample project.

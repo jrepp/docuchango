@@ -1,24 +1,60 @@
 name: Release
 
+# Automated releases driven by python-semantic-release.
+#
+#   push to main        -> release candidate (v1.19.0-rc.1 -> PyPI 1.19.0rc1),
+#                          GitHub "pre-release"
+#   Run workflow (UI)   -> promote: the same commits are released as stable
+#                          (v1.19.0), GitHub "latest"
+#
+# Every push to main runs semantic-release. If the conventional commits since
+# the last release warrant a version bump, this workflow tags, creates the
+# GitHub release, publishes to PyPI via trusted publishing, builds PyApp
+# binaries, signs the distributions with Sigstore, and attaches everything to
+# the GitHub release. See PUBLISHING.md.
+#
+# semantic-release picks the channel by branch name. The promote path checks
+# out main's HEAD under the local name `stable`, which pyproject.toml maps to a
+# non-prerelease channel, then pushes the release commit and tag back to main.
+#
+# NOTE: the GitHub release is created with GITHUB_TOKEN, which never triggers
+# other workflows. That is why the binary/signing jobs live here rather than
+# in a `release: published` workflow. For the same reason the release commit
+# pushed back to main does not re-trigger this workflow.
+
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      promote:
+        description: "Promote to stable: release the current rc series on main as vX.Y.Z"
+        type: boolean
+        default: true
 
 permissions:
-  contents: write
-  issues: write
-  pull-requests: write
-  id-token: write  # IMPORTANT: mandatory for trusted publishing to PyPI
+  contents: read
 
 jobs:
   release:
     name: Semantic Release
+    # Dispatch is only meaningful from main; other refs are not release groups.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     concurrency: release
     environment:
       name: pypi
       url: https://pypi.org/p/docuchango
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      id-token: write  # IMPORTANT: mandatory for trusted publishing to PyPI
+    outputs:
+      released: ${{ steps.release.outputs.released }}
+      version: ${{ steps.release.outputs.version }}
+      prerelease: ${{ steps.release.outputs.prerelease }}
 
     steps:
       - name: Check out the repository
@@ -37,25 +73,56 @@ jobs:
         id: release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Only a manual dispatch with the promote box ticked produces a stable
+          # release. Pushes and un-ticked dispatches produce release candidates.
+          PROMOTE: ${{ github.event_name == 'workflow_dispatch' && inputs.promote == true }}
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
 
-          # Store the current tag before running semantic-release
+          # Nearest tag on main before this run: the previous rc or stable.
           OLD_TAG="$(git describe --tags --abbrev=0 2>/dev/null || echo 'none')"
 
-          # Run semantic-release (uv tool run installs and runs in one step)
+          if [ "$PROMOTE" = "true" ]; then
+            CHANNEL=stable
+            # Channel is selected by branch name; see
+            # [tool.semantic_release.branches.stable] in pyproject.toml.
+            git checkout -B stable
+          else
+            CHANNEL=rc
+          fi
+          echo "Channel: $CHANNEL"
+
+          # uv tool run installs and runs in one step.
           uv tool run python-semantic-release version --no-push
 
-          # Check if a new tag was created
           NEW_TAG="$(git describe --tags --abbrev=0 2>/dev/null || echo 'none')"
+
+          # Most recent stable tag other than the one just created. Used as the
+          # lower bound for stable release notes.
+          PREV_STABLE="$(git tag --list 'v*' --merged HEAD --sort=-v:refname \
+            | grep -vE -- '-rc\.' | grep -vx -- "$NEW_TAG" | head -n1 || true)"
+
+          if [ "$CHANNEL" = "rc" ]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "old_tag=${OLD_TAG}" >> "$GITHUB_OUTPUT"
+          echo "prev_stable=${PREV_STABLE}" >> "$GITHUB_OUTPUT"
 
           if [ "$OLD_TAG" = "$NEW_TAG" ]; then
             echo "No version change detected (tag: $NEW_TAG)"
             echo "released=false" >> "$GITHUB_OUTPUT"
           else
             echo "Version bumped from $OLD_TAG to $NEW_TAG"
-            git push origin main --follow-tags
+            # Always land on main, whichever local branch name we released from.
+            # --atomic: if main moved under us the whole push is rejected,
+            # tag included. Without it git pushes the tag and the branch as
+            # separate refs, the tag survives on an orphaned commit, and every
+            # later run refuses to release because that version "already
+            # exists". That is what silently disabled releases in May 2026.
+            git push --atomic origin HEAD:main --follow-tags
             echo "released=true" >> "$GITHUB_OUTPUT"
             echo "version=${NEW_TAG}" >> "$GITHUB_OUTPUT"
           fi
@@ -64,38 +131,194 @@ jobs:
         if: steps.release.outputs.released == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
           VERSION: ${{ steps.release.outputs.version }}
+          PRERELEASE: ${{ steps.release.outputs.prerelease }}
+          OLD_TAG: ${{ steps.release.outputs.old_tag }}
+          PREV_STABLE: ${{ steps.release.outputs.prev_stable }}
         run: |
-          # Extract the changelog section for this version
-          # The VERSION already includes 'v' prefix (e.g., v1.0.2)
-          # Escape regex metacharacters in VERSION for safe use in awk pattern
-          ESCAPED_VERSION=$(printf '%s\n' "$VERSION" | sed -e 's/[]\\/$*.^[]/\\&/g')
-          CHANGELOG_SECTION=$(awk "/^## ${ESCAPED_VERSION} /{flag=1; next} /^## /{flag=0} flag" CHANGELOG.md)
+          # Escape regex metacharacters for safe use in awk patterns.
+          esc() { printf '%s\n' "$1" | sed -e 's/[]\/$*.^[]/\\&/g'; }
+          V="$(esc "$VERSION")"
 
-          # Fallback to generic message if changelog section is empty
-          if [ -z "$CHANGELOG_SECTION" ]; then
-            CHANGELOG_SECTION="Release ${VERSION}"
+          NOTES_FILE=$(mktemp)
+
+          if [ "$PRERELEASE" = "true" ]; then
+            # rc: the changelog section for this version only.
+            awk "/^## ${V} /{flag=1; next} /^## /{flag=0} flag" CHANGELOG.md > "$NOTES_FILE"
+            NOTES_SINCE="$OLD_TAG"
+          else
+            # stable: semantic-release writes an empty section for a promoted
+            # version because the commits were already listed under the rc
+            # sections. Roll up everything between this header and the
+            # previous stable header, which is exactly the rc series.
+            if [ -n "$PREV_STABLE" ]; then
+              P="$(esc "$PREV_STABLE")"
+              awk "/^## ${V} /{flag=1; next} /^## ${P} /{flag=0} flag" CHANGELOG.md > "$NOTES_FILE"
+              printf 'Stable release of the changes since %s.\n\n' "$PREV_STABLE" | cat - "$NOTES_FILE" > "${NOTES_FILE}.tmp"
+              mv "${NOTES_FILE}.tmp" "$NOTES_FILE"
+            else
+              awk "/^## ${V} /{flag=1; next} flag" CHANGELOG.md > "$NOTES_FILE"
+            fi
+            NOTES_SINCE="$PREV_STABLE"
           fi
 
-          # Write changelog section to a temporary file to safely handle multiline content
-          NOTES_FILE=$(mktemp)
-          printf "%s\n" "$CHANGELOG_SECTION" > "$NOTES_FILE"
+          if [ ! -s "$NOTES_FILE" ]; then
+            printf 'Release %s\n' "$VERSION" > "$NOTES_FILE"
+          fi
 
-          # Create GitHub release with changelog
+          # Append GitHub's generated "What's Changed" (merged PRs, contributors,
+          # full-changelog link) so the curated changelog is followed by the
+          # PR-level view. Best effort: a failure here must not block the release.
+          GEN_ARGS=(-f tag_name="$VERSION")
+          if [ -n "$NOTES_SINCE" ] && [ "$NOTES_SINCE" != "none" ]; then
+            GEN_ARGS+=(-f previous_tag_name="$NOTES_SINCE")
+          fi
+          if GENERATED="$(gh api "repos/${REPO}/releases/generate-notes" "${GEN_ARGS[@]}" --jq .body 2>/dev/null)" \
+             && [ -n "$GENERATED" ]; then
+            printf '\n---\n\n%s\n' "$GENERATED" >> "$NOTES_FILE"
+          else
+            echo "::warning::Could not generate GitHub release notes; using changelog only"
+          fi
+
+          # Release candidates are flagged as pre-releases and never become "latest"
+          if [ "$PRERELEASE" = "true" ]; then
+            RELEASE_FLAGS=(--prerelease)
+          else
+            RELEASE_FLAGS=(--latest)
+          fi
+
           gh release create "${VERSION}" \
             --title "${VERSION}" \
             --notes-file "$NOTES_FILE" \
-            --latest
+            "${RELEASE_FLAGS[@]}"
 
-          # Clean up temporary file
           rm -f "$NOTES_FILE"
 
       - name: Build distribution packages
         if: steps.release.outputs.released == 'true'
         run: uv build
 
+      - name: Check package metadata
+        if: steps.release.outputs.released == 'true'
+        run: uv tool run twine check dist/*
+
+      - name: Store the distribution packages
+        if: steps.release.outputs.released == 'true'
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: python-package-distributions
+          path: dist/
+
       - name: Publish to PyPI
         if: steps.release.outputs.released == 'true'
-        uses: pypa/gh-action-pypi-publish@v1.14.0
+        uses: pypa/gh-action-pypi-publish@v1.14.2
         with:
           packages-dir: dist/
+
+  build-pyapp-binaries:
+    name: Build PyApp binaries
+    needs: release
+    if: needs.release.outputs.released == 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: docuchango-linux-x86_64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: docuchango-macos-aarch64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: docuchango-windows-x86_64.exe
+
+    steps:
+      - uses: actions/checkout@v6.0.2
+        with:
+          ref: ${{ needs.release.outputs.version }}
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Download PyApp
+        run: |
+          git clone --depth 1 --branch v0.29.0 https://github.com/ofek/pyapp.git pyapp-src
+        shell: bash
+
+      - name: Build PyApp binary
+        env:
+          PYAPP_PROJECT_NAME: docuchango
+          PYAPP_EXEC_MODULE: docuchango.cli:main
+          PYAPP_PYTHON_VERSION: "3.14"
+          VERSION_TAG: ${{ needs.release.outputs.version }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          # Strip 'v' prefix from version tag; pip normalizes 1.1.0-rc.1 -> 1.1.0rc1
+          export PYAPP_PROJECT_VERSION="${VERSION_TAG#v}"
+          cd pyapp-src
+          cargo build --release --target "$TARGET"
+        shell: bash
+
+      - name: Rename binary
+        env:
+          TARGET: ${{ matrix.target }}
+          ARTIFACT_NAME: ${{ matrix.artifact_name }}
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            mv "pyapp-src/target/${TARGET}/release/pyapp.exe" "$ARTIFACT_NAME"
+          else
+            mv "pyapp-src/target/${TARGET}/release/pyapp" "$ARTIFACT_NAME"
+          fi
+        shell: bash
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: pyapp-binary-${{ matrix.os }}
+          path: ${{ matrix.artifact_name }}
+
+  release-assets:
+    name: Sign and attach release assets
+    needs:
+      - release
+      - build-pyapp-binaries
+    if: needs.release.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # IMPORTANT: mandatory for uploading GitHub Release assets
+      id-token: write  # IMPORTANT: mandatory for sigstore
+
+    steps:
+      - name: Download all the dists
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Download PyApp binaries
+        uses: actions/download-artifact@v8.0.1
+        with:
+          pattern: pyapp-binary-*
+          path: binaries/
+          merge-multiple: true
+
+      - name: Sign the dists with Sigstore
+        uses: sigstore/gh-action-sigstore-python@v3.3.0
+        with:
+          inputs: >-
+            ./dist/*.tar.gz
+            ./dist/*.whl
+
+      - name: Upload dists, signatures and binaries to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.release.outputs.version }}
+          REPO: ${{ github.repository }}
+        # `dist/` contains the built packages plus the sigstore-produced
+        # signature bundles. Use --clobber to replace existing assets.
+        run: |
+          gh release upload "$VERSION" dist/* binaries/* --clobber --repo "$REPO"

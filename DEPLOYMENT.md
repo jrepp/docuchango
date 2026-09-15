@@ -1,5 +1,10 @@
 # Deployment Guide for docuchango
 
+> **This is the manual, token-based procedure.** It is kept for emergencies and
+> for understanding what the automation does. Normal releases are automated by
+> semantic-release on `main` (release candidates on every merge, promoted to
+> stable on demand) with trusted publishing. See [PUBLISHING.md](PUBLISHING.md).
+
 This guide covers how to publish the `docuchango` package to PyPI and TestPyPI.
 
 ## Prerequisites
