@@ -288,3 +288,7 @@ changelog_file = "CHANGELOG.md"
 allowed_tags = ["feat", "fix", "docs", "style", "refactor", "perf", "test", "build", "ci", "chore"]
 minor_tags = ["feat"]
 patch_tags = ["fix", "perf"]
+
+[dependency-groups]
+# Installed by a bare `uv sync`, so a fresh checkout can run the tests and linters.
+dev = ["docuchango[dev]"]
