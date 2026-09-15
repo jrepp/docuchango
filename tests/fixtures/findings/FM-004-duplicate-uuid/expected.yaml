@@ -1,0 +1,7 @@
+summary: Two ADRs that carry the same `doc_uuid`.
+messages:
+  - "Duplicate UUID '22222222-2222-4222-8222-222222222222'"
+  - "also used by adr-004-first.md"
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1

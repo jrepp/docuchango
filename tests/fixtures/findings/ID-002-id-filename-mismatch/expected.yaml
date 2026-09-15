@@ -1,0 +1,6 @@
+summary: An ADR whose frontmatter `id` disagrees with its filename.
+messages:
+  - "ID mismatch: frontmatter has 'adr-007' but filename suggests 'adr-002'"
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1

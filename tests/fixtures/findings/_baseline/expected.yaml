@@ -1,0 +1,9 @@
+summary: >-
+  A healthy tree that must produce no findings at all. Not keyed to a finding
+  ID: the leading underscore keeps it out of registry discovery. It guards
+  against false positives, so a new check cannot pass its own fixture by
+  firing on every document.
+messages: []
+fixed: false
+dry_run_exit_code: 0
+exit_code: 0

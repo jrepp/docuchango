@@ -1,0 +1,7 @@
+summary: An ADR with a relative link that climbs out of the docs root.
+messages:
+  - "Found 1 cross-plugin link(s) - use absolute GitHub URLs instead"
+# LNK-011 (planned) would rewrite these to absolute repository URLs.
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1

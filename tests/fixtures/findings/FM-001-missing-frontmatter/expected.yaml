@@ -1,0 +1,11 @@
+summary: An ADR with no YAML frontmatter block at all.
+# Substrings that must appear in the output of `docuchango validate --dry-run`.
+messages:
+  - "Missing YAML frontmatter"
+# `validate` (without --dry-run) repairs this finding.
+fixed: true
+# Substrings expected in the "Fixes applied" section when the fix runs.
+fix_messages:
+  - "[Frontmatter metadata] Added frontmatter block with ID 'adr-001'"
+dry_run_exit_code: 1
+exit_code: 0

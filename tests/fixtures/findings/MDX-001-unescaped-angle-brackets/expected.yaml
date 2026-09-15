@@ -1,0 +1,10 @@
+summary: >-
+  An ADR with bare `<` and `>` before numbers in a bullet list, which MDX
+  reads as the start of a JSX tag.
+messages:
+  - "Line 16: Unescaped < before number (use &lt; or backticks)"
+  - "Line 17: Unescaped > before number (use &gt; or backticks)"
+# MDX-010 (planned) would escape these automatically.
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1
