@@ -67,7 +67,7 @@ reported.
 | ID | Check | Status | Mode | Where |
 |----|-------|--------|------|-------|
 | FM-001 | Missing YAML frontmatter block | Implemented | report | `DocValidator.scan_documents` |
-| FM-002 | Frontmatter fails the per-type Pydantic schema (required fields, types, status values) | Implemented | fix/report | `scan_documents`, `fixes/frontmatter.py` |
+| FM-002 | Frontmatter fails the per-type Pydantic schema (required fields, types, status values) | Implemented | fix/report | `scan_documents`, `schemas.py` (`Literal` types and `VALID_*_STATUSES`), `fixes/frontmatter.py` (`VALID_STATUSES` and `STATUS_MAPPINGS`) |
 | FM-003 | Malformed `doc_uuid` | Implemented | report | `schemas.py` validators |
 | FM-004 | Duplicate `doc_uuid` across documents | Implemented | report | `check_uuids` |
 | FM-005 | Missing `tags`, `project_id` or `doc_uuid` filled in | Implemented | fix | `fixes/whitespace.py` `ensure_required_fields` |
