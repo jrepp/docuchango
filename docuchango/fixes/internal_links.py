@@ -14,6 +14,8 @@ import re
 import sys
 from pathlib import Path
 
+from docuchango.text_io import read_text
+
 
 def fix_links_in_content(content: str) -> tuple[str, int]:
     """Fix all internal markdown links in content.
@@ -59,7 +61,7 @@ def fix_links_in_content(content: str) -> tuple[str, int]:
 def fix_links_in_file(file_path: Path, dry_run: bool = False) -> int:
     """Fix links in a single file. Returns number of fixes."""
     try:
-        content = file_path.read_text(encoding="utf-8")
+        content = read_text(file_path)
         fixed_content, fixes = fix_links_in_content(content)
 
         if fixes > 0:

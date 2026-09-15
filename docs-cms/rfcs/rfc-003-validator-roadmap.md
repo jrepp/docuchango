@@ -92,6 +92,7 @@ reported.
 | FMT-002 | More than two consecutive blank lines | Implemented | report | `check_formatting` |
 | FMT-010 | CRLF or mixed line endings | Planned | fix | see below |
 | FMT-011 | Collapse runs of blank lines | Planned | fix | see below |
+| FMT-012 | UTF-8 byte-order mark before the frontmatter | Implemented | fix | `check_formatting`, `text_io.py`, `fixes/frontmatter.py`, `fixes/whitespace.py` |
 | CB-001 | Code fence without a language, or unclosed fence | Implemented | fix/report | `check_code_blocks`, `fixes/code_blocks.py` |
 | IDX-001 | Document index missing, unlinked, or missing bucket headings | Implemented | report | `check_document_indexes` |
 | RD-001 | Paragraph outside the configured readability thresholds | Implemented | report | `check_readability` |
@@ -107,6 +108,19 @@ scanning nested files with the same id/uuid/link/filename rules as top-level
 files, matched against the file name and not the subfolder path.
 `structure.doc_types.<type>.scan_subfolders` overrides the structure default
 for one document type. Report only.
+
+**FMT-012 UTF-8 byte-order mark (shipped).** `python-frontmatter` wants the
+opening `---` at byte zero, so a BOM in front of it made a perfectly good
+document look like it had no frontmatter at all: every Phase 1 fixer bailed
+out with "No frontmatter found" and Phase 2 reported FM-001 for a document
+that has frontmatter. Every document and config read now goes through
+`docuchango/text_io.py`, which drops a leading BOM the way `utf-8-sig` does,
+and every write stays plain UTF-8. `check_formatting` reports
+`FMT-012: UTF-8 byte-order mark at start of file` from the bytes on disk,
+which is what a `--dry-run` shows; a fixing run removes the mark in Phase 1
+and reports `FMT-012: Removed UTF-8 byte-order mark`. The BOM is the only
+thing removed: when no other fix applies, the original text is rewritten
+verbatim rather than re-serialized.
 
 ### Planned validators
 

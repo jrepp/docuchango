@@ -250,3 +250,71 @@ status: accepted
 
         # A file whose frontmatter can't be parsed is skipped, not raised.
         assert len(validator.documents) == 0
+
+
+class TestUtf8ByteOrderMark:
+    """FMT-012: documents behind a UTF-8 BOM are parsed, and the BOM is reported."""
+
+    BOM = b"\xef\xbb\xbf"
+    VALID_ADR = (
+        "---\n"
+        'id: "adr-001"\n'
+        'title: "ADR-001: Test"\n'
+        "status: Accepted\n"
+        "created: 2026-01-02\n"
+        "tags: []\n"
+        'project_id: "fixture"\n'
+        'doc_uuid: "4f2f2b3e-0e2c-4b0a-9a4f-2a8b1c9d0e11"\n'
+        "---\n"
+        "# ADR-001: Test\n"
+    )
+
+    def _adr(self, tmp_path: Path, body: bytes) -> Path:
+        adr_dir = tmp_path / "docs-cms" / "adr"
+        adr_dir.mkdir(parents=True, exist_ok=True)
+        doc = adr_dir / "adr-001-test.md"
+        doc.write_bytes(body)
+        return doc
+
+    def test_frontmatter_behind_a_bom_is_parsed(self, tmp_path):
+        """A BOM must not make a document with frontmatter look like it has none."""
+        self._adr(tmp_path, self.BOM + self.VALID_ADR.encode("utf-8"))
+
+        validator = DocValidator(repo_root=tmp_path, verbose=False, fix=False)
+        validator.scan_documents()
+
+        assert len(validator.documents) == 1
+        doc = validator.documents[0]
+        assert doc.doc_id == "adr-001"
+        assert not any("Missing YAML frontmatter" in error for error in doc.errors)
+
+    def test_bom_is_reported_as_fmt_012(self, tmp_path):
+        """check_formatting reports the byte-order mark it found on disk."""
+        self._adr(tmp_path, self.BOM + self.VALID_ADR.encode("utf-8"))
+
+        validator = DocValidator(repo_root=tmp_path, verbose=False, fix=False)
+        validator.scan_documents()
+        validator.check_formatting()
+
+        errors = validator.documents[0].errors
+        assert any("FMT-012: UTF-8 byte-order mark at start of file" in error for error in errors)
+
+    def test_document_without_a_bom_is_not_reported(self, tmp_path):
+        """FMT-012 does not fire on an ordinary UTF-8 document."""
+        self._adr(tmp_path, self.VALID_ADR.encode("utf-8"))
+
+        validator = DocValidator(repo_root=tmp_path, verbose=False, fix=False)
+        validator.scan_documents()
+        validator.check_formatting()
+
+        assert not any("FMT-012" in error for error in validator.documents[0].errors)
+
+    def test_bom_without_frontmatter_still_reports_fm_001(self, tmp_path):
+        """Stripping the BOM does not invent frontmatter for a plain Markdown file."""
+        self._adr(tmp_path, self.BOM + b"# ADR-001: Test\n\nNo frontmatter here.\n")
+
+        validator = DocValidator(repo_root=tmp_path, verbose=False, fix=False)
+        validator.scan_documents()
+
+        assert len(validator.documents) == 1
+        assert any("Missing YAML frontmatter" in error for error in validator.documents[0].errors)

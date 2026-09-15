@@ -134,6 +134,9 @@ wrap the text in backticks, then validate again.
 
 - Trailing whitespace
 - More than two consecutive blank lines
+- A UTF-8 byte-order mark at the start of a file (`FMT-012`), which otherwise
+  hides the frontmatter from the parser and gets the document reported as
+  having none
 
 **Fixed automatically**
 
@@ -141,6 +144,10 @@ wrap the text in backticks, then validate again.
   fence fixes (above), this is not previewed in `--dry-run`: a trailing-space
   line shows up as a plain issue there, then disappears silently on the real
   run
+- Removes a UTF-8 byte-order mark (`FMT-012: Removed UTF-8 byte-order mark`)
+  and rewrites the file as plain UTF-8. Documents are always read with a
+  leading BOM ignored, so the frontmatter behind one is parsed and validated
+  normally instead of being reported as missing
 
 **Left to you**
 

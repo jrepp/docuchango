@@ -14,6 +14,8 @@ import argparse
 import re
 from pathlib import Path
 
+from docuchango.text_io import read_text
+
 
 def fix_mdx_issues(content: str) -> tuple[str, list[str]]:
     """Fix MDX syntax issues in content."""
@@ -81,7 +83,7 @@ def fix_mdx_issues(content: str) -> tuple[str, list[str]]:
 def process_file(file_path: Path, dry_run: bool = False) -> bool:
     """Process a single file."""
     try:
-        content = file_path.read_text(encoding="utf-8")
+        content = read_text(file_path)
         fixed_content, changes = fix_mdx_issues(content)
 
         if changes:

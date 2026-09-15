@@ -16,6 +16,8 @@ from pathlib import Path
 
 import frontmatter
 
+from docuchango.text_io import read_text
+
 
 def get_git_dates(file_path: Path) -> tuple[str | None, str | None]:
     """Get creation and last update datetimes from git history.
@@ -166,7 +168,7 @@ def update_document_timestamps(file_path: Path, dry_run: bool = False) -> tuple[
 
     # Read file content
     try:
-        content = file_path.read_text(encoding="utf-8")
+        content = read_text(file_path)
     except Exception as e:
         return False, [f"Error reading file: {e}"]
 

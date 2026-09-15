@@ -17,13 +17,15 @@ import re
 import sys
 from pathlib import Path
 
+from docuchango.text_io import read_text
+
 
 def fix_code_blocks(file_path: Path) -> tuple[bool, list[str]]:
     """Fix code block issues in a file"""
     changes = []
 
     try:
-        content = file_path.read_text(encoding="utf-8")
+        content = read_text(file_path)
         lines = content.split("\n")
         fixed_lines = []
 
