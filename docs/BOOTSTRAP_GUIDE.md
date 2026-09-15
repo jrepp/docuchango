@@ -39,9 +39,10 @@ docuchango init --project-id my-app --project-name "My App"
 
 This creates `docs-cms/` with a config file, its JSON schema, a README,
 empty `adr/`, `rfcs/`, `memos/` and `prd/` folders, and a template for each
-type under `templates/`. Existing files are never overwritten unless you pass
-`--force`, so it is safe to run in a repository that already has a
-`docs-cms/`. Use `--path` to put it somewhere other than `./docs-cms`.
+type under `templates/`. If the target folder already has files in it, `init`
+stops and changes nothing; `--force` runs anyway and overwrites the files it
+generates, so back up a config you have edited before using it. Use `--path`
+to put it somewhere other than `./docs-cms`.
 
 ### 3. Review the config
 
@@ -50,10 +51,14 @@ check are:
 
 ```yaml
 project:
-  id: my-app            # every document's project_id must match this
+  id: my-app            # copy this value into each document's project_id
   name: My App
   description: Documentation for My App
 ```
+
+Keeping `project.id` and every document's `project_id` in step is a
+convention, not a rule docuchango enforces: `project_id` is required on every
+document, but its value is never compared with the config.
 
 Everything else has a working default and is documented inline as comments.
 The file points at `docs-project.schema.json`, so editors with a YAML
@@ -223,6 +228,9 @@ Do not rewrite history in the old document.
 
 ## Troubleshooting
 
+Schema problems are reported as `Frontmatter field '<name>': <message>`,
+where the message comes from the schema itself.
+
 **`ID mismatch: frontmatter has 'adr-000' but filename suggests 'adr-001'`**
 The template's `id` was not updated after copying. Set `id` to match the
 filename.
@@ -231,14 +239,14 @@ filename.
 The template body contains an example link. Replace it with a real target or
 remove it.
 
-**`doc_uuid must be a valid UUID v4`**
+**`Frontmatter field 'doc_uuid': Value error, doc_uuid must be a valid UUID v4 format. Got: ...`**
 Generate one with `uuidgen | tr '[:upper:]' '[:lower:]'`.
 
-**`Field 'project_id' is required`** or a `project_id` mismatch
-Set it to the `project.id` from `docs-project.yaml`. For many files at once:
-`docuchango bulk update --set project_id=my-app`.
+**`Frontmatter field 'project_id': Field required`**
+Add it, using the `project.id` from `docs-project.yaml` by convention. For
+many files at once: `docuchango bulk update --set project_id=my-app`.
 
-**`status must be one of ...`**
+**`Frontmatter field 'status': Input should be 'Proposed', 'Accepted', ...`**
 Use a value from the table above for that document type. Common variants
 such as `accepted` or `Draft` on an ADR are corrected automatically.
 

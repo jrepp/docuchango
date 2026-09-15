@@ -30,14 +30,18 @@ structure:
   document_folders: [adr, rfcs, memos, prd]
 ```
 
-`project.id` is the value every document's `project_id` field must match.
-`document_folders` lists the folders that are scanned; anything outside them
-is ignored.
+`project.id` is the value to copy into each document's `project_id` field.
+The match is a convention: `project_id` is required on every document, but
+docuchango never compares it against `project.id`. `document_folders` lists
+the folders that are scanned; anything outside them is ignored.
 
 ## Several documentation roots
 
 A monorepo can keep documents in more than one place. `docs_roots` lists the
-directories to scan, relative to the config file:
+directories to scan, relative to the config file. It only takes effect
+together with `doc_types` below: with the plain `adr_dir`/`rfc_dir`/
+`memo_dir`/`prd_dir` layout, those folders are resolved against the config's
+own directory and `docs_roots` is ignored.
 
 ```yaml
 structure:
@@ -45,9 +49,17 @@ structure:
     - .
     - services/billing/docs
     - services/search/docs
+  doc_types:
+    adr:
+      schema: adr
+      folders: [adr]
+    rfc:
+      schema: rfc
+      folders: [rfcs]
 ```
 
-Each root is scanned for the same `document_folders`.
+Each root is scanned for the same `doc_types` folders. To scan roots that
+should not share one set of folders and rules, use `subprojects` instead.
 
 ## Sub-projects
 
@@ -230,8 +242,11 @@ metadata:
 
 ## Adopting docuchango in an existing repository
 
-1. Run `docuchango init --path <your docs dir>` to get a config, schema and
-   templates. It will not overwrite existing files unless you pass `--force`.
+1. Run `docuchango init --path <a new, empty directory>` to get a config,
+   schema and templates, then move them next to your existing documents.
+   `init` refuses to write into a directory that already has files in it, and
+   `--force` makes it overwrite the files it generates, so pointing it at a
+   populated docs folder is not a safe way to add the config in place.
 2. Map your existing folders with `doc_types`. Start with
    `enforce_filename_pattern: false` and `require_frontmatter: false` on
    folders that are not ready, then tighten one folder at a time.

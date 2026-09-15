@@ -14,10 +14,13 @@ a schema, verifies every link, cleans up the Markdown, and fixes what it can
 without asking. It is built for repositories where humans and coding agents
 write documentation together and need it to stay trustworthy.
 
-- **Structured by default.** Every document has an id, a status, tags and a
-  UUID, enforced by Pydantic schemas per document type.
-- **Fixes, not just findings.** Whitespace, code fences, dates, tags and
-  missing fields are repaired in place. What it cannot fix, it reports.
+- **Structured by default.** Every document has an id, a title, a created
+  date, tags, a project id and a UUID, enforced by Pydantic schemas per
+  document type. ADRs, RFCs and PRDs also carry a status.
+- **Fixes, not just findings.** Whitespace, code fences, status variants,
+  recognizable date formats and tags are repaired in place, and a missing
+  `tags`, `project_id` or `doc_uuid` is filled in with a default. What it
+  cannot fill in safely, such as `title` or `deciders`, it reports.
 - **Agent-ready.** Ships a guide that tells coding agents how to read,
   cite and extend the docs. Point `AGENTS.md` at it and you are done.
 - **Fast and CI-friendly.** A hundred documents validate in under a second,
@@ -122,8 +125,10 @@ Generate a UUID with `uuidgen | tr '[:upper:]' '[:lower:]'` or
 | `docuchango migrate --project-id my-app` | Upgrade legacy frontmatter to the current schema |
 | `docuchango bootstrap` | Print the setup guide; `--guide agent` prints the agent guide |
 
-Every command that changes files accepts `--dry-run`. `dcc-validate` is a
-short alias for `docuchango validate`.
+`validate`, the `bulk` commands and `migrate` all accept `--dry-run`. `init`
+does not: it refuses to write into a folder that already has files in it
+unless you pass `--force`, which overwrites the files it generates.
+`dcc-validate` is a short alias for `docuchango validate`.
 
 ## Working with coding agents
 

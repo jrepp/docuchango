@@ -12,7 +12,6 @@ what is detected, what is repaired automatically when you run without
 - Missing required fields (`id`, `title`, `created`, `tags`, `project_id`, `doc_uuid`, plus per-type fields such as `status`, `deciders`, `author`, `target_release`)
 - Wrong field types or formats
 - Status values not valid for the document type
-- Dates that are not ISO 8601 (`YYYY-MM-DD`)
 - Malformed UUIDs
 - `id` that does not match the filename
 - `id` that does not match the number in the title
@@ -22,9 +21,10 @@ what is detected, what is repaired automatically when you run without
 **Fixed automatically**
 
 - Generates a frontmatter block with sensible defaults when one is missing
-- Adds missing required fields
+- Adds a missing `tags`, `project_id` or `doc_uuid` to an existing block
 - Maps common status variants and misspellings to the valid value for the type
-- Converts dates in slash, dot and long-month formats to ISO 8601
+- Converts dates in slash, dot and long-month formats (`2026/09/14`,
+  `14.09.2026`, `September 14, 2026`) to ISO 8601
 - Normalizes tags to a sorted, de-duplicated, lowercase-with-dashes list
 - Trims whitespace and removes empty or null values
 - Adds `created` from git history and migrates a legacy `date` field
@@ -32,10 +32,13 @@ what is detected, what is repaired automatically when you run without
 **Left to you**
 
 - Type or format errors that have no safe automatic value
+- Missing `title` or `id` in an existing frontmatter block
 - Per-type fields such as `deciders` or `author`
 - Malformed UUIDs
 - `id` and filename or title mismatches
 - Duplicate ids or UUIDs
+- Dates in a format the fixer does not recognize: `created` accepts any
+  string, so an unrecognized date is neither rewritten nor reported
 
 ## Code blocks
 
@@ -62,11 +65,11 @@ what is detected, what is repaired automatically when you run without
 - Cross-references to ADRs or RFCs that do not exist
 - Links that climb several `../` levels across plugin boundaries
 
-**Fixed automatically**
+**Left to you**
 
-- Rewrites broken internal links when the target can be found elsewhere
-- Converts cross-plugin links to absolute GitHub URLs
-- Normalizes link formats
+Link findings are reported, never rewritten: `docuchango validate` checks
+links but does not touch them, because the right target is a judgement call.
+Fix them by hand, or with your own tooling, and validate again.
 
 ## MDX compatibility
 
@@ -76,10 +79,10 @@ what is detected, what is repaired automatically when you run without
 - Other characters that break MDX parsing
 - MDX or JSX compilation errors
 
-**Fixed automatically**
+**Left to you**
 
-- Escapes `<` and `>` as `&lt;` and `&gt;`
-- Corrects common JSX-incompatible Markdown
+MDX findings are reported only. Escape `<` and `>` as `&lt;` and `&gt;`, or
+wrap the text in backticks, then validate again.
 
 ## Formatting
 
@@ -87,22 +90,24 @@ what is detected, what is repaired automatically when you run without
 
 - Trailing whitespace
 - More than two consecutive blank lines
-- Inconsistent line endings
 
 **Fixed automatically**
 
-- Removes trailing whitespace
-- Collapses runs of blank lines
+- Removes trailing whitespace outside code blocks
+
+**Left to you**
+
+- Runs of more than two blank lines, which are reported but not collapsed
 
 ## Filenames
 
 **Detected**
 
-- Names that do not match `type-NNN-slug.md` or the configured pattern
-- Uppercase characters in filenames
-- Gaps or inconsistency in ADR, RFC and memo numbering
+- Names that do not match `type-NNN-slug.md` or the configured pattern,
+  unless `enforce_filename_pattern: false` is set for that folder
 
-Filename problems are always left to you, because renaming a file can break
+There is no gap or sequence check: a jump from `adr-004` to `adr-009` is not
+reported. Filename problems are always left to you, because renaming can break
 links elsewhere. `docuchango bulk compress-ids` can renumber documents and
 update references in one step.
 
@@ -136,6 +141,8 @@ and in CI jobs that do not have Node installed.
 |------|---------|
 | 0 | Every document valid, or every issue fixed |
 | 1 | Issues remain that need a person |
+| 2 | The run itself failed: the validator could not be imported or raised, or the command line was wrong (a bad `--repo-root`, an unknown option) |
 
-With `--dry-run` the exit code reflects the issues found, so a CI job fails
-on problems without rewriting files.
+Treat 2 as "docuchango could not tell you anything", not as a documentation
+problem. With `--dry-run` the exit code reflects the issues found, so a CI
+job fails on problems without rewriting files.

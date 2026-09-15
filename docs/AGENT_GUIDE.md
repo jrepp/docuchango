@@ -6,10 +6,11 @@ This guide is for AI agents working with projects that use `docs-cms` for docume
 an architecture question or change anything significant, search it and read
 the relevant ADRs, RFCs, PRDs and memos. Cite them by id when you answer.
 When you learn something durable, write it down there as a new document from
-a template, with `status: Proposed` unless a human has approved it. Run
-`docuchango validate --dry-run`, then `docuchango validate`, before you
-commit, and report anything it could not fix. The rest of this guide is
-detail on how to do each of those well.
+a template, in the draft state for its type unless a human has approved it:
+`status: Proposed` for an ADR, `status: Draft` for an RFC or PRD, and no
+`status` field at all for a memo. Run `docuchango validate --dry-run`, then
+`docuchango validate`, before you commit, and report anything it could not
+fix. The rest of this guide is detail on how to do each of those well.
 
 ## Core Principle: Trust the CMS
 
