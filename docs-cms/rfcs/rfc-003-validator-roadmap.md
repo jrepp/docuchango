@@ -168,6 +168,27 @@ IDs, which is the intended suppression mechanism and is out of scope here.
 5. Update `docs/VALIDATION_REFERENCE.md` and flip the row to `Implemented`
    in the same change.
 
+### Regression fixtures
+
+Step 4 has a fixed shape. `tests/fixtures/findings/<FINDING-ID>-<slug>/` holds
+a miniature repository that reproduces one finding, plus an `expected.yaml`
+recording the messages `validate` should print, whether the finding is
+repaired, and the exit codes with and without `--dry-run`.
+`tests/test_findings.py` discovers every such directory and runs the real
+Click command against a copy under `tmp_path`.
+
+Write the fixture before the check. While the row here says `Planned`, the
+harness collects the detection test as a strict `xfail`, so the suite stays
+green; the moment the check starts reporting the finding, the `xfail` turns
+into a failure, which is the reminder to flip the row to `Implemented`. In the
+other direction, `test_every_implemented_id_has_a_fixture` fails when an
+`Implemented` row has no fixture, unless its ID is listed in the annotated
+`KNOWN_GAPS` set for checks a Markdown-only fixture cannot reach, such as the
+Docusaurus build ones.
+
+`tests/fixtures/findings/README.md` has the `expected.yaml` reference and the
+commands for adding a case.
+
 ## Drawbacks
 
 A registry is one more thing to keep in sync, and an unmaintained one is
