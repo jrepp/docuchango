@@ -1,6 +1,9 @@
 """Tests for whitespace and required fields fixes."""
 
+import uuid as uuid_mod
+
 import frontmatter
+import pytest
 
 from docuchango.fixes.whitespace import (
     ensure_required_fields,
@@ -67,6 +70,97 @@ class TestTrimStringValues:
         assert updated == metadata
         assert len(messages) == 0
 
+    def test_only_whitespace_strings_become_empty(self):
+        """Test that strings containing only whitespace are trimmed to empty."""
+        metadata = {
+            "title": "   ",
+            "description": "\t\t",
+            "summary": "\n\n",
+        }
+
+        updated, messages = trim_string_values(metadata)
+
+        assert updated["title"] == ""
+        assert updated["description"] == ""
+        assert updated["summary"] == ""
+
+    def test_mixed_whitespace_characters_trimmed(self):
+        """Test trimming a mix of tabs, newlines, and spaces."""
+        metadata = {"title": " \t\nMy Title\r\n\t "}
+
+        updated, messages = trim_string_values(metadata)
+
+        assert updated["title"] == "My Title"
+
+    def test_unicode_whitespace_trimmed(self):
+        """Test trimming Unicode whitespace (non-breaking space, em space)."""
+        metadata = {
+            "title": " Title ",  # Non-breaking space
+            "description": " Content ",  # Em space
+        }
+
+        updated, messages = trim_string_values(metadata)
+
+        # Python strip() handles Unicode whitespace
+        assert updated["title"].strip() == "Title"
+
+    def test_nested_dicts_are_not_trimmed_but_array_strings_are(self):
+        """Test that trimming only handles top-level strings and arrays, not nested dicts."""
+        metadata = {
+            "config": {"nested": " value "},
+            "tags": [" tag1 ", " tag2 "],
+        }
+
+        updated, messages = trim_string_values(metadata)
+
+        assert updated["config"]["nested"] == " value "  # Not trimmed
+        assert updated["tags"] == ["tag1", "tag2"]  # Trimmed
+
+    def test_long_string_edges_trimmed_content_preserved(self):
+        """Test trimming a very long string only strips the edges."""
+        long_content = " " + ("x" * 10000) + " "
+        metadata = {"content": long_content}
+
+        updated, messages = trim_string_values(metadata)
+
+        assert len(updated["content"]) == 10000
+        assert updated["content"][0] == "x"
+        assert updated["content"][-1] == "x"
+
+    def test_internal_whitespace_preserved(self):
+        """Test that only leading/trailing whitespace is trimmed, not internal runs."""
+        metadata = {"title": "  Multiple   Internal   Spaces  "}
+
+        updated, messages = trim_string_values(metadata)
+
+        assert updated["title"] == "Multiple   Internal   Spaces"
+
+    def test_empty_metadata_dict(self):
+        """Test trimming an empty metadata dictionary is a no-op."""
+        metadata = {}
+
+        updated, messages = trim_string_values(metadata)
+
+        assert updated == {}
+        assert len(messages) == 0
+
+    def test_mixed_type_array_only_trims_strings(self):
+        """Test arrays with mixed types only trim the string entries."""
+        metadata = {"mixed": [" string ", 123, True, " another "]}
+
+        updated, messages = trim_string_values(metadata)
+
+        assert updated["mixed"] == ["string", 123, True, "another"]
+
+    def test_empty_arrays_untouched(self):
+        """Test that empty arrays pass through unchanged."""
+        metadata = {"tags": [], "authors": []}
+
+        updated, messages = trim_string_values(metadata)
+
+        assert updated["tags"] == []
+        assert updated["authors"] == []
+
 
 class TestNormalizeEmptyValues:
     """Test normalizing empty values."""
@@ -125,6 +219,73 @@ class TestNormalizeEmptyValues:
 
         assert "tags" in updated
         assert "custom_field" not in updated
+
+    def test_zero_and_false_are_kept_not_treated_as_empty(self):
+        """Test that 0 and False are valid values, distinct from empty string/null."""
+        metadata = {
+            "str_empty": "",
+            "str_spaces": "   ",
+            "null_value": None,
+            "empty_list": [],
+            "zero": 0,
+            "false": False,
+        }
+
+        updated, messages = normalize_empty_values(metadata)
+
+        assert "str_empty" not in updated
+        assert "str_spaces" not in updated
+        assert "null_value" not in updated
+        assert updated["zero"] == 0
+        assert updated["false"] is False
+
+    def test_all_known_list_fields_kept_empty(self):
+        """Test that every known list field is kept even when empty, and unknown ones dropped."""
+        metadata = {
+            "tags": [],
+            "authors": [],
+            "reviewers": [],
+            "related": [],
+            "custom_list": [],
+        }
+
+        updated, messages = normalize_empty_values(metadata)
+
+        assert "tags" in updated
+        assert "authors" in updated
+        assert "reviewers" in updated
+        assert "related" in updated
+        assert "custom_list" not in updated
+
+    def test_empty_strings_inside_arrays_are_not_filtered(self):
+        """Test that normalize_empty_values does not recurse into array contents."""
+        metadata = {"tags": ["", "valid", ""]}
+
+        updated, messages = normalize_empty_values(metadata)
+
+        assert updated["tags"] == ["", "valid", ""]
+
+    def test_nested_dict_values_are_not_recursed_into(self):
+        """Test that normalize_empty_values does not recurse into nested dicts."""
+        metadata = {"config": {"value": "", "other": None}}
+
+        updated, messages = normalize_empty_values(metadata)
+
+        assert "config" in updated
+        assert updated["config"]["value"] == ""
+
+    def test_strings_that_look_empty_but_are_not_are_kept(self):
+        """Test that strings like '0', 'false', 'null' are valid non-empty values."""
+        metadata = {
+            "zero_str": "0",
+            "false_str": "false",
+            "null_str": "null",
+            "none_str": "None",
+        }
+
+        updated, messages = normalize_empty_values(metadata)
+
+        assert all(key in updated for key in metadata)
 
 
 class TestEnsureRequiredFields:
@@ -185,6 +346,72 @@ class TestEnsureRequiredFields:
         assert updated["doc_uuid"] == "existing-uuid"
         assert updated["project_id"] == "my-custom-project"
         assert len(messages) == 0
+
+    def test_generated_uuids_are_unique_across_calls(self):
+        """Test that each call to ensure_required_fields generates a distinct doc_uuid."""
+        updated1, _ = ensure_required_fields({"id": "test1"})
+        updated2, _ = ensure_required_fields({"id": "test2"})
+
+        assert updated1["doc_uuid"] != updated2["doc_uuid"]
+
+    def test_generated_uuid_is_well_formed(self):
+        """Test that the generated doc_uuid parses as a valid UUID."""
+        updated, _ = ensure_required_fields({"id": "test"})
+
+        uuid_mod.UUID(updated["doc_uuid"])  # Raises ValueError if malformed
+
+    def test_existing_empty_fields_replaced_except_tags(self):
+        """Test that empty doc_uuid/project_id are replaced but an empty tags string is left alone."""
+        metadata = {
+            "id": "test",
+            "tags": "",  # Not our job to fix here
+            "doc_uuid": "",
+            "project_id": "",
+        }
+
+        updated, messages = ensure_required_fields(metadata)
+
+        assert updated["tags"] == ""
+        assert updated["doc_uuid"] != ""
+        assert updated["project_id"] != ""
+
+    @pytest.mark.parametrize(
+        "metadata",
+        [
+            pytest.param({"id": "test-adr", "doc_type": "adr"}, id="adr"),
+            pytest.param({"id": "test-rfc", "doc_type": "rfc"}, id="rfc"),
+            pytest.param({"id": "test-memo", "doc_type": "memo"}, id="memo"),
+            pytest.param({"id": "test-prd", "doc_type": "prd"}, id="prd"),
+            pytest.param({"id": "test-generic"}, id="no-doc-type"),
+        ],
+    )
+    def test_required_fields_added_regardless_of_doc_type(self, metadata):
+        """Test that tags/doc_uuid/project_id are always added, independent of doc_type."""
+        updated, messages = ensure_required_fields(metadata)
+
+        assert "tags" in updated
+        assert "doc_uuid" in updated
+        assert "project_id" in updated
+
+    def test_extra_fields_are_preserved(self):
+        """Test that fields unrelated to the required set are left untouched."""
+        metadata = {"id": "test", "custom_field": "custom_value", "another": 123}
+
+        updated, messages = ensure_required_fields(metadata)
+
+        assert updated["custom_field"] == "custom_value"
+        assert updated["another"] == 123
+
+    def test_large_metadata_still_gets_required_fields(self):
+        """Test that required fields are added even to metadata with many existing keys."""
+        metadata = {f"field{i}": f"value{i}" for i in range(1000)}
+
+        updated, messages = ensure_required_fields(metadata)
+
+        assert "tags" in updated
+        assert "doc_uuid" in updated
+        assert "project_id" in updated
+        assert len(updated) >= 1003
 
 
 class TestFixWhitespaceAndFields:
@@ -276,3 +503,113 @@ title: "  Needs Trim  "
         assert len(messages) > 0
         # File should be unchanged
         assert doc.read_text() == content
+
+    def test_file_in_root_directory_without_doc_type(self, tmp_path):
+        """Test that fixing works for files not in a typed subdirectory."""
+        doc = tmp_path / "test.md"
+        doc.write_text("""---
+id: " test "
+title: "  Title  "
+---
+# Test
+""")
+
+        changed, messages = fix_whitespace_and_fields(doc)
+
+        assert changed
+
+        post = frontmatter.loads(doc.read_text())
+        assert post.metadata["id"] == "test"
+        assert post.metadata["title"] == "Title"
+
+    def test_follows_symlink_to_document(self, tmp_path):
+        """Test that fixing a symlink operates on the real underlying file."""
+        real_doc = tmp_path / "adr" / "real.md"
+        real_doc.parent.mkdir(parents=True)
+        real_doc.write_text('---\nid: " test "\n---\n# Test')
+
+        link_doc = tmp_path / "adr" / "link.md"
+        link_doc.symlink_to(real_doc)
+
+        changed, messages = fix_whitespace_and_fields(link_doc)
+
+        assert changed
+
+    def test_file_with_utf8_bom_is_not_recognized_as_having_frontmatter(self, tmp_path):
+        """A UTF-8 BOM before the '---' marker defeats frontmatter detection.
+
+        This documents current behavior rather than desired behavior: python-frontmatter
+        requires the delimiter at the very start of the file, so a BOM-prefixed file is
+        treated as having no frontmatter and is left untouched.
+        """
+        doc = tmp_path / "test.md"
+        content = '---\nid: " test "\n---\n# Test'
+        raw = b"\xef\xbb\xbf" + content.encode("utf-8")
+        doc.write_bytes(raw)
+
+        changed, messages = fix_whitespace_and_fields(doc)
+
+        assert not changed
+        assert any("no frontmatter" in msg.lower() for msg in messages)
+        assert doc.read_bytes() == raw
+
+    def test_very_long_field_values_are_preserved_after_trim(self, tmp_path):
+        """Test that trimming a very long field value keeps its full inner content."""
+        doc = tmp_path / "test.md"
+        long_value = " " + ("x" * 100000) + " "
+        doc.write_text(f'---\nid: test\ndescription: "{long_value}"\n---\n# Test')
+
+        changed, messages = fix_whitespace_and_fields(doc)
+
+        assert changed
+
+        post = frontmatter.loads(doc.read_text())
+        assert len(post.metadata["description"]) == 100000
+
+    def test_second_run_finds_nothing_left_to_fix(self, tmp_path):
+        """Test that running the fix twice is idempotent."""
+        doc = tmp_path / "adr" / "test.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text('---\nid: " test "\n---\n# Test')
+
+        changed1, messages1 = fix_whitespace_and_fields(doc)
+        assert changed1
+
+        changed2, messages2 = fix_whitespace_and_fields(doc)
+        assert not changed2
+        assert len(messages2) == 0
+
+    def test_all_edge_cases_combined(self, tmp_path):
+        """Test a document combining trimming, empty removal, and missing required fields."""
+        doc = tmp_path / "adr" / "test.md"
+        doc.parent.mkdir(parents=True)
+
+        content = """---
+id: "  test-001  "
+title: "  \t Title \n "
+description: ""
+null_field: null
+tags: " backend "
+status: "  Accepted  "
+custom: "  value  "
+---
+# Test
+"""
+        doc.write_text(content)
+
+        changed, messages = fix_whitespace_and_fields(doc)
+
+        assert changed
+        assert len(messages) > 0
+
+        post = frontmatter.loads(doc.read_text())
+        # Trimmed
+        assert post.metadata["id"] == "test-001"
+        assert post.metadata["title"] == "Title"
+        assert post.metadata["custom"] == "value"
+        # Removed empty
+        assert "description" not in post.metadata
+        assert "null_field" not in post.metadata
+        # Required fields added
+        assert "doc_uuid" in post.metadata
+        assert "project_id" in post.metadata
