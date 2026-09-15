@@ -36,7 +36,9 @@ def test_user_facing_docs_do_not_reference_removed_fix_commands(doc_path: Path):
 def test_readme_quick_start_uses_init_not_bootstrap():
     """The README quick start should point users at the init command."""
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
-    quick_start = readme.split("## Quick Start", maxsplit=1)[1].split("## Usage Examples", maxsplit=1)[0]
+    quick_start = readme.split("## Two-minute start", maxsplit=1)[1].split("## What a document looks like", maxsplit=1)[
+        0
+    ]
 
     assert "docuchango init" in quick_start
     assert "docuchango bootstrap" not in quick_start

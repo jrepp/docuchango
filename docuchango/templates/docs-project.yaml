@@ -62,7 +62,7 @@ structure:
   # Custom standards can override built-ins or define new patterns.
   # naming_standards:
   #   my-custom-standard: "^custom-.+\\.md$"
-  #   date-prefix: "^\\d{6}-.+必$"
+  #   date-prefix: "^\\d{6}-.+$"
 
 security:
   # Keep configured paths inside this docs-project.yaml directory by default.
