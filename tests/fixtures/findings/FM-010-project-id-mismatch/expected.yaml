@@ -1,7 +1,7 @@
 summary: >-
   An ADR whose `project_id` is not the `project.id` of the governing
-  docs-project.yaml. FM-010 is Planned, so this fixture is a strict xfail
-  until the check is implemented.
+  docs-project.yaml. The value is not the `my-project` placeholder, so it may
+  be deliberate: FM-010 reports it and never rewrites it.
 messages:
   - "project_id"
   - "fixture-project"

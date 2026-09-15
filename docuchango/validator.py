@@ -107,6 +107,10 @@ class Document:
     doc_id: str = ""  # Frontmatter id field (e.g., "adr-001", "rfc-015")
     expected_id: str | None = None  # ID inferred from configured filename pattern, when available
     doc_uuid: str = ""  # Frontmatter doc_uuid field (UUID v4)
+    # Frontmatter project_id as written. ``None`` means the key is absent (or
+    # the document has no frontmatter at all), which FM-002/FM-005 already
+    # own, so FM-010 leaves it alone.
+    project_id: str | None = None
     links: list["Link"] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     _content_cache: str | None = None  # Cached file content to avoid multiple reads
@@ -668,6 +672,21 @@ class DocValidator:
             file_path, doc_type, require_frontmatter=require_frontmatter, expected_id=expected_id
         )
 
+    @staticmethod
+    def _frontmatter_project_id(metadata: dict[str, Any]) -> str | None:
+        """Return the frontmatter ``project_id`` as written, or ``None``.
+
+        ``None`` means the key is absent, which the schema (FM-002) and the
+        required-field fixer (FM-005) already own; an empty or blank value is
+        returned as the empty string so FM-010 can report it.
+        """
+        if "project_id" not in metadata:
+            return None
+        value = metadata["project_id"]
+        if value is None:
+            return ""
+        return str(value)
+
     def _infer_plain_markdown_title(self, file_path: Path, content: str) -> str:
         """Infer a title for plain-markdown generic documents."""
         for line in content.splitlines():
@@ -737,6 +756,7 @@ class DocValidator:
                     tags=metadata.get("tags", []),
                     doc_id=metadata.get("id", ""),
                     expected_id=expected_id,
+                    project_id=self._frontmatter_project_id(metadata),
                     _content_cache=content,
                 )
 
@@ -767,6 +787,7 @@ class DocValidator:
                 doc_id=metadata.get("id", ""),
                 expected_id=expected_id,
                 doc_uuid=metadata.get("doc_uuid", ""),
+                project_id=self._frontmatter_project_id(metadata),
                 _content_cache=content,
             )
 
@@ -1985,6 +2006,56 @@ class DocValidator:
                 doc.errors.append(f"Error checking readability: {e}")
                 self.log(f"   ✗ {doc.file_path.name}: Readability check failed: {e}")
 
+    def check_project_ids(self):
+        """Validate `project_id` against the governing config (FM-010).
+
+        The governing config is the deepest one that owns the document's
+        folder, so a monorepo is not flattened to a single ID: a document in
+        a sub-project is compared against that sub-project's `project.id`.
+        Documents that no config governs, and documents whose frontmatter has
+        no `project_id` key at all (FM-002 and FM-005 own that), are skipped.
+        """
+        self.log("\n🏷️  Checking project_id...")
+
+        if not self.project_configs:
+            self.log("   ⊘ No project config loaded; project_id check skipped")
+            return
+
+        mismatches = 0
+        for doc in self.documents:
+            if doc.project_id is None:
+                continue
+
+            context = self._config_context_for_path(doc.file_path)
+            if context is None:
+                continue
+
+            expected = context.config.project.id
+            if doc.project_id == expected:
+                self.log(f"   ✓ {doc.file_path.name}: project_id='{expected}'")
+                continue
+
+            actual = doc.project_id if doc.project_id else "(empty)"
+            error = (
+                f"FM-010: project_id '{actual}' does not match project.id '{expected}' "
+                f"in {self._display_path(context.path)}"
+            )
+            doc.errors.append(error)
+            self.log(f"   ✗ {doc.file_path.name}: {error}")
+            mismatches += 1
+
+        if mismatches == 0:
+            self.log("   ✓ All project_id values match their governing config")
+        else:
+            self.log(f"   ✗ Found {mismatches} project_id mismatch(es)")
+
+    def _display_path(self, path: Path) -> str:
+        """Render a path relative to the repository root when it is inside it."""
+        try:
+            return str(path.resolve().relative_to(self.repo_root))
+        except ValueError:
+            return str(path)
+
     def check_ids(self):
         """Validate document IDs for consistency and uniqueness"""
         self.log("\n🆔 Checking document IDs...")
@@ -2195,6 +2266,7 @@ class DocValidator:
         self.scan_documents()
         self.extract_links()
         self.validate_links()
+        self.check_project_ids()  # FM-010: project_id vs the governing config
         self.check_ids()  # Validate document IDs
         self.check_uuids()  # Validate document UUID uniqueness
         self.check_code_blocks()  # Check code block balance and labeling

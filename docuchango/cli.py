@@ -79,26 +79,31 @@ def _iter_docs_project_configs(root: Path) -> list[tuple[DocsProjectConfig, Path
     return configs
 
 
-def _discover_doc_schemas(root: Path) -> dict[Path, str | None]:
-    """Discover markdown docs mapped to the schema configured for each of them.
+def _discover_doc_claims(root: Path) -> dict[Path, list[tuple[str | None, str]]]:
+    """Discover markdown docs mapped to the configs that claim each of them.
 
-    The value is the ``schema`` of the ``structure.doc_types`` entry (or the
-    folder binding of a legacy ``adr_dir``/``rfc_dir``/``memo_dir``/``prd_dir``
-    layout) that owns the file, so the fixers shape frontmatter by the
-    configured schema instead of guessing from the folder name. It is ``None``
-    when no config claims the file, which leaves the fixers on their
-    folder-name heuristic.
+    The value is one ``(schema, project_id)`` pair per claiming config, in the
+    order the configs were loaded, so callers can tell a file governed by
+    exactly one config from one that several configs claim. It is an empty
+    list when no config claims the file (legacy discovery).
     """
     configs = _iter_docs_project_configs(root)
 
     if configs:
-        all_files: dict[Path, str | None] = {}
+        claims: dict[Path, list[tuple[str | None, str]]] = {}
+
+        def claim(file_path: Path, schema: str | None, project_id: str) -> None:
+            entry = (schema, project_id)
+            existing = claims.setdefault(file_path, [])
+            if entry not in existing:
+                existing.append(entry)
 
         for config, config_path in configs:
             if not config.structure:
                 continue
             config_base = config_path.parent
             allow_external_paths = config.security.allow_external_paths
+            project_id = config.project.id
 
             if config.structure.doc_types:
                 roots = config.structure.docs_roots or ["."]
@@ -114,7 +119,7 @@ def _discover_doc_schemas(root: Path) -> dict[Path, str | None]:
                             if not folder_path.exists():
                                 continue
                             for file_path in folder_path.rglob("*.md"):
-                                all_files.setdefault(file_path, doc_type_cfg.frontmatter_schema)
+                                claim(file_path, doc_type_cfg.frontmatter_schema, project_id)
             else:
                 folder_schemas = {
                     config.structure.adr_dir: "adr",
@@ -129,10 +134,10 @@ def _discover_doc_schemas(root: Path) -> dict[Path, str | None]:
                     if not folder_path.exists():
                         continue
                     for file_path in folder_path.rglob("*.md"):
-                        all_files.setdefault(file_path, folder_schemas.get(folder))
+                        claim(file_path, folder_schemas.get(folder), project_id)
 
-        if all_files:
-            return all_files
+        if claims:
+            return claims
 
     # Legacy mode (backwards compatibility)
     doc_patterns = [
@@ -145,16 +150,50 @@ def _discover_doc_schemas(root: Path) -> dict[Path, str | None]:
         "docs-cms/memos/**/*.md",
         "docs-cms/prd/**/*.md",
     ]
-    files: dict[Path, str | None] = {}
+    files: dict[Path, list[tuple[str | None, str]]] = {}
     for pattern in doc_patterns:
         for file_path in root.glob(pattern):
-            files.setdefault(file_path, None)
+            files.setdefault(file_path, [])
     return files
+
+
+def _schemas_from_claims(claims: dict[Path, list[tuple[str | None, str]]]) -> dict[Path, str | None]:
+    """Map each discovered file to the schema configured for it.
+
+    The value is the ``schema`` of the ``structure.doc_types`` entry (or the
+    folder binding of a legacy ``adr_dir``/``rfc_dir``/``memo_dir``/``prd_dir``
+    layout) that owns the file, so the fixers shape frontmatter by the
+    configured schema instead of guessing from the folder name. It is ``None``
+    when no config claims the file, which leaves the fixers on their
+    folder-name heuristic.
+    """
+    return {file_path: (entries[0][0] if entries else None) for file_path, entries in claims.items()}
+
+
+def _project_ids_from_claims(claims: dict[Path, list[tuple[str | None, str]]]) -> dict[Path, str | None]:
+    """Map each discovered file to the project ID that governs it (FM-010).
+
+    The value is ``None`` unless exactly one project ID claims the file: a
+    folder that two configs claim has no single governing ID, and the
+    placeholder fix must not guess between them. Such a file is still reported
+    by ``DocValidator.check_project_ids``, which resolves the deepest owning
+    config instead.
+    """
+    governing: dict[Path, str | None] = {}
+    for file_path, entries in claims.items():
+        project_ids = {project_id for _, project_id in entries}
+        governing[file_path] = next(iter(project_ids)) if len(project_ids) == 1 else None
+    return governing
+
+
+def _discover_doc_schemas(root: Path) -> dict[Path, str | None]:
+    """Discover markdown docs mapped to the schema configured for each of them."""
+    return _schemas_from_claims(_discover_doc_claims(root))
 
 
 def _discover_doc_files(root: Path) -> list[Path]:
     """Discover markdown docs, preferring docs-project.yaml when present."""
-    return sorted(_discover_doc_schemas(root))
+    return sorted(_discover_doc_claims(root))
 
 
 def _empty_scan_message(repo_root: Path) -> str:
@@ -318,8 +357,13 @@ def validate(
     # doc_types entry binds it to, so the frontmatter fixer shapes the block by
     # the configured schema rather than by the folder name. The value is None
     # for a file no config claims, which keeps the folder-name heuristic.
-    doc_schemas = _discover_doc_schemas(repo_root)
-    all_files = sorted(doc_schemas)
+    doc_claims = _discover_doc_claims(repo_root)
+    doc_schemas = _schemas_from_claims(doc_claims)
+    # FM-010: the project ID of the config that governs each file, and None
+    # when no single config does, which keeps the placeholder fix from
+    # guessing.
+    doc_project_ids = _project_ids_from_claims(doc_claims)
+    all_files = sorted(doc_claims)
 
     # Track fixes applied and remaining issues
     fixes_applied: list[tuple[Path, str]] = []
@@ -343,7 +387,10 @@ def validate(
         for file_path in all_files:
             try:
                 changed, messages = fix_frontmatter_metadata(
-                    file_path, dry_run=dry_run, schema=doc_schemas.get(file_path)
+                    file_path,
+                    dry_run=dry_run,
+                    schema=doc_schemas.get(file_path),
+                    project_id=doc_project_ids.get(file_path),
                 )
                 if changed and messages:
                     for msg in messages:
@@ -386,6 +433,7 @@ def validate(
         documents_scanned = len(validator.documents)
         validator.extract_links()
         validator.validate_links()
+        validator.check_project_ids()
         validator.check_ids()
         validator.check_uuids()
         validator.check_code_blocks()

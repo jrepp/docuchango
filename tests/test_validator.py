@@ -318,3 +318,134 @@ class TestUtf8ByteOrderMark:
 
         assert len(validator.documents) == 1
         assert any("Missing YAML frontmatter" in error for error in validator.documents[0].errors)
+
+
+class TestProjectIdMatch:
+    """FM-010: project_id is compared with the governing config's project.id."""
+
+    ROOT_CONFIG = (
+        'version: "1"\n'
+        "project:\n"
+        "  id: root-project\n"
+        "  name: Root Project\n"
+        "  description: Root project of the test tree\n"
+        "structure:\n"
+        "  adr_dir: adr\n"
+        "  rfc_dir: rfcs\n"
+        "  memo_dir: memos\n"
+        "  document_folders:\n"
+        "    - adr\n"
+        "security:\n"
+        "  allow_external_paths: false\n"
+        "readability:\n"
+        "  enabled: false\n"
+    )
+
+    @staticmethod
+    def _adr(project_id_line: str) -> str:
+        return (
+            "---\n"
+            "id: adr-001\n"
+            'title: "ADR-001: Test"\n'
+            "status: Accepted\n"
+            "created: 2026-01-02\n"
+            "tags: []\n"
+            'deciders: "Engineering Team"\n'
+            f"{project_id_line}"
+            "doc_uuid: 4f2f2b3e-0e2c-4b0a-9a4f-2a8b1c9d0e11\n"
+            "---\n"
+            "\n"
+            "# ADR-001: Test\n"
+        )
+
+    def _tree(self, tmp_path: Path, project_id_line: str, config: str | None = None) -> Path:
+        docs_cms = tmp_path / "docs-cms"
+        (docs_cms / "adr").mkdir(parents=True)
+        if config is not None:
+            (docs_cms / "docs-project.yaml").write_text(config, encoding="utf-8")
+        (docs_cms / "adr" / "adr-001-test.md").write_text(self._adr(project_id_line), encoding="utf-8")
+        return tmp_path
+
+    @staticmethod
+    def _findings(repo_root: Path) -> list[str]:
+        validator = DocValidator(repo_root=repo_root, verbose=False)
+        validator.scan_documents()
+        validator.check_project_ids()
+        return [error for doc in validator.documents for error in doc.errors if "FM-010" in error]
+
+    def test_matching_project_id_reports_nothing(self, tmp_path):
+        """A document whose project_id equals project.id is not a finding."""
+        root = self._tree(tmp_path, "project_id: root-project\n", self.ROOT_CONFIG)
+
+        assert self._findings(root) == []
+
+    def test_non_placeholder_mismatch_is_reported(self, tmp_path):
+        """A deliberate-looking value is reported with both IDs named."""
+        root = self._tree(tmp_path, "project_id: other-project\n", self.ROOT_CONFIG)
+
+        findings = self._findings(root)
+
+        assert len(findings) == 1
+        assert "other-project" in findings[0]
+        assert "root-project" in findings[0]
+        assert "docs-cms/docs-project.yaml" in findings[0]
+
+    def test_empty_project_id_is_reported(self, tmp_path):
+        """An empty value is reported rather than silently passing."""
+        root = self._tree(tmp_path, 'project_id: ""\n', self.ROOT_CONFIG)
+
+        findings = self._findings(root)
+
+        assert len(findings) == 1
+        assert "(empty)" in findings[0]
+
+    def test_missing_project_id_is_left_to_the_schema(self, tmp_path):
+        """FM-002 and FM-005 own an absent key, so FM-010 does not double-report."""
+        root = self._tree(tmp_path, "", self.ROOT_CONFIG)
+
+        validator = DocValidator(repo_root=root, verbose=False)
+        validator.scan_documents()
+        validator.check_project_ids()
+
+        errors = validator.documents[0].errors
+        assert any("project_id" in error and "Field required" in error for error in errors)
+        assert not any("FM-010" in error for error in errors)
+
+    def test_check_is_skipped_without_a_config(self, tmp_path):
+        """With no docs-project.yaml there is no project.id to compare against."""
+        root = self._tree(tmp_path, "project_id: other-project\n", config=None)
+
+        validator = DocValidator(repo_root=root, verbose=False)
+        validator.scan_documents()
+        validator.check_project_ids()
+
+        assert validator.project_configs == []
+        assert len(validator.documents) == 1, "the document must still be scanned for the test to mean anything"
+        assert not any("FM-010" in error for error in validator.documents[0].errors)
+
+    def test_sub_project_document_is_measured_against_its_own_config(self, tmp_path):
+        """A monorepo is not flattened to the root project's ID."""
+        root_config = self.ROOT_CONFIG + "subprojects:\n  - services/service-a\n"
+        root = self._tree(tmp_path, "project_id: root-project\n", root_config)
+
+        service = root / "docs-cms" / "services" / "service-a"
+        (service / "adr").mkdir(parents=True)
+        (service / "docs-project.yaml").write_text(
+            self.ROOT_CONFIG.replace("id: root-project", "id: service-a").replace(
+                "name: Root Project", "name: Service A"
+            ),
+            encoding="utf-8",
+        )
+        (service / "adr" / "adr-002-service.md").write_text(
+            self._adr("project_id: root-project\n")
+            .replace("adr-001", "adr-002")
+            .replace("ADR-001", "ADR-002")
+            .replace("4f2f2b3e", "5f2f2b3e"),
+            encoding="utf-8",
+        )
+
+        findings = self._findings(root)
+
+        assert len(findings) == 1
+        assert "service-a" in findings[0]
+        assert "root-project" in findings[0]

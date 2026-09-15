@@ -51,16 +51,28 @@ Neither `--dry-run` nor `--skip-build` suppresses the check.
 - `id` that does not match the filename
 - `id` that does not match the number in the title
 - Duplicate `id` or `doc_uuid` across documents
+- `FM-010`: `project_id` that does not match the `project.id` of the config that governs the document
 - Binary or non-UTF-8 files in a document folder
 
 The `id`/`doc_uuid` mismatch and duplicate checks above apply only to the
 standard `adr`, `rfc`, `memo` and `prd` schemas; a `generic` document is not
 checked for either.
 
+`FM-010` compares each document's `project_id` with the `project.id` of the
+config that governs its folder. In a monorepo that is the sub-project's own
+config, not the root one, so a document under a sub-project is measured
+against the sub-project's ID. A document whose frontmatter has no `project_id`
+key at all is left to the schema check above, and a document that no config
+governs is skipped.
+
 **Fixed automatically**
 
 - Generates a frontmatter block with sensible defaults when one is missing
 - Adds a missing `tags`, `project_id` or `doc_uuid` to an existing block
+- `FM-010`: replaces an empty or placeholder `project_id` (`my-project`, what
+  `docuchango init` and the bundled templates ship with) with the `project.id`
+  of the config that governs the document, but only when exactly one config
+  governs its folder
 - Maps common status variants and misspellings to the valid value for the type
 - Converts dates in slash, dot and long-month formats (`2026/09/14`,
   `14.09.2026`, `September 14, 2026`) to ISO 8601
@@ -93,6 +105,10 @@ generated and an invalid status is reported instead of mapped.
 - Duplicate ids or UUIDs
 - Dates in a format the fixer does not recognize: `created` accepts any
   string, so an unrecognized date is neither rewritten nor reported
+- A `project_id` that is neither empty nor the `my-project` placeholder but
+  still does not match the governing config. A different value may be
+  deliberate, so `FM-010` reports it and never rewrites it; set the right
+  `project_id` by hand, or change `project.id` in `docs-project.yaml`
 
 ## Code blocks
 
