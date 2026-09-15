@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.19.0-rc.11 (2026-09-15)
+
+### Features
+
+- **validate**: Implement FMT-010 line ending detection and fix
+  ([`84dc931`](https://github.com/jrepp/docuchango/commit/84dc9319ac315d022f70f78b05ef7340caa23681))
+
+
 ## v1.19.0-rc.10 (2026-09-15)
 
 ### Bug Fixes
