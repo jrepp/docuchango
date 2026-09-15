@@ -1,13 +1,16 @@
 summary: >-
   An ADR with a bare `<token>` placeholder in prose. The bullet-list
   comparisons (`<100 ms`, `>5 failures`) are deliberately not findings since
-  the MDX check rework in PR #71, and are kept here to prove that.
+  the MDX check rework in PR #71, and are kept here to prove that. MDX-010
+  escapes the placeholder on a fixing run, so the document validates clean
+  afterwards and the comparisons are still untouched.
 messages:
-  - "Line 19: Unescaped '<token>' looks like a JSX tag"
+  - "MDX-001: Line 19: Unescaped '<token>' looks like a JSX tag"
 forbidden:
   - "Line 16"
   - "Line 17"
-# MDX-010 (planned) would escape the placeholder automatically.
-fixed: false
+fixed: true
+fix_messages:
+  - "MDX-010: Line 19: Escaped '<token>' in prose as '&lt;token&gt;'"
 dry_run_exit_code: 1
-exit_code: 1
+exit_code: 0
