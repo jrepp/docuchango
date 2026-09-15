@@ -254,8 +254,18 @@ disable_error_code = ["no-untyped-call", "no-untyped-def", "no-any-return", "unt
 version_toml = ["pyproject.toml:project.version"]
 branch = "main"
 upload_to_vcs_release = true
-build_command = "uv build"
 commit_message = "chore(release): {version}"
+
+# semantic-release writes the new version into pyproject.toml, then runs
+# build_command, then commits everything in `assets` plus the files it
+# rewrote. uv.lock records the project's own version, so `uv lock` has to run
+# in that window: it restamps the lock against the just-bumped pyproject and
+# the refreshed lock lands in the same `chore(release):` commit. Without this
+# the lock kept the version from whenever it was last hand-refreshed, and the
+# next `uv run`/`uv sync` on a clean checkout rewrote it and dirtied the tree.
+# Plain `uv lock` (no --upgrade) only restamps; it never moves dependencies.
+build_command = "uv lock && uv build"
+assets = ["uv.lock"]
 
 # Release channels. semantic-release picks the channel by the name of the
 # branch it runs on.
