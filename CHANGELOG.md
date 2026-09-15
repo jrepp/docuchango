@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.19.0-rc.14 (2026-09-15)
+
+### Bug Fixes
+
+- **config**: Resolve legacy document folders under docs_roots
+  ([`ab461ed`](https://github.com/jrepp/docuchango/commit/ab461ed6ebd3f89d399838ab95d7c02445620bae))
+
+### Features
+
+- **validate**: Implement FMT-011 blank-line collapse fix
+  ([`fbd143c`](https://github.com/jrepp/docuchango/commit/fbd143c8340801c1da5034c6f3c79005f7aadddf))
+
+
 ## v1.19.0-rc.13 (2026-09-15)
 
 ### Bug Fixes
