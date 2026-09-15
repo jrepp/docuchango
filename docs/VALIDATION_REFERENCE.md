@@ -186,12 +186,16 @@ Index findings are reported, not fixed.
 
 ## Readability
 
-When `textstat` is installed and `readability.enabled` is true in the
-top-level config, paragraphs at least as long as the configured minimum are
-scored. Paragraphs outside the thresholds are reported with the metric that
-failed. Nothing is rewritten. In a monorepo with `subprojects`, only the
-top-level `readability` settings apply; a sub-project's own settings are not
-read.
+When `textstat` is installed and `readability.enabled` is true, paragraphs at
+least as long as the configured minimum are scored. Paragraphs outside the
+thresholds are reported with the metric that failed. Nothing is rewritten.
+
+Settings are resolved per document from the config that owns it, so in a
+monorepo with `subprojects` a sub-project can enable, disable or tune
+readability on its own. A config that does not declare a `readability` block
+inherits the nearest one up the `subprojects` chain, ending at the root
+config. A declared block is used whole and is never merged key by key with its
+parent's.
 
 ## Docusaurus build
 
