@@ -1,9 +1,19 @@
 summary: >-
-  An ADR written with CRLF line endings. FMT-010 is Planned, so this fixture
-  is collected as a strict xfail: it flips to a real failure the moment the
-  check lands, which is the signal to mark the registry row Implemented.
+  An ADR written entirely with CRLF line endings. Text-mode reads use universal
+  newlines, so the carriage returns are invisible to every check that works on
+  the decoded string; FMT-010 reads the bytes on disk instead and reports one
+  finding per offending line, the way FMT-001 reports trailing whitespace.
 messages:
-  - "CRLF"
+  - "FMT-010: Line 1: CRLF line ending"
+  - "FMT-010: Line 14: CRLF line ending"
+# The carriage returns must not also be seen as trailing whitespace, and the
+# frontmatter behind them must parse normally.
+forbidden:
+  - "Trailing whitespace"
+  - "Missing YAML frontmatter"
+# `validate` (without --dry-run) rewrites the file with LF line endings.
 fixed: true
+fix_messages:
+  - "FMT-010: Converted CRLF line endings to LF"
 dry_run_exit_code: 1
 exit_code: 0

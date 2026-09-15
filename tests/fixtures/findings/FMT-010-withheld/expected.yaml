@@ -1,0 +1,15 @@
+summary: >-
+  A CRLF ADR that also links to a document that does not exist. FMT-010 knows
+  how to repair the line endings, LNK-001 cannot be repaired, and `validate` is
+  atomic by default, so the rewrite is withheld and the file is restored to its
+  original CRLF bytes. This is the case that proves the snapshot/restore path
+  handles a file whose bytes differ from its decoded text.
+messages:
+  - "Broken link './adr-999-does-not-exist.md'"
+fixed: false
+fix_messages:
+  - "FMT-010: Converted CRLF line endings to LF"
+  - "Fixes withheld: 1"
+  - "1 fix(es) withheld; the tree was left untouched."
+dry_run_exit_code: 1
+exit_code: 1

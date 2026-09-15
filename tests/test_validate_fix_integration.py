@@ -263,3 +263,103 @@ class TestValidateDocTypeFromConfig:
         assert metadata["status"] == "Proposed"
         assert metadata["deciders"]
         assert metadata["id"] == "adr-001"
+
+
+CRLF_DOC = (
+    "---\n"
+    "title: Line Ending Decision Record\n"
+    "status: Proposed\n"
+    "created: 2024-10-13\n"
+    "deciders: Team\n"
+    'tags: ["test"]\n'
+    'id: "adr-001"\n'
+    "project_id: fixture-project\n"
+    'doc_uuid: "12345678-1234-4123-8123-123456789abc"\n'
+    "---\n"
+    "\n"
+    "# ADR-001: Line Ending Decision Record\n"
+    "\n"
+    "A paragraph with nothing wrong with it except the line terminators.\n"
+)
+
+
+class TestValidateLineEndings:
+    """FMT-010 through the real command, including the atomic rollback.
+
+    A CRLF document is the one case where the bytes on disk and the decoded
+    text genuinely differ, so it is also the sharpest test of the byte-level
+    snapshot the atomic run restores from.
+    """
+
+    def _tree(self, tmp_path: Path, body: str = "") -> Path:
+        (tmp_path / "docs-project.yaml").write_text(_project_config(), encoding="utf-8")
+        adr = tmp_path / "adr" / "adr-001-line-endings.md"
+        adr.parent.mkdir(parents=True, exist_ok=True)
+        adr.write_bytes((CRLF_DOC + body).replace("\n", "\r\n").encode("utf-8"))
+        return adr
+
+    def _run(self, tmp_path: Path, *extra: str):
+        return CliRunner().invoke(
+            validate,
+            ["--repo-root", str(tmp_path), "--skip-build", *extra],
+            env={"COLUMNS": "200"},
+            catch_exceptions=False,
+        )
+
+    def test_dry_run_reports_every_line_and_writes_nothing(self, tmp_path):
+        adr = self._tree(tmp_path)
+        before = adr.read_bytes()
+
+        result = self._run(tmp_path, "--dry-run")
+
+        assert result.exit_code == 1
+        assert "FMT-010: Line 1: CRLF line ending" in result.output
+        assert "FMT-010: Line 14: CRLF line ending" in result.output
+        # A carriage return is not trailing whitespace, and the frontmatter
+        # behind it parses, so FMT-001 and FM-001 must stay quiet.
+        assert "Trailing whitespace" not in result.output
+        assert "Missing YAML frontmatter" not in result.output
+        assert adr.read_bytes() == before
+
+    def test_fix_rewrites_the_file_with_lf(self, tmp_path):
+        adr = self._tree(tmp_path)
+
+        result = self._run(tmp_path)
+
+        assert result.exit_code == 0, result.output
+        assert "FMT-010: Converted CRLF line endings to LF" in result.output
+        assert b"\r" not in adr.read_bytes()
+        # Only the terminators changed.
+        assert adr.read_text(encoding="utf-8") == CRLF_DOC
+
+    def test_atomic_run_restores_the_original_bytes(self, tmp_path):
+        # The broken link is not fixable, so the atomic run withholds the
+        # line-ending rewrite and must put the CRLF bytes back exactly.
+        adr = self._tree(tmp_path, "\nSee [the absent one](./adr-999-absent.md).\n")
+        before = adr.read_bytes()
+
+        result = self._run(tmp_path)
+
+        assert result.exit_code == 1
+        assert "Fixes withheld" in result.output
+        assert "FMT-010: Converted CRLF line endings to LF" in result.output
+        assert adr.read_bytes() == before
+
+    def test_no_atomic_keeps_the_rewrite(self, tmp_path):
+        adr = self._tree(tmp_path, "\nSee [the absent one](./adr-999-absent.md).\n")
+
+        result = self._run(tmp_path, "--no-atomic")
+
+        assert result.exit_code == 1
+        assert b"\r" not in adr.read_bytes()
+
+    def test_line_ending_fix_is_idempotent(self, tmp_path):
+        adr = self._tree(tmp_path)
+
+        self._run(tmp_path)
+        after_first = adr.read_bytes()
+        result = self._run(tmp_path)
+
+        assert result.exit_code == 0, result.output
+        assert adr.read_bytes() == after_first
+        assert "FMT-010" not in result.output

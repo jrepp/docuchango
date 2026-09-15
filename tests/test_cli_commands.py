@@ -241,15 +241,19 @@ doc_uuid: 12345678-1234-4123-8123-123456789abc
             encoding="utf-8",
         )
 
-        original_write_text = Path.write_text
+        # Counting opens rather than Path.write_text calls: the fixers write
+        # through text_io.write_text, which pins newline="" so a Windows run
+        # cannot reintroduce the carriage returns FMT-010 removes.
+        # Path.write_text funnels through Path.open too, so this catches both.
+        original_open = Path.open
         writes = []
 
-        def counting_write_text(self, *args, **kwargs):
-            if self == test_file:
-                writes.append(args[0])
-            return original_write_text(self, *args, **kwargs)
+        def counting_open(self, mode="r", *args, **kwargs):
+            if self == test_file and "w" in mode:
+                writes.append(mode)
+            return original_open(self, mode, *args, **kwargs)
 
-        monkeypatch.setattr(Path, "write_text", counting_write_text)
+        monkeypatch.setattr(Path, "open", counting_open)
 
         runner = CliRunner()
         result = runner.invoke(validate, ["--repo-root", str(tmp_path), "--skip-build"])

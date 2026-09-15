@@ -1,0 +1,18 @@
+summary: >-
+  An ADR whose line endings are mixed: some lines end with CRLF, one ends with
+  a bare carriage return, the rest end with LF. Both non-LF forms are reported
+  and both are normalized to LF, so the file ends up with one consistent
+  terminator rather than being left half converted.
+messages:
+  - "FMT-010: Line 1: CRLF line ending"
+  - "FMT-010: Line 14: CRLF line ending"
+  - "FMT-010: Line 15: CR line ending"
+# Only the lines that really end with a carriage return are reported.
+forbidden:
+  - "FMT-010: Line 2: "
+  - "Trailing whitespace"
+fixed: true
+fix_messages:
+  - "FMT-010: Converted CR and CRLF line endings to LF"
+dry_run_exit_code: 1
+exit_code: 0
