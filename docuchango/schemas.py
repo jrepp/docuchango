@@ -12,6 +12,7 @@ from collections.abc import Callable
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import PurePosixPath
 from typing import Any, Literal, cast
+from urllib.parse import urlsplit
 
 _eval_type_candidate = getattr(typing, "_eval_type", None)
 _eval_type_parameters = inspect.signature(_eval_type_candidate).parameters if _eval_type_candidate is not None else {}
@@ -248,6 +249,16 @@ class DocsProjectInfo(BaseModel):
         None,
         description="Brief project description",
     )
+    repository_url: str | None = Field(
+        None,
+        description=(
+            "Base URL under which this repository's file tree is served, used by LNK-011 to rewrite a "
+            "link that leaves the repository root into an absolute repository URL. Point it at whatever "
+            "serves the directory --repo-root names, for example "
+            "'https://github.com/org/repo/blob/main'. Unset (the default) leaves those links as LNK-002 "
+            "reports."
+        ),
+    )
 
     @field_validator("id")
     @classmethod
@@ -256,6 +267,29 @@ class DocsProjectInfo(BaseModel):
         if not re.match(r"^[a-z0-9\-]+$", v):
             raise ValueError(f"Project ID must be lowercase with hyphens only. Got: {v}")
         return v
+
+    @field_validator("repository_url")
+    @classmethod
+    def validate_repository_url(cls, v: str | None) -> str | None:
+        """Ensure the repository URL is an absolute http(s) URL with a host.
+
+        LNK-011 pastes a repository-relative path onto this value, so anything
+        that is not an absolute URL - a bare host, an 'ssh://' or 'git@' clone
+        URL, a local path - would produce a link that resolves nowhere. It is
+        rejected at config-load time rather than silently ignored during a run.
+        """
+        if v is None:
+            return v
+        value = v.strip()
+        if not value:
+            raise ValueError("project.repository_url must not be empty. Remove the key or give it a URL.")
+        parsed = urlsplit(value)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            raise ValueError(
+                f"project.repository_url must be an absolute http:// or https:// URL. Got: {v}. "
+                "Example: https://github.com/org/repo/blob/main"
+            )
+        return value
 
 
 class DocsProjectReadability(BaseModel):

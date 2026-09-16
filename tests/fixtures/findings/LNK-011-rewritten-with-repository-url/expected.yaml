@@ -1,0 +1,26 @@
+summary: >-
+  A monorepo whose site checkout is validated on its own (`--repo-root site`)
+  and whose ADR links to shared reference material one level above it. The
+  link leaves the repository root, so LNK-002 reports it; the target exists on
+  disk and the config sets `project.repository_url`, so LNK-011 rewrites it to
+  an absolute repository URL, keeping the '#terms' anchor. The '../' that
+  climbs out of `site/` is consumed from the end of the configured URL, which
+  is why the result is `/blob/main/shared/...` and not `/blob/main/site/...`.
+  The identical link inside a fenced code block is sample text and must stay
+  as written.
+# The documents live in site/, and shared/ is deliberately outside the root.
+repo_root: site
+messages:
+  - "LNK-002: Line 14: Link '../../../shared/reference/glossary.md#terms' points outside the repository"
+# The target exists and a repository URL is configured, so Phase 1 rewrites
+# the link and Phase 2 finds nothing left.
+fixed: true
+fix_messages:
+  - "[Cross-plugin links] LNK-011: Line 14: Rewrote link '../../../shared/reference/glossary.md#terms' to 'https://github.com/acme/handbook/blob/main/shared/reference/glossary.md#terms'"
+forbidden:
+  # The fenced copy of the link is never a finding and never a rewrite.
+  - "Line 19"
+  # A configured repository URL means no "set project.repository_url" nudge.
+  - "setting project.repository_url"
+dry_run_exit_code: 1
+exit_code: 0

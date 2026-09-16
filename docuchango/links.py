@@ -1,4 +1,4 @@
-"""Markdown link classification and resolution shared by LNK-001 and LNK-010.
+"""Markdown link classification and resolution shared by the link checks.
 
 ``DocValidator.validate_links`` reports a broken internal link (``LNK-001``)
 and ``docuchango.fixes.internal_links`` rewrites one when the scanned set holds
@@ -15,6 +15,13 @@ decides what kind of target this is, :func:`link_path_target` reduces a target
 to the filesystem path inside it, :func:`resolve_internal_link` turns that into
 a path on disk plus whether it exists, and :func:`link_candidates` is the
 "exactly one document has this filename" rule LNK-010 is built on.
+
+The same applies to the pair on the other side of the repository boundary:
+:func:`resolve_repository_escape` is how ``check_cross_plugin_links``
+(``LNK-002``) decides a link leaves the repository root and how
+:mod:`docuchango.fixes.cross_plugin_links` (``LNK-011``) decides it may
+rewrite one, and :func:`repository_file_url` builds the absolute URL it is
+rewritten to.
 """
 
 from __future__ import annotations
@@ -24,7 +31,9 @@ import re
 from collections.abc import Iterable, Mapping
 from enum import Enum
 from pathlib import Path, PurePosixPath
-from urllib.parse import unquote
+from urllib.parse import unquote, urlsplit, urlunsplit
+
+from docuchango.config_paths import is_within_path
 
 #: A link target that starts with a URI scheme ("mailto:", "tel:", "ftp://",
 #: ...) is never a filesystem path and must not be resolved as one.
@@ -38,6 +47,11 @@ LINK_PATTERN = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 
 #: Link targets that are never a filesystem path.
 NON_PATH_PREFIXES = ("mailto:", "data:")
+
+#: Prefixes ``check_cross_plugin_links`` (LNK-002) never resolves against the
+#: filesystem, and so the ones LNK-011 skips too. Kept as one tuple so the
+#: check and its fixer cannot drift apart about what counts as a path.
+NON_FILESYSTEM_PREFIXES = ("http://", "https://", "#", "mailto:", "data:", "tel:")
 
 
 class LinkType(Enum):
@@ -151,6 +165,97 @@ def resolve_internal_link(source_doc: Path, repo_root: Path, target: str) -> tup
     if path_target.startswith("/"):
         return resolve_link_target(repo_root, path_target.lstrip("/"))
     return resolve_link_target(source_doc.parent, path_target)
+
+
+def resolve_repository_escape(source_doc: Path, repo_root: Path, target: str) -> Path | None:
+    """Resolve a link the way LNK-002 does, and report where it leaves the repo.
+
+    ``DocValidator.check_cross_plugin_links`` reports a link whose target
+    resolves outside the repository root, and
+    :mod:`docuchango.fixes.cross_plugin_links` rewrites one to an absolute
+    repository URL (LNK-011). Both call this, so the fixer can never rewrite a
+    link the check does not report.
+
+    A site-root target ('/docs/x.md') resolves against ``repo_root`` and every
+    other form against the linking document's folder, in both cases fully
+    resolved so that a parent traversal buried later in the path
+    ('a/../../../out') is caught.
+
+    Args:
+        source_doc: Path of the document that contains the link.
+        repo_root: The resolved repository root of the run.
+        target: The raw link destination, title and anchor included.
+
+    Returns:
+        The resolved target when it lands outside ``repo_root``, and ``None``
+        when the target is not a filesystem path at all or stays inside the
+        repository -- neither is an LNK-002 finding.
+    """
+    stripped = target.strip()
+    if stripped.startswith(NON_FILESYSTEM_PREFIXES):
+        return None
+    path_target = link_path_target(stripped)
+    if not path_target:
+        return None
+    if path_target.startswith("/"):
+        resolved = (repo_root / path_target.lstrip("/")).resolve()
+    else:
+        resolved = (source_doc.parent / path_target).resolve()
+    if is_within_path(resolved, repo_root):
+        return None
+    return resolved
+
+
+def repository_file_url(repository_url: str, repo_root: Path, target: Path) -> str | None:
+    """Absolute URL for a repository file, for LNK-011.
+
+    ``repository_url`` is the base under which the tree at ``repo_root`` is
+    served -- ``https://github.com/org/repo/blob/main`` for a checkout
+    validated at its own root. A trailing slash is stripped, and the target's
+    path relative to ``repo_root`` is appended in POSIX form. No forge-specific
+    segment such as ``/blob/main/`` is inserted: whatever the user wrote is
+    treated as the root of the served file tree, so a different forge, a
+    different branch or a plain file server is a config change and not a code
+    change.
+
+    A target outside ``repo_root`` -- which is every LNK-002 finding, since the
+    check fires on exactly that -- yields a relative path with leading ``..``
+    segments, and those are consumed from the end of the URL path the way a
+    browser resolves them. That is what makes the rule work for a run pointed
+    at a subdirectory of the repository: with
+    ``repository_url: https://github.com/org/repo/blob/main/site`` and
+    ``--repo-root site``, a link to ``../shared/glossary.md`` becomes
+    ``https://github.com/org/repo/blob/main/shared/glossary.md``.
+
+    Args:
+        repository_url: The configured ``project.repository_url``.
+        repo_root: The resolved repository root of the run.
+        target: The resolved file the link points at.
+
+    Returns:
+        The absolute URL, or ``None`` when the target cannot be addressed under
+        this base: a URL that is not absolute http(s), or a path that climbs
+        past the base URL's own root, which means the configured URL is not
+        deep enough to describe where the target actually lives.
+    """
+    parsed = urlsplit(repository_url.strip().rstrip("/"))
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return None
+
+    segments = [segment for segment in parsed.path.split("/") if segment]
+    relative = os.path.relpath(target, start=repo_root).replace(os.sep, "/")
+    for segment in relative.split("/"):
+        if segment in ("", "."):
+            continue
+        if segment == "..":
+            if not segments:
+                return None
+            segments.pop()
+        else:
+            segments.append(segment)
+    if not segments:
+        return None
+    return urlunsplit((parsed.scheme, parsed.netloc, "/" + "/".join(segments), "", ""))
 
 
 def document_index(documents: Iterable[Path]) -> dict[str, list[Path]]:

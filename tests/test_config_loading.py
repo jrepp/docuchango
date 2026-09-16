@@ -51,6 +51,11 @@ class TestConfigLoading:
         assert doc_type_properties["report_numbering_gaps"]["type"] == "boolean"
         assert doc_type_properties["report_numbering_gaps"]["default"] is False
 
+        repository_url = schema["properties"]["project"]["properties"]["repository_url"]
+        assert repository_url["type"] == ["string", "null"]
+        assert repository_url["default"] is None
+        assert repository_url["pattern"] == "^https?://"
+
     def test_load_valid_config(self):
         """Test that valid config file is loaded correctly."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1240,6 +1245,107 @@ doc_uuid: 22222222-2222-4222-8222-222222222222
             assert doc_types is not None
             assert doc_types["adr"].report_numbering_gaps is True
             assert doc_types["rfc"].report_numbering_gaps is False
+
+    def test_repository_url_round_trips_from_yaml(self):
+        """The LNK-011 base URL survives a real docs-project.yaml load."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            docs_cms = repo_root / "docs-cms"
+            (docs_cms / "adr").mkdir(parents=True)
+
+            (docs_cms / "docs-project.yaml").write_text(
+                yaml.dump(
+                    {
+                        "project": {
+                            "id": "url-project",
+                            "name": "URL Project",
+                            "repository_url": "https://github.com/org/repo/blob/main",
+                        },
+                        "structure": {"document_folders": ["adr"]},
+                    }
+                )
+            )
+
+            validator = DocValidator(repo_root, verbose=False)
+            assert validator.project_config is not None
+            assert validator.project_config.project.repository_url == "https://github.com/org/repo/blob/main"
+            # The report side resolves the same value per document.
+            assert validator._repository_url_for(docs_cms / "adr" / "adr-001-x.md") == (
+                "https://github.com/org/repo/blob/main"
+            )
+
+    def test_subproject_inherits_the_root_repository_url(self):
+        """A sub-project that declares no URL uses the one that included it."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            (repo_root / "adr").mkdir(parents=True)
+            (repo_root / "service-a" / "adr").mkdir(parents=True)
+
+            (repo_root / "docs-project.yaml").write_text(
+                yaml.dump(
+                    {
+                        "project": {
+                            "id": "root-project",
+                            "name": "Root",
+                            "repository_url": "https://example.com/org/repo/blob/main",
+                        },
+                        "structure": {"document_folders": ["adr"]},
+                        "subprojects": ["service-a"],
+                    }
+                )
+            )
+            (repo_root / "service-a" / "docs-project.yaml").write_text(
+                yaml.dump(
+                    {
+                        "project": {"id": "service-a", "name": "Service A"},
+                        "structure": {"document_folders": ["adr"]},
+                    }
+                )
+            )
+
+            validator = DocValidator(repo_root, verbose=False)
+            nested = repo_root / "service-a" / "adr" / "adr-001-x.md"
+            assert validator._repository_url_for(nested) == "https://example.com/org/repo/blob/main"
+
+    def test_subproject_repository_url_overrides_the_root_one(self):
+        """A sub-project from a different repository declares its own URL."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            (repo_root / "adr").mkdir(parents=True)
+            (repo_root / "service-a" / "adr").mkdir(parents=True)
+
+            (repo_root / "docs-project.yaml").write_text(
+                yaml.dump(
+                    {
+                        "project": {
+                            "id": "root-project",
+                            "name": "Root",
+                            "repository_url": "https://example.com/org/repo/blob/main",
+                        },
+                        "structure": {"document_folders": ["adr"]},
+                        "subprojects": ["service-a"],
+                    }
+                )
+            )
+            (repo_root / "service-a" / "docs-project.yaml").write_text(
+                yaml.dump(
+                    {
+                        "project": {
+                            "id": "service-a",
+                            "name": "Service A",
+                            "repository_url": "https://example.com/org/service-a/blob/main",
+                        },
+                        "structure": {"document_folders": ["adr"]},
+                    }
+                )
+            )
+
+            validator = DocValidator(repo_root, verbose=False)
+            nested = repo_root / "service-a" / "adr" / "adr-001-x.md"
+            assert validator._repository_url_for(nested) == "https://example.com/org/service-a/blob/main"
+            assert validator._repository_url_for(repo_root / "adr" / "adr-001-x.md") == (
+                "https://example.com/org/repo/blob/main"
+            )
 
 
 class TestLegacyFoldersUnderDocsRoots:

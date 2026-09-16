@@ -599,3 +599,47 @@ class TestReportNumberingGaps:
         """The option is per-type only; structure carries no default for it."""
         config = DocsProjectConfig(project={"id": "gap-project", "name": "Gap Project"})
         assert not hasattr(config.structure, "report_numbering_gaps")
+
+
+class TestRepositoryUrl:
+    """LNK-011: the `project.repository_url` base for absolute link rewrites."""
+
+    def test_repository_url_defaults_to_none(self):
+        """The field is optional; without it LNK-002 stays a report."""
+        config = DocsProjectConfig(project={"id": "url-project", "name": "URL Project"})
+        assert config.project.repository_url is None
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            "https://github.com/org/repo/blob/main",
+            "http://docs.internal/repo",
+            "https://example.com/org/repo/blob/main/",
+        ],
+    )
+    def test_absolute_http_urls_are_accepted(self, value):
+        """Any absolute http(s) URL with a host is a valid base."""
+        config = DocsProjectConfig(project={"id": "url-project", "name": "URL Project", "repository_url": value})
+        assert config.project.repository_url == value
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            "git@github.com:org/repo.git",
+            "ssh://git@github.com/org/repo",
+            "github.com/org/repo",
+            "/srv/docs",
+            "   ",
+        ],
+    )
+    def test_non_http_urls_are_rejected(self, value):
+        """A clone URL or a bare host would produce links that resolve nowhere."""
+        with pytest.raises(ValidationError, match="repository_url"):
+            DocsProjectConfig(project={"id": "url-project", "name": "URL Project", "repository_url": value})
+
+    def test_surrounding_whitespace_is_stripped(self):
+        """A pasted value keeps working rather than producing a broken URL."""
+        config = DocsProjectConfig(
+            project={"id": "url-project", "name": "URL Project", "repository_url": "  https://example.com/repo  "},
+        )
+        assert config.project.repository_url == "https://example.com/repo"

@@ -156,7 +156,8 @@ issue above instead of a previewed fix, then silently fixed on the real run.
 - `LNK-002`: links that resolve outside the repository root, reported one per
   link with its line number and target. A link that points elsewhere *inside*
   the repository, such as `../../internal/notes.md` or the repository
-  `README.md`, is legitimate and is not reported
+  `README.md`, is legitimate and is not reported. `LNK-011` repairs the
+  finding when `project.repository_url` is set and the target exists
 
 Links inside a code fence or an inline code span are sample text and are
 neither checked nor rewritten. Reference-style links (`[text][ref]`) and
@@ -167,10 +168,14 @@ images are not checked.
 - `LNK-010`: a broken link is rewritten to the correct relative path when
   exactly one scanned document carries the target's filename, reported as
   `LNK-010: Line 12: Rewrote link 'adr-003.md' to '../adr/adr-003-title.md'`
+- `LNK-011`: a link that leaves the repository root is rewritten to an
+  absolute repository URL when `project.repository_url` is set, reported as
+  `LNK-011: Line 14: Rewrote link '../../shared/glossary.md' to
+  'https://github.com/org/repo/blob/main/shared/glossary.md'`
 
-This is the "the file moved, or the link was written from the wrong folder"
-case, and it is the only one that is not a guess: the rewritten path is
-checked against the same resolution `LNK-001` uses, so a repaired link is
+`LNK-010` is the "the file moved, or the link was written from the wrong
+folder" case, and it is the only one that is not a guess: the rewritten path
+is checked against the same resolution `LNK-001` uses, so a repaired link is
 guaranteed to resolve. The anchor and query are kept as written. A target
 carrying a link title (`path "Title"`), the angle-bracket form (`<path>`) or
 percent-escapes is left alone, and so is a candidate that lives outside the
@@ -190,7 +195,53 @@ LNK-010 rewrites a broken link only when exactly one document matches, so pick
 one and write the path out.
 ```
 
-`LNK-002` is reported only. Fix those by hand and validate again.
+### Links that leave the repository (`LNK-011`)
+
+A relative link that climbs out of the repository root - into a sibling
+checkout, or another Docusaurus plugin - cannot be satisfied by anything in
+this repository. Set `project.repository_url` to the base URL under which the
+repository's file tree is served and `validate` writes the absolute URL for
+you:
+
+```yaml
+project:
+  id: my-app
+  name: My App
+  repository_url: https://github.com/my-org/my-repo/blob/main
+```
+
+The rewrite is that URL, trailing slash stripped, plus the target's path
+relative to `--repo-root`, in POSIX form, with the anchor or query kept as
+written. Nothing forge-specific is inserted: whatever you configure is treated
+as the root of the served file tree, so `/blob/main` for GitHub's blob view,
+`/-/blob/main` for GitLab, or a plain file server, are all a config change
+rather than a code change. The value must be an absolute `http://` or
+`https://` URL with a host, and a config that sets anything else fails to
+load.
+
+Because the target is outside `--repo-root`, its relative path starts with
+`../`, and those segments are taken off the end of the configured URL the way
+a browser resolves them. That is what makes the rule work when you validate
+one checkout of a larger tree: with `--repo-root site` and
+`repository_url: https://github.com/org/repo/blob/main/site`, a link to
+`../../../shared/glossary.md` becomes
+`https://github.com/org/repo/blob/main/shared/glossary.md`. If the `../`
+segments run past the configured URL's own path, the URL does not describe
+where the target lives and the link is left alone.
+
+In a monorepo the URL comes from the config that governs the linking document.
+A sub-project that declares none inherits the URL of the config that included
+it, up to the root, so one `repository_url` at the root covers a whole
+monorepo; a sub-project checked out from a different repository declares its
+own. When two configs claim the same folder with different URLs, there is no
+single repository to rewrite against and the link stays a report.
+
+`LNK-011` never rewrites a link whose target does not exist on disk: a link
+that escapes the repository *and* points at nothing is a typo, and an
+absolute URL would only hide it behind a 404. Those stay `LNK-002` reports, as
+does every escaping link in a project with no `repository_url` - with a note
+on the message saying that setting one would repair it. Fix those by hand and
+validate again.
 
 ## MDX compatibility
 

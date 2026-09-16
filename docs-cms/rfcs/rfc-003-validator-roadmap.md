@@ -83,9 +83,9 @@ reported.
 | ID-010 | Gap or non-contiguous numbering within a document type, opt-in per type via `structure.doc_types.<type>.report_numbering_gaps` | Implemented | report | `check_numbering_gaps`, `_numbering_gap_types`, `_format_number_ranges`, `_config_context_for_path`, `schemas.py` (`DocTypeConfig.report_numbering_gaps`) |
 | ID-011 | Validate numbered documents nested in subfolders of a document folder, opt-in via `structure.scan_subfolders` (and per-type via `structure.doc_types.<type>.scan_subfolders`) | Implemented | report | `scan_documents`, `_build_scan_entries`, `_scan_document_folder`, `schemas.py` (`DocsProjectStructure.scan_subfolders`, `DocTypeConfig.scan_subfolders`) |
 | LNK-001 | Broken internal link, including bare relative, suffix-less and directory targets. LNK-010 repairs the single-candidate case in Phase 1, so what reaches the report is a target no scanned document carries, or an ambiguous one, whose candidates the message lists | Implemented | report | `validate_links`, `_validate_internal_link`, `_link_candidates`, `links.py` (`resolve_internal_link`, `link_candidates`) |
-| LNK-002 | Link that resolves outside the repository root, reported once per link with line number and target | Implemented | report | `check_cross_plugin_links` |
+| LNK-002 | Link that resolves outside the repository root, reported once per link with line number and target. LNK-011 repairs it in Phase 1 when the target exists on disk and the governing config sets `project.repository_url`, so what reaches the report is a target that does not exist or a project with no repository URL | Implemented | report | `check_cross_plugin_links`, `links.py` (`resolve_repository_escape`) |
 | LNK-010 | Rewrite a broken internal link when the target exists elsewhere | Implemented | fix | `cli.validate` (Phase 1), `fixes/internal_links.py` (`build_index`, `fix_internal_links`, `fix_links_in_tree`), `links.py`, `markdown.py` (`mask_code`) |
-| LNK-011 | Rewrite cross-plugin links to absolute repository URLs | Planned | fix | see below |
+| LNK-011 | Rewrite cross-plugin links to absolute repository URLs | Implemented | fix | `cli.validate` (Phase 1), `cli._repository_urls_from_claims`, `fixes/cross_plugin_links.py` (`fix_cross_plugin_links`, `fix_cross_plugin_links_in_tree`), `links.py` (`resolve_repository_escape`, `repository_file_url`), `schemas.py` (`DocsProjectInfo.repository_url`), `validator._repository_url_for` |
 | MDX-001 | `<` that opens a JSX-shaped tag which is not a valid HTML element, PascalCase component, self-closing tag or CommonMark autolink (bare prose placeholders such as `<token>`). Comparisons such as `<5ms` or `a < b` are not findings | Implemented | report | `check_mdx_compatibility`, `_is_safe_mdx_tag`, `_mask_code` |
 | MDX-002 | MDX compilation error | Implemented | report | `check_mdx_compilation` |
 | MDX-010 | Escape `<` and `>` and repair common JSX-incompatible Markdown | Planned | fix | see below |
@@ -298,6 +298,78 @@ both FM-006's proposed rewrite and the FM-011 finding, since nothing has been
 written, which is how FMT-012 presents the same pairing. A format FM-006
 cannot identify is an FM-011 report in either mode.
 
+**LNK-011 Cross-plugin link rewrite (shipped).** `fixes/cross_plugin_links.py`
+predates the validator and `validate` never called it, so an LNK-002 finding -
+a relative link that climbs out of the repository root into a sibling checkout
+or another Docusaurus plugin - was a report whose advice ("use an absolute
+GitHub URL for external references") the user had to follow by hand. Phase 1
+now writes that URL, when the config that governs the linking document says
+which repository this is.
+
+`project.repository_url` is the base under which the repository's file tree is
+served, and the rewrite is `<repository_url>/<path from the repository root to
+the target>`: a trailing slash is stripped from the configured URL, the
+target's path relative to `--repo-root` is appended in POSIX form, and the
+anchor or query is kept as written. No forge-specific segment such as
+`/blob/main/` is inserted. That is the least surprising rule of the ones
+available: a user who wants the GitHub blob view writes
+`https://github.com/org/repo/blob/main` in the config, a user on a different
+forge, a different branch or a plain file server writes that instead, and
+neither is a code change. The value is validated at config-load time as an
+absolute `http(s)://` URL with a host, because an SSH clone URL or a bare
+hostname pasted there would otherwise produce links that resolve nowhere.
+
+An LNK-002 target is by definition outside `--repo-root`, so its relative path
+begins with `../`, and those segments are consumed from the end of the
+configured URL's path the way a browser resolves them. That is what makes the
+rule work for the case that produces these findings in the first place: a run
+pointed at one checkout, or one package, of a larger tree. With
+`--repo-root site` and
+`repository_url: https://github.com/org/repo/blob/main/site`, a link to
+`../../../shared/reference/glossary.md` becomes
+`https://github.com/org/repo/blob/main/shared/reference/glossary.md`. When the
+`../` segments outrun the configured URL's path, the URL is not deep enough to
+say where the target lives, and the link stays a report rather than becoming a
+guess.
+
+Two constraints keep the fix safe under the default atomic run, where a fix the
+check still reports withholds every fix in the tree. The target must exist on
+disk: a link that escapes the repository *and* points at nothing is a typo, and
+freezing a typo into a well-formed absolute URL would hide it behind a 404 no
+check in this repository can see again. And which links escape at all is
+decided by `links.resolve_repository_escape`, shared with
+`check_cross_plugin_links`, so the fixer cannot rewrite a link the check is
+happy with. The fixer matches inline links one line at a time, as LNK-010 does,
+while the check also matches a link whose label and target straddle a newline;
+the fixer's set is therefore a subset of the check's, which is the safe
+direction. Code masking is `markdown.mask_code`, shared with the check, so a
+link inside a fence or an inline span is invisible to both.
+
+The URL is resolved per document. `cli._discover_doc_claims` carries the
+governing `project.repository_url` alongside the schema and project ID it
+already carried for FM-010, and a sub-project that declares none inherits the
+URL of the config that included it, up to the root: a monorepo is usually one
+repository, and a sub-project checked out from a different one says so by
+declaring its own. When two configs claim the same folder with different URLs
+there is no single repository to rewrite against and the link stays a report,
+the same rule FM-010's placeholder fix uses for a contested `project.id`.
+`DocValidator._repository_url_for` resolves the same value through
+`_config_context_for_path` for the report side, which is how LNK-002 knows to
+add "setting project.repository_url ... lets LNK-011 rewrite this link for you"
+to a finding whose target exists and whose project has no URL - and to leave
+that sentence off a finding LNK-011 would decline anyway.
+
+What the module used to do was rewrite `../rfcs/RFC-001-x.md` to the Docusaurus
+route `/rfc/RFC-001-x` for three hard-coded folder names. Those links resolve
+perfectly well on disk and are not LNK-002 findings at all, the routes were one
+site's layout, and nothing checked that the route existed. The standalone entry
+point survives as `python -m docuchango.fixes.cross_plugin_links --repo-root
+<path>`, discovering documents and their URLs through the same `cli` helpers
+`validate` uses.
+
+LNK-002 also takes the `LNK-002:` message prefix here, per the "Error message
+format" rule, since its wording had to be touched for the nudge anyway.
+
 **LNK-010 Internal link rewrite (shipped).** `fixes/internal_links.py`
 existed since before the validator and `validate` never called it, so every
 broken link was a report even when the file the author meant was one folder
@@ -357,10 +429,6 @@ inline spans before the prose checks run, but not 4-space indented code
 blocks, so a `<token>` placeholder inside one is reported. Correct handling
 needs list-continuation context, because a 4-space indent inside a list
 item is a paragraph, not code.
-
-**LNK-011 Cross-plugin link rewrite.** Wire `fixes/cross_plugin_links.py`
-into Phase 1. Needs a repository base URL, so add `project.repository_url`
-to `docs-project.yaml`; when it is absent the check stays a report (LNK-002).
 
 **MDX-010 MDX escapes.** Wire `fixes/mdx_syntax.py` into Phase 1 for the
 patterns `check_mdx_compatibility` already detects. Content inside code

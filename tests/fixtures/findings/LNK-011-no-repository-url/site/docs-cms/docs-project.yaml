@@ -1,0 +1,19 @@
+version: "1"
+project:
+  id: fixture-project
+  name: Fixture Project
+  description: Synthetic project used by the finding regression fixtures
+  # No repository_url: LNK-011 has no base to rewrite against, so the escaping
+  # link stays an LNK-002 report that says so.
+structure:
+  adr_dir: adr
+  rfc_dir: rfcs
+  memo_dir: memos
+  document_folders:
+    - adr
+    - rfcs
+    - memos
+security:
+  allow_external_paths: false
+readability:
+  enabled: false

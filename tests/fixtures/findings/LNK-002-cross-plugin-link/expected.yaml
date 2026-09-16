@@ -1,9 +1,15 @@
 summary: >-
   An ADR with a relative link that climbs out of the repository root. The
   same link is also reported as broken (LNK-001), since it cannot resolve.
+  The target does not exist, so LNK-011 declines to rewrite it even when a
+  repository URL is configured: a typo must not become a dead absolute URL.
 messages:
-  - "Line 14: Link '../../../../other-plugin/docs/intro.md' points outside the repository"
-# LNK-011 (planned) would rewrite these to absolute repository URLs.
+  - "LNK-002: Line 14: Link '../../../../other-plugin/docs/intro.md' points outside the repository"
+forbidden:
+  # The target does not exist, so the "set project.repository_url" nudge would
+  # be wrong here - LNK-011 would not rewrite this link either way.
+  - "setting project.repository_url"
+  - "Rewrote link"
 fixed: false
 dry_run_exit_code: 1
 exit_code: 1

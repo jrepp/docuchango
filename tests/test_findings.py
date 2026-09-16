@@ -170,6 +170,18 @@ class FindingCase:
         return int(self.expected["exit_code"])
 
     @property
+    def repo_root(self) -> str:
+        """Subdirectory of the staged case that ``--repo-root`` points at.
+
+        Defaults to ``"."``, the whole case directory, which is what every
+        case wants unless the finding is about the repository boundary itself:
+        LNK-002 fires on a link that resolves *outside* ``--repo-root``, and
+        LNK-011 rewrites one only when the target exists, so such a case needs
+        a file that the run can see on disk but that sits outside the root.
+        """
+        return str(self.expected.get("repo_root", "."))
+
+    @property
     def requires(self) -> list[str]:
         """Optional third-party modules this case needs (e.g. ``textstat``)."""
         return list(self.expected.get("requires") or [])
@@ -282,7 +294,11 @@ def _tree_snapshot(root: Path) -> dict[str, bytes]:
 
 
 def _stage(case: FindingCase, tmp_path: Path) -> Path:
-    """Copy a fixture into ``tmp_path`` as a standalone repository root.
+    """Copy a fixture into ``tmp_path`` and return the staged tree.
+
+    The tree is the whole case directory, and ``--repo-root`` is
+    :func:`_repo_root` of it -- the tree itself for every case but one that
+    declares ``repo_root``, which keeps files deliberately outside the root.
 
     ``tmp_path`` is deliberately not resolved: on macOS it goes through the
     ``/var`` symlink, which is exactly the shape of ``--repo-root`` that
@@ -291,10 +307,16 @@ def _stage(case: FindingCase, tmp_path: Path) -> Path:
     root = tmp_path / "repo"
     shutil.copytree(case.path, root)
     (root / "expected.yaml").unlink(missing_ok=True)
-    if not any(root.rglob("docs-project.yaml")):
-        target = root / "docs-cms" if (root / "docs-cms").is_dir() else root
+    repo_root = _repo_root(case, root)
+    if not any(repo_root.rglob("docs-project.yaml")):
+        target = repo_root / "docs-cms" if (repo_root / "docs-cms").is_dir() else repo_root
         (target / "docs-project.yaml").write_text(DEFAULT_PROJECT_CONFIG, encoding="utf-8")
     return root
+
+
+def _repo_root(case: FindingCase, root: Path) -> Path:
+    """The ``--repo-root`` for a staged case."""
+    return root if case.repo_root == "." else root / case.repo_root
 
 
 def _run_validate(root: Path, dry_run: bool, atomic: bool = True) -> Result:
@@ -351,7 +373,7 @@ def test_finding_dry_run_reports_it(case: FindingCase, tmp_path: Path) -> None:
     root = _stage(case, tmp_path)
     before = _tree_snapshot(root)
 
-    result = _run_validate(root, dry_run=True)
+    result = _run_validate(_repo_root(case, root), dry_run=True)
 
     assert result.exit_code == case.dry_run_exit_code, (
         f"{case.name}: --dry-run exit code {result.exit_code}, expected {case.dry_run_exit_code}\n{result.output}"
@@ -369,7 +391,7 @@ def test_finding_fix_behaviour(case: FindingCase, tmp_path: Path) -> None:
     """``validate`` repairs the finding, or keeps reporting it, as declared."""
     root = _stage(case, tmp_path)
 
-    result = _run_validate(root, dry_run=False, atomic=case.atomic)
+    result = _run_validate(_repo_root(case, root), dry_run=False, atomic=case.atomic)
 
     assert result.exit_code == case.exit_code, (
         f"{case.name}: exit code {result.exit_code}, expected {case.exit_code}\n{result.output}"
@@ -391,10 +413,11 @@ def test_finding_fix_behaviour(case: FindingCase, tmp_path: Path) -> None:
 def test_finding_fix_is_idempotent(case: FindingCase, tmp_path: Path) -> None:
     """Running ``validate`` twice reaches a fixed point."""
     root = _stage(case, tmp_path)
+    repo_root = _repo_root(case, root)
 
-    _run_validate(root, dry_run=False, atomic=case.atomic)
+    _run_validate(repo_root, dry_run=False, atomic=case.atomic)
     after_first = _tree_snapshot(root)
-    _run_validate(root, dry_run=False, atomic=case.atomic)
+    _run_validate(repo_root, dry_run=False, atomic=case.atomic)
 
     assert _tree_snapshot(root) == after_first, f"{case.name}: a second validate run changed files again"
 

@@ -45,18 +45,26 @@ def _load_docs_project_config_from_candidates(candidates: list[Path]) -> tuple[D
     return None, None
 
 
-def _iter_docs_project_configs(root: Path) -> list[tuple[DocsProjectConfig, Path]]:
-    """Load the root docs-project.yaml plus any configured subprojects."""
+def _iter_docs_project_configs(root: Path) -> list[tuple[DocsProjectConfig, Path, str | None]]:
+    """Load the root docs-project.yaml plus any configured subprojects.
+
+    The third element of each tuple is the ``project.repository_url`` that
+    applies to the config (LNK-011): its own when it declares one, otherwise
+    the one inherited from the config that included it, up to the root. It is
+    ``None`` when no config in that chain sets one, which leaves LNK-002 a
+    report.
+    """
     config, config_path = _load_docs_project_config(root)
     if not config or not config_path:
         return []
 
-    configs = [(config, config_path)]
+    root_url = config.project.repository_url
+    configs = [(config, config_path, root_url)]
     seen = {config_path.resolve()}
-    pending = deque([(config, config_path)])
+    pending = deque([(config, config_path, root_url)])
 
     while pending:
-        parent_config, parent_path = pending.popleft()
+        parent_config, parent_path, parent_url = pending.popleft()
         parent_base = parent_path.parent
         allow_external_paths = parent_config.security.allow_external_paths
         for subproject in parent_config.subprojects:
@@ -73,32 +81,33 @@ def _iter_docs_project_configs(root: Path) -> list[tuple[DocsProjectConfig, Path
             if not sub_config or not loaded_path:
                 continue
 
-            configs.append((sub_config, loaded_path))
-            pending.append((sub_config, loaded_path))
+            sub_url = sub_config.project.repository_url or parent_url
+            configs.append((sub_config, loaded_path, sub_url))
+            pending.append((sub_config, loaded_path, sub_url))
 
     return configs
 
 
-def _discover_doc_claims(root: Path) -> dict[Path, list[tuple[str | None, str]]]:
+def _discover_doc_claims(root: Path) -> dict[Path, list[tuple[str | None, str, str | None]]]:
     """Discover markdown docs mapped to the configs that claim each of them.
 
-    The value is one ``(schema, project_id)`` pair per claiming config, in the
-    order the configs were loaded, so callers can tell a file governed by
-    exactly one config from one that several configs claim. It is an empty
-    list when no config claims the file (legacy discovery).
+    The value is one ``(schema, project_id, repository_url)`` triple per
+    claiming config, in the order the configs were loaded, so callers can tell
+    a file governed by exactly one config from one that several configs claim.
+    It is an empty list when no config claims the file (legacy discovery).
     """
     configs = _iter_docs_project_configs(root)
 
     if configs:
-        claims: dict[Path, list[tuple[str | None, str]]] = {}
+        claims: dict[Path, list[tuple[str | None, str, str | None]]] = {}
 
-        def claim(file_path: Path, schema: str | None, project_id: str) -> None:
-            entry = (schema, project_id)
+        def claim(file_path: Path, schema: str | None, project_id: str, repository_url: str | None) -> None:
+            entry = (schema, project_id, repository_url)
             existing = claims.setdefault(file_path, [])
             if entry not in existing:
                 existing.append(entry)
 
-        for config, config_path in configs:
+        for config, config_path, repository_url in configs:
             if not config.structure:
                 continue
             config_base = config_path.parent
@@ -134,7 +143,7 @@ def _discover_doc_claims(root: Path) -> dict[Path, list[tuple[str | None, str]]]
                     if not folder_path.exists():
                         continue
                     for file_path in folder_path.rglob("*.md"):
-                        claim(file_path, schema_name, project_id)
+                        claim(file_path, schema_name, project_id, repository_url)
 
         if claims:
             return claims
@@ -150,14 +159,14 @@ def _discover_doc_claims(root: Path) -> dict[Path, list[tuple[str | None, str]]]
         "docs-cms/memos/**/*.md",
         "docs-cms/prd/**/*.md",
     ]
-    files: dict[Path, list[tuple[str | None, str]]] = {}
+    files: dict[Path, list[tuple[str | None, str, str | None]]] = {}
     for pattern in doc_patterns:
         for file_path in root.glob(pattern):
             files.setdefault(file_path, [])
     return files
 
 
-def _schemas_from_claims(claims: dict[Path, list[tuple[str | None, str]]]) -> dict[Path, str | None]:
+def _schemas_from_claims(claims: dict[Path, list[tuple[str | None, str, str | None]]]) -> dict[Path, str | None]:
     """Map each discovered file to the schema configured for it.
 
     The value is the ``schema`` of the ``structure.doc_types`` entry (or the
@@ -170,7 +179,7 @@ def _schemas_from_claims(claims: dict[Path, list[tuple[str | None, str]]]) -> di
     return {file_path: (entries[0][0] if entries else None) for file_path, entries in claims.items()}
 
 
-def _project_ids_from_claims(claims: dict[Path, list[tuple[str | None, str]]]) -> dict[Path, str | None]:
+def _project_ids_from_claims(claims: dict[Path, list[tuple[str | None, str, str | None]]]) -> dict[Path, str | None]:
     """Map each discovered file to the project ID that governs it (FM-010).
 
     The value is ``None`` unless exactly one project ID claims the file: a
@@ -181,8 +190,27 @@ def _project_ids_from_claims(claims: dict[Path, list[tuple[str | None, str]]]) -
     """
     governing: dict[Path, str | None] = {}
     for file_path, entries in claims.items():
-        project_ids = {project_id for _, project_id in entries}
+        project_ids = {project_id for _, project_id, _ in entries}
         governing[file_path] = next(iter(project_ids)) if len(project_ids) == 1 else None
+    return governing
+
+
+def _repository_urls_from_claims(
+    claims: dict[Path, list[tuple[str | None, str, str | None]]],
+) -> dict[Path, str | None]:
+    """Map each discovered file to the repository URL that governs it (LNK-011).
+
+    The value is the ``project.repository_url`` of the config that claims the
+    file, or the URL that config inherited from the one that included it. It is
+    ``None`` when no config in that chain declares a URL, and also when two
+    configs claim the same folder with *different* URLs: there is no single
+    repository the file's links can be rewritten against, and LNK-002 stays a
+    report rather than picking one.
+    """
+    governing: dict[Path, str | None] = {}
+    for file_path, entries in claims.items():
+        urls = {repository_url for _, _, repository_url in entries if repository_url}
+        governing[file_path] = next(iter(urls)) if len(urls) == 1 else None
     return governing
 
 
@@ -333,11 +361,14 @@ def validate(
     - Timestamps (created/updated from git history)
     - Code blocks (languages, blank lines, closing fences)
     - Internal links, rewritten when exactly one scanned document matches
+    - Links that leave the repository, rewritten to absolute repository URLs
+      when project.repository_url is set
     - Internal link reachability
     - Markdown formatting issues
     - Consistent ADR/RFC numbering
     """
     from docuchango.fixes.code_blocks import fix_code_blocks
+    from docuchango.fixes.cross_plugin_links import fix_cross_plugin_links
     from docuchango.fixes.frontmatter import fix_frontmatter_metadata
     from docuchango.fixes.internal_links import build_index, fix_internal_links
     from docuchango.fixes.timestamps import update_document_timestamps
@@ -365,6 +396,10 @@ def validate(
     # when no single config does, which keeps the placeholder fix from
     # guessing.
     doc_project_ids = _project_ids_from_claims(doc_claims)
+    # LNK-011: the project.repository_url of the config that governs each file,
+    # inherited from the including config when a sub-project declares none, and
+    # None when nothing declares one - in which case LNK-002 stays a report.
+    doc_repository_urls = _repository_urls_from_claims(doc_claims)
     all_files = sorted(doc_claims)
 
     # Track fixes applied and remaining issues
@@ -438,6 +473,24 @@ def validate(
                 if verbose:
                     rel_path = file_path.relative_to(repo_root)
                     console.print(f"  [red]✗[/red] {rel_path}: Error in Internal links - {e}")
+
+        # LNK-011 runs last of the link fixes: it turns a link that leaves the
+        # repository into an absolute repository URL, which is only possible
+        # when the governing config sets project.repository_url. A file with no
+        # URL is skipped and its escaping links stay LNK-002 reports.
+        for file_path in all_files:
+            repository_url = doc_repository_urls.get(file_path)
+            if not repository_url:
+                continue
+            try:
+                changed, messages = fix_cross_plugin_links(file_path, repo_root, repository_url, dry_run=dry_run)
+                if changed and messages:
+                    for msg in messages:
+                        fixes_applied.append((file_path, f"[Cross-plugin links] {msg}"))
+            except Exception as e:
+                if verbose:
+                    rel_path = file_path.relative_to(repo_root)
+                    console.print(f"  [red]✗[/red] {rel_path}: Error in Cross-plugin links - {e}")
 
     # Phase 2: Run validation to find remaining issues
     documents_scanned = 0
