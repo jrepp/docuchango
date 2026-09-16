@@ -140,6 +140,16 @@ exclude_lines = [
     "@(abc\\.)?abstractmethod",
 ]
 
+[tool.uv]
+# Temporary security pin for GHSA-8mgp-746c-j5xp (CVE-2026-81726): nltk <= 3.10.3 lets
+# model-artifact APIs read/write outside pathsec roots. nltk is transitive via textstat
+# (only used for an optional cmudict syllable lookup) and no patched release exists yet.
+# The fix landed upstream in nltk/nltk@cbc98458b43de5f792f0382583c16df39e5c5117 (2026-08-28),
+# so resolve nltk from that commit until nltk publishes a release > 3.10.3, then remove this.
+override-dependencies = [
+    "nltk @ https://github.com/nltk/nltk/archive/cbc98458b43de5f792f0382583c16df39e5c5117.tar.gz",
+]
+
 [tool.ruff]
 target-version = "py310"
 line-length = 120
