@@ -4,7 +4,7 @@ This package contains modules for automatically fixing common documentation issu
 - broken_links: Fix broken internal and cross-reference links
 - code_blocks: Fix code block formatting and language tags
 - code_blocks_proper: Alternative code block formatter
-- cross_plugin_links: Fix cross-plugin link references
+- cross_plugin_links: Rewrite links that leave the repository to absolute repository URLs (LNK-011)
 - doc_links: Fix documentation link issues
 - docs: General documentation fixes (whitespace, frontmatter, etc.)
 - internal_links: Rewrite broken internal links with a single matching document (LNK-010)

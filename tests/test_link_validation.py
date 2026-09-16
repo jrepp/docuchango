@@ -989,3 +989,140 @@ One of two documents named `setup.md`.
         assert "LNK-001: Line 14: Broken link './adr-999-missing.md'" in flat
         assert "scanned documents are named" not in flat
         assert rfc.read_text() == before
+
+
+class TestLnk011EndToEnd:
+    """LNK-011 through the real ``validate`` command.
+
+    The tree is a small monorepo: ``site/`` is the ``--repo-root`` of the run
+    and ``shared/`` sits one level above it, so a link from a document in
+    ``site/`` into ``shared/`` leaves the repository root (LNK-002) while its
+    target is still a real file on disk. The check and the fixer resolve that
+    escape with the same code in ``docuchango.links``, so these cases check the
+    pairing: with a repository URL the link is rewritten and nothing is left to
+    report, without one it stays a report that says which config field would
+    repair it, and a target that does not exist is never rewritten either way.
+    """
+
+    CONFIG = """version: "1"
+project:
+  id: fixture-project
+  name: Fixture Project
+  description: Synthetic project
+{repository_url}structure:
+  adr_dir: adr
+  rfc_dir: rfcs
+  document_folders: [adr, rfcs]
+security:
+  allow_external_paths: false
+readability:
+  enabled: false
+"""
+
+    ADR = """---
+id: "adr-001"
+title: "ADR-001: Links Out"
+status: Accepted
+created: 2026-01-02
+deciders: Team
+tags: ["test"]
+project_id: "fixture-project"
+doc_uuid: "7b063564-82a5-4a21-943f-e868388d36b9"
+---
+
+# ADR-001: Links Out
+
+{body}
+"""
+
+    URL = "https://github.com/acme/handbook/blob/main/site"
+
+    def _repo(self, tmp_path, body, repository_url=URL):
+        """Build site/ + shared/; returns (repo root, ADR path)."""
+        glossary = tmp_path / "shared" / "reference" / "glossary.md"
+        glossary.parent.mkdir(parents=True)
+        glossary.write_text("# Glossary\n")
+
+        root = tmp_path / "site"
+        (root / "docs-cms" / "adr").mkdir(parents=True)
+        url_line = f"  repository_url: {repository_url}\n" if repository_url else ""
+        (root / "docs-cms" / "docs-project.yaml").write_text(self.CONFIG.format(repository_url=url_line))
+        adr = root / "docs-cms" / "adr" / "adr-001-links-out.md"
+        adr.write_text(self.ADR.format(body=body))
+        return root, adr
+
+    def _run(self, root, *extra):
+        args = ["--repo-root", str(root), "--skip-build", *extra]
+        return CliRunner().invoke(validate, args, env={"COLUMNS": "200"}, catch_exceptions=False)
+
+    def test_escaping_link_is_rewritten_and_nothing_is_reported(self, tmp_path):
+        root, adr = self._repo(tmp_path, "See [glossary](../../../shared/reference/glossary.md#terms).")
+
+        result = self._run(root)
+
+        assert result.exit_code == 0, result.output
+        assert (
+            "LNK-011: Line 14: Rewrote link '../../../shared/reference/glossary.md#terms' to "
+            "'https://github.com/acme/handbook/blob/main/shared/reference/glossary.md#terms'"
+        ) in _flat(result.output)
+        assert "(https://github.com/acme/handbook/blob/main/shared/reference/glossary.md#terms)" in adr.read_text()
+
+    def test_second_run_reports_and_changes_nothing(self, tmp_path):
+        root, adr = self._repo(tmp_path, "See [glossary](../../../shared/reference/glossary.md).")
+
+        self._run(root)
+        after_first = adr.read_text()
+        result = self._run(root)
+
+        assert result.exit_code == 0, result.output
+        assert "LNK-011" not in result.output
+        assert adr.read_text() == after_first
+
+    def test_without_a_repository_url_the_link_stays_a_report_with_a_nudge(self, tmp_path):
+        root, adr = self._repo(tmp_path, "See [glossary](../../../shared/reference/glossary.md).", repository_url=None)
+        before = adr.read_text()
+
+        result = self._run(root)
+        flat = _flat(result.output)
+
+        assert result.exit_code == 1
+        assert "LNK-002: Line 14: Link '../../../shared/reference/glossary.md' points outside the repository" in flat
+        assert "setting project.repository_url" in flat
+        assert "Rewrote link" not in flat
+        assert adr.read_text() == before
+
+    def test_missing_target_is_never_rewritten(self, tmp_path):
+        root, adr = self._repo(tmp_path, "See [glossary](../../../shared/reference/missing.md).")
+        before = adr.read_text()
+
+        result = self._run(root)
+        flat = _flat(result.output)
+
+        assert result.exit_code == 1
+        assert "LNK-002: Line 14: Link '../../../shared/reference/missing.md' points outside the repository" in flat
+        # The target does not exist, so the nudge would be wrong too.
+        assert "setting project.repository_url" not in flat
+        assert "Rewrote link" not in flat
+        assert adr.read_text() == before
+
+    def test_link_in_a_code_fence_is_neither_reported_nor_rewritten(self, tmp_path):
+        body = "```markdown\nSee [glossary](../../../shared/reference/glossary.md).\n```"
+        root, adr = self._repo(tmp_path, body)
+        before = adr.read_text()
+
+        result = self._run(root, "--dry-run")
+
+        assert result.exit_code == 0, result.output
+        assert "LNK-002" not in result.output
+        assert "LNK-011" not in result.output
+        assert adr.read_text() == before
+
+    def test_link_that_stays_inside_the_repository_is_untouched(self, tmp_path):
+        root, adr = self._repo(tmp_path, "See [the config](../docs-project.yaml).")
+        before = adr.read_text()
+
+        result = self._run(root, "--dry-run")
+
+        assert result.exit_code == 0, result.output
+        assert "LNK-011" not in result.output
+        assert adr.read_text() == before

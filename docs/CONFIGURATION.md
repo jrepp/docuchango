@@ -43,6 +43,54 @@ story, though - a top-level `*.md` file directly under a configured docs root
 (anything other than `README.md` or `docs-project.yaml`) is still scanned as
 a generic document, whether or not its folder is listed.
 
+## Linking out of the repository
+
+`project.repository_url` is the base URL under which this repository's file
+tree is served. It is optional, and it has one job: `LNK-011` uses it to
+rewrite a relative link that climbs out of the repository root - into a
+sibling checkout, or another Docusaurus plugin - into an absolute URL that
+resolves from anywhere.
+
+```yaml
+project:
+  id: my-app
+  name: My App
+  repository_url: https://github.com/my-org/my-repo/blob/main
+```
+
+With that set, a link written `../../../shared/reference/glossary.md#terms`
+from a document in this repository becomes
+`https://github.com/my-org/my-repo/blob/main/shared/reference/glossary.md#terms`
+the next time `validate` runs.
+
+The rule is the configured URL with any trailing slash stripped, then the
+target's path relative to `--repo-root` in POSIX form, then the anchor or
+query exactly as written. Nothing forge-specific is added, so whatever you
+configure is treated as the root of the served file tree: `/blob/main` gives
+GitHub's blob view, `/-/blob/main` GitLab's, and a plain static file server
+needs no suffix at all. Changing branch or forge is a change to this one line.
+
+The target is by definition outside `--repo-root`, so its relative path starts
+with `../`, and those segments come off the end of the configured URL the way
+a browser resolves them. That is what makes the field work when you validate
+one checkout, or one package, of a larger tree. With `--repo-root site` and
+`repository_url: https://github.com/my-org/my-repo/blob/main/site`, a link to
+`../../../shared/glossary.md` resolves to
+`https://github.com/my-org/my-repo/blob/main/shared/glossary.md`. If the `../`
+segments run past the configured URL's own path, the URL does not describe
+where the target lives and the link is left as a report.
+
+The value must be an absolute `http://` or `https://` URL with a host; a
+config that sets an SSH clone URL or a bare hostname fails to load rather than
+producing links that go nowhere.
+
+In a monorepo the URL comes from the config that governs the linking document.
+A sub-project that declares none inherits the URL of the config that included
+it, up to the root, so one `repository_url` at the root usually covers
+everything; a sub-project that is really a different repository declares its
+own. Leave the field out entirely and links that leave the repository stay
+`LNK-002` reports, which is what they have always been.
+
 ## Several documentation roots
 
 A monorepo can keep documents in more than one place. `docs_roots` lists the

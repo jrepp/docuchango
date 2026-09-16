@@ -31,6 +31,12 @@
         },
         "description": {
           "type": ["string", "null"]
+        },
+        "repository_url": {
+          "type": ["string", "null"],
+          "default": null,
+          "pattern": "^https?://",
+          "description": "Base URL under which this repository's file tree is served, used by LNK-011 to rewrite a link that leaves the repository root into an absolute repository URL. Example: https://github.com/org/repo/blob/main"
         }
       }
     },

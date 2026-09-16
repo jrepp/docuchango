@@ -1,0 +1,16 @@
+summary: >-
+  The same tree as `LNK-011-rewritten-with-repository-url` with
+  `project.repository_url` removed. There is no base URL to rewrite the
+  escaping link against, so it stays an LNK-002 report - and because the
+  target does exist on disk, the message says that setting
+  `project.repository_url` would let LNK-011 repair it.
+repo_root: site
+messages:
+  - "LNK-002: Line 14: Link '../../../shared/reference/glossary.md#terms' points outside the repository"
+  - "The target exists on disk, so setting project.repository_url in the config that governs this document lets LNK-011 rewrite this link for you"
+# Nothing to rewrite against, so the link is reported by both passes.
+fixed: false
+forbidden:
+  - "Rewrote link"
+dry_run_exit_code: 1
+exit_code: 1

@@ -1,0 +1,20 @@
+version: "1"
+project:
+  id: fixture-project
+  name: Fixture Project
+  description: Synthetic project used by the finding regression fixtures
+  # The URL that serves the tree at --repo-root (site/), so a target one level
+  # above it resolves to .../blob/main/shared/... rather than .../site/shared/...
+  repository_url: https://github.com/acme/handbook/blob/main/site
+structure:
+  adr_dir: adr
+  rfc_dir: rfcs
+  memo_dir: memos
+  document_folders:
+    - adr
+    - rfcs
+    - memos
+security:
+  allow_external_paths: false
+readability:
+  enabled: false

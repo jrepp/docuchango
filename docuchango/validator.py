@@ -85,6 +85,7 @@ from docuchango.links import (
     relative_link,
     resolve_internal_link,
     resolve_link_target,
+    resolve_repository_escape,
 )
 from docuchango.links import (
     LinkType as LinkType,  # re-exported: `from docuchango.validator import LinkType` predates links.py
@@ -442,6 +443,24 @@ class DocValidator:
                 return context.config.readability
             context = context.parent
         return self.project_config.readability if self.project_config else None
+
+    def _repository_url_for(self, file_path: Path) -> str | None:
+        """Resolve the ``project.repository_url`` that applies to one document.
+
+        The governing (sub-)project's URL wins, resolved with the same
+        ``_config_context_for_path`` that RD-001 and FM-010 use. A sub-project
+        that declares none inherits the URL of the config that included it, up
+        to the root config: a monorepo is usually one repository, so the root's
+        URL is the right answer for a sub-project that does not live in one of
+        its own. A sub-project checked out from a different repository declares
+        its own URL and is not touched by the fallback.
+        """
+        context = self._config_context_for_path(file_path)
+        while context is not None:
+            if context.config.project.repository_url:
+                return context.config.project.repository_url
+            context = context.parent
+        return self.project_config.project.repository_url if self.project_config else None
 
     def log(self, message: str, force: bool = False):
         """Log if verbose or forced"""
@@ -1131,7 +1150,7 @@ class DocValidator:
             self.log("   ✓ No MDX syntax issues found")
 
     def check_cross_plugin_links(self):
-        """Check for relative links that escape the repository root.
+        """Report relative links that escape the repository root (LNK-002).
 
         A relative link that resolves to a path outside the repository cannot be
         satisfied by any in-repo reference and will not resolve at build time.
@@ -1140,7 +1159,16 @@ class DocValidator:
         are NOT flagged.
 
         Each offending link is reported individually with its line number and
-        the resolved target.
+        the resolved target. Whether a target escapes at all is decided by
+        :func:`docuchango.links.resolve_repository_escape`, shared with the
+        LNK-011 fixer, so the fixer cannot rewrite a link this check is happy
+        with.
+
+        LNK-011 repairs the finding in Phase 1 when the target exists on disk
+        and the config governing the document sets ``project.repository_url``.
+        What reaches this report is therefore a link whose target does not
+        exist -- a typo, which must not be frozen into an absolute URL -- or a
+        document whose config has no repository URL, and the message says so.
         """
         self.log("\n🔗 Checking links escaping the repository...")
 
@@ -1159,37 +1187,20 @@ class DocValidator:
                     # Line number of the target (where the '(' opens).
                     line_num = masked.count("\n", 0, match.start(1)) + 1
 
-                    # Skip external URLs, anchors, and non-file schemes.
-                    if target.startswith(("http://", "https://", "#", "mailto:", "data:", "tel:")):
-                        continue
-
-                    # Strip an optional link title, anchors and query; ignore
-                    # anchor-only targets.
-                    path_part = self._link_path_target(target)
-                    if not path_part:
-                        continue
-
-                    # Absolute (site-root) links are resolved against repo root;
-                    # all other targets are relative to the source document. In
-                    # both cases we resolve fully so that parent traversals that
-                    # appear later in the path (e.g. 'a/../../../out') are caught.
-                    if path_part.startswith("/"):
-                        resolved = (repo_root / path_part.lstrip("/")).resolve()
-                    else:
-                        resolved = (doc.file_path.parent / path_part).resolve()
-
-                    # Flag only if the resolved target is outside the repo.
-                    try:
-                        resolved.relative_to(repo_root)
-                        continue  # inside repo -> fine
-                    except ValueError:
-                        pass
+                    resolved = resolve_repository_escape(doc.file_path, repo_root, target)
+                    if resolved is None:
+                        continue  # not a path, or stays inside the repository
 
                     issues_found = True
                     error = (
-                        f"Line {line_num}: Link '{target}' points outside the repository "
+                        f"LNK-002: Line {line_num}: Link '{target}' points outside the repository "
                         f"({repo_root.name}/) - use an absolute GitHub URL for external references"
                     )
+                    if resolved.exists() and not self._repository_url_for(doc.file_path):
+                        error += (
+                            ". The target exists on disk, so setting project.repository_url in the config "
+                            "that governs this document lets LNK-011 rewrite this link for you"
+                        )
                     doc.errors.append(error)
                     self.log(f"   ⚠️  {doc.file_path.name}:{line_num} - {error}")
 

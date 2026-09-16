@@ -34,6 +34,13 @@ contains no `docs-project.yaml`, the harness writes a default one declaring
 own when the finding depends on configuration, as `RD-001-unreadable-paragraph`
 does.
 
+A case can point `--repo-root` at a subdirectory of itself with `repo_root:` in
+`expected.yaml`. The whole case directory is still copied, so the files outside
+that subdirectory are on disk but outside the repository root - which is the
+only way to write a case about the repository boundary itself, such as the
+`LNK-011-*` pair, where LNK-002 needs a link that escapes the root and LNK-011
+needs its target to exist.
+
 ## `expected.yaml`
 
 ```yaml
@@ -77,6 +84,11 @@ forbidden: []
 # Exit codes for `validate --dry-run` and for `validate`.
 dry_run_exit_code: 1
 exit_code: 1
+
+# Subdirectory of the case that `--repo-root` points at. Defaults to ".", the
+# whole case directory. Only useful for a finding about the repository
+# boundary, where the case needs files on disk outside the repository root.
+repo_root: "."
 
 # Optional third-party modules the case needs. Missing ones skip the case.
 requires: []

@@ -6,6 +6,13 @@ project:
   id: my-project
   name: My Project
   description: Documentation for My Project
+  # Base URL under which this repository's file tree is served. LNK-011 uses it
+  # to rewrite a link that leaves the repository root (LNK-002) into an absolute
+  # repository URL: the target's path relative to --repo-root is appended
+  # verbatim, so point this at whatever serves that directory. On GitHub that is
+  # the blob URL of the branch you publish from. Leave it unset and such links
+  # stay LNK-002 reports.
+  # repository_url: https://github.com/my-org/my-repo/blob/main
 
 structure:
   adr_dir: adr
