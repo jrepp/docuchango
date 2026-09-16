@@ -205,7 +205,7 @@ wheels = [
 
 [[package]]
 name = "docuchango"
-version = "1.19.0rc17"
+version = "1.19.0rc18"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
