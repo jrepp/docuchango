@@ -248,8 +248,9 @@ validate again.
 **Detected**
 
 - A `<` that starts something MDX reads as a JSX tag but that is not a valid
-  element: a bare placeholder in prose such as `<token>`, `<agentName>` or
-  `<time-out>`
+  element (`MDX-001`): a bare placeholder in prose such as `<token>`,
+  `<agentName>` or `<time-out>`, reported as
+  `MDX-001: Line 19: Unescaped '<token>' looks like a JSX tag ...`
 - MDX or JSX compilation errors
 
 A `<` or `>` is only a tag when a letter follows immediately, so comparisons
@@ -260,10 +261,32 @@ elements (`<br/>`, `<sup>`, `<div class="x">`), PascalCase JSX components
 reported either. Code fences, inline code spans and the frontmatter block are
 excluded from the check.
 
+**Fixed automatically**
+
+- Escapes the angle brackets of every `MDX-001` candidate as `&lt;` and
+  `&gt;` (`MDX-010: Line 19: Escaped '<token>' in prose as '&lt;token&gt;'`,
+  one message per candidate), which is the repair for every MDX-001 finding
+  above. `MDX-001` stays the report, which is what a `--dry-run` shows
+- The fix and the check are the same scan, so nothing the check tolerates is
+  rewritten: comparisons, valid HTML, PascalCase components, self-closing
+  tags and autolinks are left exactly as written, and so is everything inside
+  a code fence (backtick or tilde), an inline code span or the frontmatter
+  block. Only the opening `<` and the closing `>` of the candidate change;
+  the text between them, and any `&`, is untouched, so an already escaped
+  `&lt;token&gt;` is never double-escaped and a second run is a no-op
+- It runs after the code-block fixes, because what counts as prose depends on
+  the fences: a fence the run is about to repair would otherwise make the
+  rest of the document look like code. A line number in an `MDX-010` message
+  is therefore the line in the partly repaired file, which can differ from
+  the line `MDX-001` reported for the file on disk when the same run also
+  inserted a blank line around a fence
+
 **Left to you**
 
-MDX findings are reported only. Escape `<` and `>` as `&lt;` and `&gt;`, or
-wrap the text in backticks, then validate again.
+MDX or JSX compilation errors (`MDX-002`) are reported only; they need the
+document read, not a mechanical rewrite. If you would rather keep the literal
+angle brackets, wrap the text in backticks by hand before running `validate`:
+inline code is never touched.
 
 ## Formatting
 

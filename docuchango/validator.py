@@ -94,6 +94,8 @@ from docuchango.markdown import (
     blank_line_finding_message,
     blank_line_runs,
     mask_code,
+    mdx_finding_message,
+    mdx_tags,
 )
 from docuchango.text_io import (
     FMT_012_FINDING_MESSAGE,
@@ -1104,186 +1106,6 @@ class DocValidator:
             self.log(f"   ✗ {error}")
             return False
 
-    # Known HTML elements that are valid raw markup in MDX and must not be
-    # flagged (e.g. '<a href=...>', '<br/>', '<sup>', '<div>').
-    _KNOWN_HTML_TAGS = frozenset(
-        {
-            # Content / text
-            "a",
-            "abbr",
-            "address",
-            "article",
-            "aside",
-            "b",
-            "bdi",
-            "bdo",
-            "blockquote",
-            "br",
-            "button",
-            "canvas",
-            "caption",
-            "cite",
-            "code",
-            "col",
-            "colgroup",
-            "data",
-            "datalist",
-            "dd",
-            "del",
-            "details",
-            "dfn",
-            "dialog",
-            "div",
-            "dl",
-            "dt",
-            "em",
-            "embed",
-            "fieldset",
-            "figcaption",
-            "figure",
-            "footer",
-            "form",
-            "h1",
-            "h2",
-            "h3",
-            "h4",
-            "h5",
-            "h6",
-            "head",
-            "header",
-            "hgroup",
-            "hr",
-            "i",
-            "iframe",
-            "img",
-            "input",
-            "ins",
-            "kbd",
-            "label",
-            "legend",
-            "li",
-            "link",
-            "main",
-            "map",
-            "mark",
-            "menu",
-            "meta",
-            "meter",
-            "nav",
-            "noscript",
-            "object",
-            "ol",
-            "optgroup",
-            "option",
-            "output",
-            "p",
-            "param",
-            "picture",
-            "pre",
-            "progress",
-            "q",
-            "rp",
-            "rt",
-            "ruby",
-            "s",
-            "samp",
-            "script",
-            "section",
-            "select",
-            "slot",
-            "small",
-            "source",
-            "span",
-            "strong",
-            "style",
-            "sub",
-            "summary",
-            "sup",
-            "table",
-            "tbody",
-            "td",
-            "template",
-            "textarea",
-            "tfoot",
-            "th",
-            "thead",
-            "time",
-            "title",
-            "tr",
-            "track",
-            "u",
-            "ul",
-            "var",
-            "video",
-            "wbr",
-            # Media / SVG / MathML (commonly embedded raw)
-            "audio",
-            "svg",
-            "path",
-            "g",
-            "circle",
-            "rect",
-            "line",
-            "polyline",
-            "polygon",
-            "ellipse",
-            "text",
-            "defs",
-            "use",
-            "symbol",
-            "math",
-        }
-    )
-
-    # CommonMark autolinks: '<scheme:rest>' (absolute URI) and '<local@domain>'
-    # (email). Both are valid Markdown and must never be reported as JSX.
-    _AUTOLINK_PATTERN = re.compile(
-        r"<(?:[A-Za-z][A-Za-z0-9+.\-]{1,31}:[^<>\s]*"
-        r"|[^\s<>@]+@[A-Za-z0-9](?:[A-Za-z0-9\-]*[A-Za-z0-9])?"
-        r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9\-]*[A-Za-z0-9])?)+)>"
-    )
-
-    def _is_safe_mdx_tag(self, tag_text: str) -> bool:
-        """Return True if a '<...>' occurrence is safe/valid in MDX.
-
-        Safe cases:
-        - Known HTML elements (<a>, <br/>, <sup>, ...), open or close.
-        - JSX components: PascalCase names or self-closing tags with a proper
-          structure (e.g. <Outlet />, <SuspenseWrapper>).
-
-        - CommonMark autolinks: '<https://example.com>' and '<user@host>'.
-          Markdown resolves these before MDX sees a JSX tag, so they are valid.
-
-        Risky (returns False): bare placeholders in prose that are not valid
-        elements, e.g. <agentName>, <token>, <your-secret>, <log-name>.
-        """
-        # CommonMark autolinks are resolved by the Markdown parser and never
-        # reach the JSX parser. An absolute-URI autolink is '<scheme:rest>' with
-        # no whitespace; an email autolink is '<local@domain>'.
-        if self._AUTOLINK_PATTERN.fullmatch(tag_text):
-            return True
-
-        # The name charset must match the candidate pattern, otherwise a
-        # placeholder such as '<time-out>' or '<a-b>' would be truncated to a
-        # known HTML prefix ('time', 'a') and wrongly treated as safe.
-        m = re.match(r"</?([A-Za-z][A-Za-z0-9._-]*)", tag_text)
-        if not m:
-            return False
-        name = m.group(1)
-
-        # Known HTML element (case-insensitive) -> always safe.
-        if name.lower() in self._KNOWN_HTML_TAGS:
-            return True
-
-        # JSX component convention: starts with an uppercase letter.
-        if name[0].isupper():
-            return True
-
-        # Self-closing tag with valid structure, with or without attributes,
-        # e.g. '<thing />' or '<widget role="img" />'. Any explicitly
-        # self-closed tag is safe MDX regardless of the element name.
-        return bool(re.match(r"<[A-Za-z][A-Za-z0-9._-]*(\s[^<>]*)?/>", tag_text))
-
     @staticmethod
     def _mask_code(content: str, strip_frontmatter: bool = False) -> list[str]:
         """Return the document's lines with code masked out, line numbers kept.
@@ -1295,49 +1117,31 @@ class DocValidator:
         return mask_code(content, strip_frontmatter=strip_frontmatter)
 
     def check_mdx_compatibility(self):
-        """Check for MDX parsing issues (unescaped special characters)"""
-        self.log("\n🔧 Checking MDX compatibility...")
+        """Report JSX-shaped '<...>' in prose that MDX cannot compile (MDX-001).
 
-        # MDX only mis-parses '<' when it looks like the start of a JSX tag,
-        # i.e. '<' immediately followed by a letter. A '<'/'>' before a digit or
-        # whitespace ('<5ms', '>90%', 'a < b') is NOT interpreted as JSX and is
-        # safe. Valid HTML elements and JSX components are also safe. Only bare
-        # placeholders in prose (e.g. '<agentName>', '<token>') actually break
-        # MDX and should be flagged.
-        #
-        # A '<' only starts a tag when a letter (or '/') follows IMMEDIATELY,
-        # with no whitespace. '< threshold' or 'a < b' are comparisons and are
-        # safe; only '<word...' is a tag candidate. The tag name may be a single
-        # character ('<x>') and may contain underscores ('<api_key>'), matching
-        # JSX identifier-shaped names. The candidate is bounded by the matching
-        # '>' so we inspect the whole tag when deciding safety.
-        tag_candidate_pattern = re.compile(r"</?[A-Za-z][A-Za-z0-9._-]*[^<>]*/?>")
+        MDX only mis-parses '<' when it looks like the start of a JSX tag, i.e.
+        '<' immediately followed by a letter. A '<'/'>' before a digit or
+        whitespace ('<5ms', '>90%', 'a < b') is NOT interpreted as JSX and is
+        safe. Valid HTML elements, PascalCase components, explicitly
+        self-closing tags and CommonMark autolinks are safe too. Only bare
+        placeholders in prose ('<agentName>', '<token>') actually break MDX.
+
+        The scan itself lives in :func:`docuchango.markdown.mdx_tags`, which
+        masks code fences, inline code spans and the frontmatter block first.
+        MDX-010 escapes exactly the tags this reports, using the same function,
+        so the report and the repair can never drift.
+        """
+        self.log("\n🔧 Checking MDX compatibility...")
 
         mdx_issues_found = False
 
         for doc in self.documents:
             try:
-                # Code fences and inline code (including multi-line inline
-                # spans) are masked out so we only inspect prose. Frontmatter is
-                # masked too because it is not compiled as MDX.
-                masked_lines = self._mask_code(doc.get_content(), strip_frontmatter=True)
-
-                for line_num, line in enumerate(masked_lines, start=1):
-                    for match in tag_candidate_pattern.finditer(line):
-                        tag_text = match.group(0)
-                        if self._is_safe_mdx_tag(tag_text):
-                            continue
-                        name_match = re.match(r"</?([A-Za-z][A-Za-z0-9._-]*)", tag_text)
-                        placeholder = name_match.group(1) if name_match else tag_text
-                        issue_desc = (
-                            f"Unescaped '<{placeholder}>' looks like a JSX tag but is not a "
-                            f"valid HTML/JSX element. Wrap it in backticks (`<{placeholder}>`) "
-                            f"or escape the angle brackets as &lt;{placeholder}&gt;"
-                        )
-                        error = f"Line {line_num}: {issue_desc}"
-                        doc.errors.append(error)
-                        mdx_issues_found = True
-                        self.log(f"   ✗ {doc.file_path.name}:{line_num} - {issue_desc}")
+                for tag in mdx_tags(doc.get_content()):
+                    error = mdx_finding_message(tag)
+                    doc.errors.append(error)
+                    mdx_issues_found = True
+                    self.log(f"   ✗ {doc.file_path.name}:{tag.line_number} - {error}")
 
             except Exception as e:
                 doc.errors.append(f"Error checking MDX compatibility: {e}")

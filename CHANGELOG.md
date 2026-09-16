@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.19.0-rc.18 (2026-09-16)
+
+### Features
+
+- **validate**: Implement MDX-010 by wiring the MDX escape fixer into Phase 1
+  ([`5f3b2c8`](https://github.com/jrepp/docuchango/commit/5f3b2c8b905c88479518753be33d29a19346ef7e))
+
+
 ## v1.19.0-rc.17 (2026-09-15)
 
 ### Features

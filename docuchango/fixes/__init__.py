@@ -9,7 +9,7 @@ This package contains modules for automatically fixing common documentation issu
 - docs: General documentation fixes (whitespace, frontmatter, etc.)
 - internal_links: Rewrite broken internal links with a single matching document (LNK-010)
 - mdx_code_blocks: Fix MDX-specific code block issues
-- mdx_syntax: Fix MDX syntax issues
+- mdx_syntax: Escape JSX-incompatible angle brackets in prose (MDX-010)
 - migration_syntax: Fix syntax during migrations
 - proto_imports: Fix protocol buffer import statements
 """

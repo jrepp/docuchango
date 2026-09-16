@@ -1,0 +1,15 @@
+summary: >-
+  An ADR whose only angle-bracket placeholders sit inside inline code, a
+  backtick fence and a tilde fence, plus one that is already escaped as
+  `&lt;token&gt;`. None of them is an MDX-001 finding, so MDX-010 must rewrite
+  nothing: the run reports nothing, exits 0 in both modes, and the
+  idempotence assertion in the harness proves the file is left byte-identical.
+messages: []
+forbidden:
+  - "MDX-001"
+  - "MDX-010"
+  - "looks like a JSX tag"
+fixed: false
+fix_messages: []
+dry_run_exit_code: 0
+exit_code: 0
