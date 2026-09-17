@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.19.0 (2026-09-17)
+
+### Chores
+
+- **deps**: Pin nltk to patched upstream commit for GHSA-8mgp-746c-j5xp
+  ([`a451930`](https://github.com/jrepp/docuchango/commit/a451930ffb53b87ba8da6ed14eee09ae9985ce1c))
+
+
 ## v1.19.0-rc.19 (2026-09-16)
 
 
