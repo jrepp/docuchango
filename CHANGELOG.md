@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.19.1-rc.1 (2026-09-18)
+
+### Bug Fixes
+
+- **release**: Generate readable notes from landed changes
+  ([`ccc8692`](https://github.com/jrepp/docuchango/commit/ccc86928accd7aa557a1cb051450b93a98ac4295))
+
+### Documentation
+
+- **release**: Record RC staging and automated publishing policy
+  ([`5152297`](https://github.com/jrepp/docuchango/commit/5152297acc6d46f402171b7c45ef06ac15944db5))
+
+
 ## v1.19.0 (2026-09-17)
 
 ### Chores
