@@ -1,0 +1,234 @@
+[
+  [
+    "f65e2d474b00c7b2b9ac809c6decdacdf88c59b2",
+    "Clean up stale command references"
+  ],
+  [
+    "b8ed43e15daeb02ca80117aa3da0e1e329f6d270",
+    "Merge pull request #64 from jrepp/codex/config-path-containment\n\nQuality, config containment, and readability coverage pass"
+  ],
+  [
+    "726d955868c3dc1a042fe2358b78554cde23bb5b",
+    "Merge pull request #65 from jrepp/fix/static-asset-link-validation\n\nfix: preserve static asset link extensions"
+  ],
+  [
+    "5b53d4bb16418497c4bccd95f3273b7efdf1299c",
+    "Merge pull request #66 from jrepp/feat/static-assets-site\n\nfeat: publish indexed static asset site"
+  ],
+  [
+    "0d48d2cdaabdca05b61321de196b21805596f7ef",
+    "Create dependabot.yml"
+  ],
+  [
+    "e9698b264a190b1b941ccb30df7c68a34e3f8737",
+    "Merge pull request #67 from jrepp/docs/docs-cms-cleanup\n\ndocs: move working notes into docs-cms"
+  ],
+  [
+    "f94b104e2750e944b83aa48cade661418f3a7ee4",
+    "Merge pull request #68 from jrepp/add-python-3-15-support\n\nci: add Python 3.15 support"
+  ],
+  [
+    "59122ec2d2fbd58614a292d33542449e33e3ca72",
+    "Merge pull request #72 from jrepp/ci/rc-channel-and-release-assets\n\nci: add rc release channel and restore release assets"
+  ],
+  [
+    "84199269f7c1eade31a0b3e1efa492622800d9c8",
+    "Merge pull request #73 from jrepp/ci/main-rc-channel-promote\n\nci: make main the rc channel and promote to stable by dispatch"
+  ],
+  [
+    "17e9bc980dbe92371d1a7d7a04274f80609c2f0b",
+    "chore(release): 1.19.0-rc.1"
+  ],
+  [
+    "13e4f4c5db6092ff42247f0caf8309b8cb983ff9",
+    "Merge pull request #69 from jrepp/dependabot/uv/uv-57a4480ba6\n\nchore(deps): bump nltk from 3.9.4 to 3.10.0 in the uv group across 1 directory"
+  ],
+  [
+    "5ced89df0bb6a7da46271fe7a596b253ac24a7c3",
+    "chore(deps): bump setuptools from 82.0.1 to 83.0.0 in the uv group across 1 directory (#75)"
+  ],
+  [
+    "8e9539734fa707a45da4d5f6ab13258b65022e52",
+    "docs: refresh onboarding and simplify the introduction (#74)"
+  ],
+  [
+    "88b46d750de0a1f31b2e20d7518fb533faad4974",
+    "fix(schemas): allow 'Rejected' status for ADRs and RFCs (#70)"
+  ],
+  [
+    "b66238e41b36276b09961984dc6f4ebd5298f198",
+    "fix(validator): eliminate validation false positives (#71)"
+  ],
+  [
+    "84617e458d93c518f44ce20da15e7c80c49fa0b0",
+    "chore(release): 1.19.0-rc.2"
+  ],
+  [
+    "3cae4e1db1f134e30fac601c0360a0ed48312985",
+    "test: fixture-driven regression harness keyed on finding IDs (#76)"
+  ],
+  [
+    "5e1dbcdf8913e312815e1457ab02518329e02dad",
+    "chore(deps): bump nltk to 3.10.3 and add a dev dependency group (#77)"
+  ],
+  [
+    "f8b627db6f99aaedbc2985a1f4b24a26590abfa3",
+    "chore(release): 1.19.0-rc.3"
+  ],
+  [
+    "80bd21e2e53c52e7d46d335dd4a3a19074beb51e",
+    "docs: act on the unaddressed review comments and align docs with merged behavior (#78)"
+  ],
+  [
+    "81b74975d4de8fc3d618361cd5cb77bc3014b805",
+    "test: consolidate duplicated test files (#79)"
+  ],
+  [
+    "5ebdc65ba8a5b8344196be00e1296200c1f52b01",
+    "feat(config): scan_subfolders option for nested documents (#84)"
+  ],
+  [
+    "52cf98230003a71c421d757d5ac8d809baf8cb6d",
+    "chore(release): 1.19.0-rc.4"
+  ],
+  [
+    "fa8d123644cb54426e238aebd47a32ba655e8fea",
+    "fix(cli): resolve --path and --repo-root before comparing to discovered paths (#85)"
+  ],
+  [
+    "f1329699b36a8a6ec3352a873503b897af26d593",
+    "chore(release): 1.19.0-rc.5"
+  ],
+  [
+    "7a5d11eac3a824bc7c06fca49546d3d2ea15f785",
+    "feat(validate): make fixing atomic by default (#86)"
+  ],
+  [
+    "925c0940acf7d00a34c5cd4c61c5d0b77930e96a",
+    "chore(release): 1.19.0-rc.6"
+  ],
+  [
+    "0fc6fb4c011f78642823e57224b1766efaaf4f7b",
+    "fix(fixes): replace whole block scalar when updating frontmatter fields (#88)"
+  ],
+  [
+    "9f50a0c05db2624484d223dac5cd0e9fc9344626",
+    "fix(validate): exit nonzero when no documents are scanned (#89)"
+  ],
+  [
+    "a117f5a20896f3d51ba709810d7213b054df691f",
+    "chore(release): 1.19.0-rc.7"
+  ],
+  [
+    "0d94ca27f876cf7258f1bd62f9155529ea162aab",
+    "fix(validate): honor sub-project readability configuration (#90)"
+  ],
+  [
+    "637975fea3579898da2405b67c46c13a54c22469",
+    "chore(release): 1.19.0-rc.8"
+  ],
+  [
+    "4ba81e31783edb53c9a822a938d03a5f98cadf9c",
+    "fix(fixes): recognize and strip UTF-8 BOM before frontmatter (FMT-012) (#92)"
+  ],
+  [
+    "9633e21fdef9837f2c0edf6500f3d28dc7d69b38",
+    "chore(release): 1.19.0-rc.9"
+  ],
+  [
+    "f4261109bb0ca891b815ca34d1ff1b471ff8ecf9",
+    "test(readability): add RD-001 sub-project fixture cases (#93)"
+  ],
+  [
+    "989053c15e2f69f5904acacba65e8ddd5f33439f",
+    "fix(fixes): derive frontmatter doc type from configured schema (#91)"
+  ],
+  [
+    "607e872c70198f32deeb48b6884f73310e877bf3",
+    "chore(release): 1.19.0-rc.10"
+  ],
+  [
+    "dbf3556e92935b515add146b91eb58da982dad40",
+    "feat(validate): implement FMT-010 line ending detection and fix (#95)"
+  ],
+  [
+    "7a91dd5d5afa1a3dc248a09a2ad851742a8e736e",
+    "chore(release): 1.19.0-rc.11"
+  ],
+  [
+    "32ca8a9b1e2a4f1c10b7397d84e183e563838608",
+    "feat(validate): implement FM-010 project_id match check and placeholder fix (#94)"
+  ],
+  [
+    "6ca33e04c419b9968ab17dff951ed4497fe42e4d",
+    "chore(release): 1.19.0-rc.12"
+  ],
+  [
+    "643ccb698694fcbe379299d3fe2f81743b9fa574",
+    "fix(release): refresh uv.lock in the release commit (#96)"
+  ],
+  [
+    "e71b073b490dd469b3b732f94d80e0c44232aab2",
+    "chore(release): 1.19.0-rc.13"
+  ],
+  [
+    "4f92325cf3954069ade5a7ee64ba686b2a7e404b",
+    "fix(config): resolve legacy document folders under docs_roots (#97)"
+  ],
+  [
+    "faefe34e65fe2b26326a65c526f02cc4514bfb3c",
+    "feat(validate): implement FMT-011 blank-line collapse fix (#98)"
+  ],
+  [
+    "fc2a78571e15c338a1c46a7ed28bc72f5582e7a6",
+    "chore(release): 1.19.0-rc.14"
+  ],
+  [
+    "f68c5835538360375f21b2bc178f2963361f8103",
+    "feat(validate): implement FM-011 date format check (#99)"
+  ],
+  [
+    "a110ab9d0c618121f6810a736ebee69ab8dbd2f9",
+    "chore(release): 1.19.0-rc.15"
+  ],
+  [
+    "8e2394e404282d8c64276e57797c316783a593c6",
+    "feat(validate): implement ID-010 opt-in numbering gap report (#100)"
+  ],
+  [
+    "609386da11e88fa59851fd981fc2237d4cd926af",
+    "chore(release): 1.19.0-rc.16"
+  ],
+  [
+    "6bf1f6e8abe4ec6e1a5da53bf6064eb97baec861",
+    "feat(validate): implement LNK-010 internal link rewrite (#102)"
+  ],
+  [
+    "9c5127353c6ac604415110c8753d2187a2537c87",
+    "chore(release): 1.19.0-rc.17"
+  ],
+  [
+    "3bf4c5563db79439311be55f4733d2793e44bb9b",
+    "feat(validate): implement MDX-010 by wiring the MDX escape fixer into Phase 1 (#101)"
+  ],
+  [
+    "3d61fe89e015a996c0b40cd231ec1fd281a83c0e",
+    "chore(release): 1.19.0-rc.18"
+  ],
+  [
+    "b17b29f4c234a3d9296cb9fb044400b3994afe88",
+    "feat(validate): implement LNK-011 cross-plugin link rewrite via project.repository_url (#103)"
+  ],
+  [
+    "96b9966dd396081e3dca5998fde2d4e1da5b6d2d",
+    "chore(release): 1.19.0-rc.19"
+  ],
+  [
+    "513bd6395e1506d5ba62e5e1d8af3d2ce92b73ff",
+    "chore(deps): pin nltk to patched upstream commit for GHSA-8mgp-746c-j5xp (#104)"
+  ],
+  [
+    "e1c05442a19a1a9b8751770d527d28936c91c431",
+    "chore(release): 1.19.0"
+  ]
+]
