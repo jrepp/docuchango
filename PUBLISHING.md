@@ -21,10 +21,10 @@ On every run, `.github/workflows/release.yml`:
    the last release, bumps `project.version` in `pyproject.toml`, updates
    `CHANGELOG.md`, refreshes `uv.lock`, commits `chore(release): X.Y.Z`, and
    tags.
-2. Creates the GitHub release. The notes are the changelog section for the
-   version, followed by GitHub's generated "What's Changed" list of merged PRs.
-   For a stable release the notes roll up every rc section since the previous
-   stable release.
+2. Creates the GitHub release with one grouped list of landed changes and
+   links to their PRs or commits. Release candidates cover changes since the
+   previous tag; stable releases cover all changes since the previous stable
+   tag. Documentation and maintenance appear in a collapsible section.
 3. Builds the sdist and wheel with `uv build`, checks them with `twine`, and
    publishes to PyPI with **trusted publishing** (OIDC, no tokens).
 4. Builds PyApp binaries for Linux, macOS (arm64) and Windows.
@@ -127,6 +127,53 @@ the full-release channel. The promote run checks out `main`'s HEAD under the
 local name `stable`, runs semantic-release there, and pushes the resulting
 release commit and tag back to `main`. No `stable` branch exists on the
 remote.
+
+## Release notes
+
+`scripts/release_notes.py` reads first-parent Git history between the two
+release tags. Each squash commit or GitHub merge commit contributes one PR
+entry; direct commits link to their commit. Intermediate branch commits and
+automated version-bump commits do not appear. This avoids duplicate entries,
+empty RC headings, and missing squash-merged changes in the generated
+`CHANGELOG.md`. The changelog remains the detailed semantic-release record;
+it is no longer copied into GitHub releases.
+
+Conventional commit types select the section. Breaking changes, security,
+features, fixes, performance, and unclassified changes stay visible.
+Documentation, dependencies, CI, tests, and other maintenance are collapsed.
+Unknown titles are retained rather than silently dropped. A breaking `!` or
+`BREAKING CHANGE:` / `BREAKING-CHANGE:` footer on the landed commit takes
+priority over maintenance grouping. There is one full comparison link.
+
+Use a PR title that describes the resulting behavior, for example
+`feat(validate): repair links when exactly one target matches`, instead of
+`feat(validate): implement LNK-010`. Preserve any breaking-change marker or
+footer in the landed squash/merge message. The generator removes commit-type
+prefixes but does not invent summaries or migration advice from code changes.
+Review stable notes for behavior changes and add upgrade guidance as needed.
+
+Preview the exact Markdown locally (fetch the tags first):
+
+```bash
+uv run --no-project python scripts/release_notes.py \
+  --repo jrepp/docuchango --version v1.19.0 --previous-tag v1.18.1 \
+  --output /tmp/release-notes.md
+```
+
+For an RC, add `--prerelease` and pass the previous RC or stable tag. Omit
+`--previous-tag` for the initial release. Missing tags or a base that is not
+an ancestor fail generation; the workflow requires `fetch-depth: 0`. The
+generator needs only Python and Git, and makes no network or API requests.
+The workflow also saves the Markdown in its job summary.
+
+The reviewed [v1.19.0 notes](docs/release-notes/v1.19.0.md) are an example of
+editing the generated list into a shorter, user-facing release summary.
+To update that release after editing the file:
+
+```bash
+gh release edit v1.19.0 --repo jrepp/docuchango \
+  --notes-file docs/release-notes/v1.19.0.md
+```
 
 ## One-time setup
 

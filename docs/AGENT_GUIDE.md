@@ -450,14 +450,14 @@ When commits are pushed to `main`:
    - `BREAKING CHANGE` → MAJOR bump (0.1.0 → 1.0.0)
    - The bump is published as a **release candidate**: `0.2.0rc1`, `0.2.0rc2`, ...
 3. **Changelog**: Automatically generates `CHANGELOG.md` from commit messages
-4. **Release**: Creates a GitHub pre-release with the changelog section plus
-   GitHub's generated "What's Changed" list
+4. **Release**: Creates a GitHub pre-release with one grouped entry per landed
+   PR or direct commit; documentation and maintenance details are collapsible
 5. **Publish**: Publishes to PyPI via trusted publishing, builds PyApp binaries, signs with Sigstore
 
 **Stable releases are a manual step.** Run the Release workflow from the
 Actions tab (Actions → Release → Run workflow → "Promote to stable"). The
 same commits are re-released as `0.2.0`, marked "latest" on GitHub, with
-release notes rolled up from every rc since the previous stable.
+release notes covering the full Git range since the previous stable.
 
 Resolvers ignore pre-releases unless the consumer opts in, so an rc never
 reaches existing `docuchango>=X` pins. See `PUBLISHING.md` for details.

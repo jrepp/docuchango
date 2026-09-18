@@ -101,7 +101,7 @@ jobs:
           # Most recent stable tag other than the one just created. Used as the
           # lower bound for stable release notes.
           PREV_STABLE="$(git tag --list 'v*' --merged HEAD --sort=-v:refname \
-            | grep -vE -- '-rc\.' | grep -vx -- "$NEW_TAG" | head -n1 || true)"
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -vx -- "$NEW_TAG" | head -n1 || true)"
 
           if [ "$CHANNEL" = "rc" ]; then
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
@@ -137,49 +137,25 @@ jobs:
           OLD_TAG: ${{ steps.release.outputs.old_tag }}
           PREV_STABLE: ${{ steps.release.outputs.prev_stable }}
         run: |
-          # Escape regex metacharacters for safe use in awk patterns.
-          esc() { printf '%s\n' "$1" | sed -e 's/[]\/$*.^[]/\\&/g'; }
-          V="$(esc "$VERSION")"
-
           NOTES_FILE=$(mktemp)
-
+          trap 'rm -f "$NOTES_FILE"' EXIT
+          NOTES_ARGS=()
           if [ "$PRERELEASE" = "true" ]; then
-            # rc: the changelog section for this version only.
-            awk "/^## ${V} /{flag=1; next} /^## /{flag=0} flag" CHANGELOG.md > "$NOTES_FILE"
             NOTES_SINCE="$OLD_TAG"
+            NOTES_ARGS+=(--prerelease)
           else
-            # stable: semantic-release writes an empty section for a promoted
-            # version because the commits were already listed under the rc
-            # sections. Roll up everything between this header and the
-            # previous stable header, which is exactly the rc series.
-            if [ -n "$PREV_STABLE" ]; then
-              P="$(esc "$PREV_STABLE")"
-              awk "/^## ${V} /{flag=1; next} /^## ${P} /{flag=0} flag" CHANGELOG.md > "$NOTES_FILE"
-              printf 'Stable release of the changes since %s.\n\n' "$PREV_STABLE" | cat - "$NOTES_FILE" > "${NOTES_FILE}.tmp"
-              mv "${NOTES_FILE}.tmp" "$NOTES_FILE"
-            else
-              awk "/^## ${V} /{flag=1; next} flag" CHANGELOG.md > "$NOTES_FILE"
-            fi
             NOTES_SINCE="$PREV_STABLE"
           fi
 
-          if [ ! -s "$NOTES_FILE" ]; then
-            printf 'Release %s\n' "$VERSION" > "$NOTES_FILE"
-          fi
+          # One entry per landed PR or direct commit. Stable notes cover the
+          # full stable-to-stable range, without RC headings or a second PR list.
+          uv run --no-project python scripts/release_notes.py \
+            --repo "$REPO" --version "$VERSION" \
+            --previous-tag "$NOTES_SINCE" --output "$NOTES_FILE" \
+            "${NOTES_ARGS[@]}"
 
-          # Append GitHub's generated "What's Changed" (merged PRs, contributors,
-          # full-changelog link) so the curated changelog is followed by the
-          # PR-level view. Best effort: a failure here must not block the release.
-          GEN_ARGS=(-f tag_name="$VERSION")
-          if [ -n "$NOTES_SINCE" ] && [ "$NOTES_SINCE" != "none" ]; then
-            GEN_ARGS+=(-f previous_tag_name="$NOTES_SINCE")
-          fi
-          if GENERATED="$(gh api "repos/${REPO}/releases/generate-notes" "${GEN_ARGS[@]}" --jq .body 2>/dev/null)" \
-             && [ -n "$GENERATED" ]; then
-            printf '\n---\n\n%s\n' "$GENERATED" >> "$NOTES_FILE"
-          else
-            echo "::warning::Could not generate GitHub release notes; using changelog only"
-          fi
+          # Keep the exact published Markdown available in the workflow summary.
+          cat "$NOTES_FILE" >> "$GITHUB_STEP_SUMMARY"
 
           # Release candidates are flagged as pre-releases and never become "latest"
           if [ "$PRERELEASE" = "true" ]; then
@@ -189,11 +165,9 @@ jobs:
           fi
 
           gh release create "${VERSION}" \
-            --title "${VERSION}" \
+            --repo "$REPO" --verify-tag --title "${VERSION}" \
             --notes-file "$NOTES_FILE" \
             "${RELEASE_FLAGS[@]}"
-
-          rm -f "$NOTES_FILE"
 
       - name: Build distribution packages
         if: steps.release.outputs.released == 'true'
