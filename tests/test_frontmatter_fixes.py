@@ -585,6 +585,17 @@ date: 2025-01-26
         assert not changed
         assert msg == "Date already in ISO 8601 format"
 
+    def test_leading_blank_lines_do_not_hide_a_canonical_date(self, tmp_path):
+        """The raw date check strips the document first, as python-frontmatter does."""
+        doc = tmp_path / "adr" / "adr-001-test.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text('\n\n---\nid: "adr-001"\ntitle: "T"\nstatus: Accepted\ncreated: 2025-01-26\n---\n\n# Test\n')
+
+        changed, msg = fix_date_format(doc)
+
+        assert not changed
+        assert msg == "Date already in ISO 8601 format"
+
     @pytest.mark.parametrize("delimiter", ["--- ", "---\t"])
     def test_whitespace_suffixed_delimiters_bound_the_raw_date_check(self, tmp_path, delimiter):
         """The raw date check finds the block python-frontmatter parsed."""
