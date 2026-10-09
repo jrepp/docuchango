@@ -94,9 +94,9 @@ reported.
 | MDX-011 | Mask 4-space indented code blocks before the prose checks (only fenced blocks and inline spans are masked today) | Planned | report | see below |
 | FMT-001 | Trailing whitespace | Implemented | fix | `check_formatting`, `fixes/code_blocks.py` |
 | FMT-002 | More than two consecutive blank lines, outside code fences and frontmatter; FMT-011 is the repair | Implemented | report | `check_formatting`, `markdown.py` (`blank_line_runs`, `blank_line_finding_message`) |
-| FMT-010 | CRLF or mixed line endings | Implemented | fix | `check_formatting`, `text_io.py` (`find_carriage_returns`, `carriage_return_lines`, `write_text`), `fixes/frontmatter.py`, `fixes/whitespace.py` |
+| FMT-010 | CRLF or mixed line endings | Implemented | fix | `check_formatting`, `text_io.py` (`find_carriage_returns`, `carriage_return_lines`, `uses_crlf_throughout`, `write_text`), `fixes/frontmatter.py`, `fixes/whitespace.py` |
 | FMT-011 | Collapse runs of blank lines | Implemented | fix | `markdown.py` (`collapse_blank_lines`, `fence_mask`, `frontmatter_span`), `fixes/frontmatter.py`, `fixes/whitespace.py` |
-| FMT-012 | UTF-8 byte-order mark before the frontmatter | Implemented | fix | `check_formatting`, `text_io.py`, `fixes/frontmatter.py`, `fixes/whitespace.py` |
+| FMT-012 | UTF-8 byte-order mark before the frontmatter | Implemented | fix | `check_formatting`, `text_io.py`, `fixes/frontmatter.py`, `fixes/whitespace.py`, `fixes/tags.py`, `fixes/timestamps.py` |
 | CB-001 | Code fence without a language, or unclosed fence | Implemented | fix/report | `check_code_blocks`, `fixes/code_blocks.py` |
 | IDX-001 | Document index missing, unlinked, or missing bucket headings | Implemented | report | `check_document_indexes` |
 | RD-001 | Paragraph outside the readability thresholds of the (sub-)project that owns the document | Implemented | report | `check_readability`, `_readability_config_for`, `_config_context_for_path` |
@@ -136,7 +136,8 @@ the date was lost. There is no fallback now: no field outside a closed block on
 the first line is read, rewritten or removed. The migration is also all or
 nothing. `date` is removed only when `created` is already in the block or has
 just been inserted; otherwise the file is left as it is and the fixer reports
-`FM-007: Left legacy 'date' in place`.
+`FM-007: Left legacy 'date' in place`. Run on its own, the fixer keeps a file
+that is CRLF throughout as CRLF and reports the BOM it drops as FMT-012.
 
 **FM-008 Tag normalization keeps the final newline (shipped).** The tag fix
 re-serializes the frontmatter through `fixes/yaml_utils.dumps`, and
@@ -146,7 +147,7 @@ happened on every other path that re-serializes a document. `dumps` now ends the
 text with a newline, unless the caller passes the original text and that text
 did not end with one. `fix_frontmatter_metadata`, `fix_whitespace_and_fields`
 and `fix_tags` pass it. The standalone `fix_tags` also keeps a file that is
-CRLF throughout as CRLF. Inside `validate`, CRLF is still converted to LF on
+CRLF throughout as CRLF, and reports the BOM its rewrite drops as FMT-012. Inside `validate`, CRLF is still converted to LF on
 purpose, as FMT-010, in the same rewrite. The `tags` field that FM-005 adds when
 it is missing is reported with the `FM-005:` prefix, and the conversion,
 normalization, de-duplication and sorting are reported with `FM-008:`.

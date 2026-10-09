@@ -17,7 +17,7 @@ from pathlib import Path
 import frontmatter
 
 from docuchango.markdown import frontmatter_body_bounds
-from docuchango.text_io import read_text, write_text
+from docuchango.text_io import FMT_012_FIX_MESSAGE, read_document, uses_crlf_throughout, write_text
 
 
 def get_git_dates(file_path: Path) -> tuple[str | None, str | None]:
@@ -317,9 +317,10 @@ def update_document_timestamps(file_path: Path, dry_run: bool = False) -> tuple[
     if "template" in file_path.name.lower() or file_path.name.startswith("000-"):
         return False, []
 
-    # Read file content
+    # Read file content. FMT-012: the BOM is dropped so python-frontmatter
+    # sees the opening '---', and any rewrite below leaves it out.
     try:
-        content = read_text(file_path)
+        content, bom_removed = read_document(file_path)
     except Exception as e:
         return False, [f"Error reading file: {e}"]
 
@@ -368,9 +369,16 @@ def update_document_timestamps(file_path: Path, dry_run: bool = False) -> tuple[
             modified = True
             messages.append(f"FM-007: Added 'created': {created_date}")
 
-    # Write updated content
+    if modified and bom_removed:
+        messages.insert(0, FMT_012_FIX_MESSAGE)
+
+    # Write updated content, keeping a file that is CRLF throughout as CRLF:
+    # only the timestamp fields are meant to change (FMT-010 normalizes line
+    # endings separately during validate).
     if modified and not dry_run:
         try:
+            if uses_crlf_throughout(file_path):
+                new_content = new_content.replace("\n", "\r\n")
             write_text(file_path, new_content)
         except Exception as e:
             return False, [f"Error writing file: {e}"]

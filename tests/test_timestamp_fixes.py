@@ -1077,6 +1077,28 @@ class TestFrontmatterDelimiterForms:
 
         assert result == "--- \r\nid: doc\r\ncreated: 2026-01-01\r\n--- \r\n"
 
+    def test_crlf_document_is_written_back_as_crlf(self, tmp_path):
+        """FM-007: the standalone fixer keeps a CRLF file CRLF, like the FM-008 fix."""
+        doc = tmp_path / "test.md"
+        doc.write_bytes(b"---\r\nid: doc\r\ndate: 2020-01-01\r\n---\r\n\r\n# Body\r\n")
+
+        changed, _ = update_document_timestamps(doc)
+
+        assert changed
+        assert doc.read_bytes() == b"---\r\nid: doc\r\ncreated: 2020-01-01\r\n---\r\n\r\n# Body\r\n"
+        assert update_document_timestamps(doc) == (False, [])
+
+    def test_bom_document_migrates_and_reports_the_bom_removal(self, tmp_path):
+        """FM-007 and FMT-012: a BOM does not hide the block, and dropping it is reported."""
+        doc = tmp_path / "test.md"
+        doc.write_bytes(b"\xef\xbb\xbf---\nid: doc\ndate: 2020-01-01\n---\n\n# Body\n")
+
+        changed, messages = update_document_timestamps(doc)
+
+        assert changed
+        assert messages == ["FMT-012: Removed UTF-8 byte-order mark", "FM-007: Migrated 'date' → 'created'"]
+        assert doc.read_bytes() == b"---\nid: doc\ncreated: 2020-01-01\n---\n\n# Body\n"
+
 
 class TestFixerStaysInsideFrontmatter:
     """FM-007: no field is ever removed, rewritten or inserted outside the block."""

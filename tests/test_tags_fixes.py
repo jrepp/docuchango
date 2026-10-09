@@ -394,3 +394,34 @@ class TestFixTagsPreservesFileShape:
 
         assert not changed
         assert doc.read_bytes() == first == b"---\ntags: [a, b]\n---\n\n# Test\n"
+
+
+class TestTagFixDelimiterForms:
+    """FM-008: the tag fix handles the delimiter forms the parser accepts."""
+
+    @pytest.mark.parametrize("delimiter", ["--- ", "---\t"])
+    def test_whitespace_suffixed_delimiters(self, tmp_path, delimiter):
+        """FM-008: tags are sorted and a second run changes nothing."""
+        doc = tmp_path / "test.md"
+        doc.write_text(f"{delimiter}\ntags: [b, a]\n{delimiter}\n\n# Test\n", encoding="utf-8")
+
+        changed, _ = fix_tags(doc)
+        first = doc.read_bytes()
+        changed_again, _ = fix_tags(doc)
+
+        assert changed
+        assert not changed_again
+        assert frontmatter.loads(first.decode()).metadata["tags"] == ["a", "b"]
+        assert first.endswith(b"\n\n# Test\n")
+        assert doc.read_bytes() == first
+
+    def test_bom_removal_is_reported(self, tmp_path):
+        """FMT-012: the rewrite drops the BOM, and the fix says so."""
+        doc = tmp_path / "test.md"
+        doc.write_bytes(b"\xef\xbb\xbf---\ntags: [b, a]\n---\n")
+
+        changed, messages = fix_tags(doc)
+
+        assert changed
+        assert "FMT-012: Removed UTF-8 byte-order mark" in messages
+        assert doc.read_bytes() == b"---\ntags: [a, b]\n---\n"

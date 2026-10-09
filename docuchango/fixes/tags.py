@@ -15,7 +15,7 @@ from pathlib import Path
 import frontmatter
 
 from docuchango.fixes.yaml_utils import dumps as frontmatter_dumps
-from docuchango.text_io import read_text, write_text
+from docuchango.text_io import FMT_012_FIX_MESSAGE, read_document, uses_crlf_throughout, write_text
 
 
 def normalize_tag(tag: str) -> str:
@@ -43,18 +43,6 @@ def normalize_tag(tag: str) -> str:
     return tag.strip("-")
 
 
-def _uses_crlf(file_path: Path) -> bool:
-    """Whether every line in ``file_path`` ends with CRLF.
-
-    The text read translates CRLF to LF, so the line endings have to be read
-    from the bytes on disk. A mixed file is not reproduced: it is written with
-    LF, the normalization FMT-010 applies during ``validate``.
-    """
-    data = file_path.read_bytes()
-    line_feeds = data.count(b"\n")
-    return line_feeds > 0 and data.count(b"\r\n") == line_feeds and b"\r" not in data.replace(b"\r\n", b"")
-
-
 def fix_tags(file_path: Path, dry_run: bool = False) -> tuple[bool, list[str]]:
     """Fix tags field issues in frontmatter.
 
@@ -68,7 +56,7 @@ def fix_tags(file_path: Path, dry_run: bool = False) -> tuple[bool, list[str]]:
     messages = []
 
     try:
-        content = read_text(file_path)
+        content, bom_removed = read_document(file_path)
         post = frontmatter.loads(content)
     except Exception as e:
         return False, [f"Error reading file: {e}"]
@@ -135,12 +123,15 @@ def fix_tags(file_path: Path, dry_run: bool = False) -> tuple[bool, list[str]]:
 
     # Write changes
     if changed:
+        if bom_removed:
+            # FMT-012: the rewrite is plain UTF-8, so the BOM goes with it.
+            messages.insert(0, FMT_012_FIX_MESSAGE)
         if not dry_run:
             try:
                 # FM-008: keep the final newline and the line endings the file
                 # had; only the tags are meant to change.
                 new_content = frontmatter_dumps(post, original=content)
-                if _uses_crlf(file_path):
+                if uses_crlf_throughout(file_path):
                     new_content = new_content.replace("\n", "\r\n")
                 write_text(file_path, new_content)
             except Exception as e:
