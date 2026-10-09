@@ -2,6 +2,43 @@
 
 <!-- version list -->
 
+## v1.19.1-rc.2 (2026-10-09)
+
+### Bug Fixes
+
+- **fixes**: Accept frontmatter delimiters of three or more dashes (FM-007)
+  ([`b75a35e`](https://github.com/jrepp/docuchango/commit/b75a35e7baed7f20683837d907674fd15b36d6c2))
+
+- **fixes**: Accept whitespace-suffixed frontmatter delimiters (FM-007)
+  ([`1128369`](https://github.com/jrepp/docuchango/commit/1128369c88b637093373bea2c83aa8bf4fe7b444))
+
+- **fixes**: Close frontmatter only on a column-zero delimiter (FM-007)
+  ([`7624e56`](https://github.com/jrepp/docuchango/commit/7624e56c68a68bbaec5630059b6926541128134f))
+
+- **fixes**: Keep CRLF and report BOM removal in standalone fixers
+  ([`89332c3`](https://github.com/jrepp/docuchango/commit/89332c31493d0b8579591ce66dd8c24062195258))
+
+- **fixes**: Keep FM-007 created insertion inside the frontmatter
+  ([`02bd34f`](https://github.com/jrepp/docuchango/commit/02bd34f0258ee6d7cbcd125d5063bb5a5c46d69d))
+
+- **fixes**: Keep the final newline when FM-008 rewrites tags
+  ([`5aa6c56`](https://github.com/jrepp/docuchango/commit/5aa6c56c83a5bc5284802accf7bd09653b6f568c))
+
+- **fixes**: Prefix the non-string tag removal message with FM-008
+  ([`809febc`](https://github.com/jrepp/docuchango/commit/809febcdb10aa41758338097a15c78b4053c7cd0))
+
+- **fixes**: Read the raw FM-006 date line from the frontmatter block
+  ([`677527b`](https://github.com/jrepp/docuchango/commit/677527b39fbe8483a2c080d10a03bb67ba17b5cf))
+
+- **validate**: Scan documents in sorted order
+  ([`53883f8`](https://github.com/jrepp/docuchango/commit/53883f876bf0c892f52a9f8a64e375e5fb9ab4e9))
+
+### Documentation
+
+- **validate**: Propose read-only validate by default
+  ([`80f1bae`](https://github.com/jrepp/docuchango/commit/80f1baece13e75449af7da13886a92d9dc3d9429))
+
+
 ## v1.19.1-rc.1 (2026-09-18)
 
 ### Bug Fixes
