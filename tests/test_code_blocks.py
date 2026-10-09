@@ -1,5 +1,7 @@
 """Tests for code_blocks.py fix module."""
 
+import pytest
+
 from docuchango.fixes.code_blocks import fix_code_blocks
 
 
@@ -428,3 +430,37 @@ line 3
         # Frontmatter should not have trailing whitespace
         assert "---   " not in result
         assert "title: Test   " not in result
+
+
+#: Frontmatter blocks whose YAML holds a fence-looking line. The block closes
+#: where python-frontmatter closes it (see docuchango.markdown), so the
+#: backticks are part of a value and must not be treated as a code fence.
+FRONTMATTER_WITH_FENCE_IN_VALUE = [
+    pytest.param("----\nid: doc\nexample: |\n  ```\n  code\n----\n\n# Body\n", id="four-dash-delimiters"),
+    pytest.param("---\nid: doc\nexample: |\n  ---\n  ```\n  code\n---\n\n# Body\n", id="indented-dashes-in-value"),
+    pytest.param("--- \nid: doc\nexample: |\n  ```\n  code\n---\t\n\n# Body\n", id="whitespace-suffixed"),
+]
+
+
+class TestCodeBlocksFrontmatterBounds:
+    """The code block fix skips exactly the block python-frontmatter parses."""
+
+    @pytest.mark.parametrize("content", FRONTMATTER_WITH_FENCE_IN_VALUE)
+    def test_fence_inside_a_frontmatter_value_is_left_alone(self, tmp_path, content):
+        test_file = tmp_path / "test.md"
+        test_file.write_text(content, encoding="utf-8")
+
+        _, changes = fix_code_blocks(test_file)
+
+        assert not any("fence" in change for change in changes), changes
+        assert "\n  ```\n  code\n" in test_file.read_text(encoding="utf-8")
+
+    def test_thematic_breaks_without_frontmatter_are_body(self, tmp_path):
+        """Two ``---`` breaks in a document with no frontmatter do not hide a bare fence."""
+        test_file = tmp_path / "test.md"
+        test_file.write_text("# Title\n\n---\n\n```\ncode\n```\n\n---\n", encoding="utf-8")
+
+        modified, changes = fix_code_blocks(test_file)
+
+        assert modified
+        assert any("Added 'text' language" in change for change in changes)

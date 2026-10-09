@@ -17,6 +17,7 @@ import re
 import sys
 from pathlib import Path
 
+from docuchango.markdown import frontmatter_span
 from docuchango.text_io import read_text, write_text
 
 
@@ -30,35 +31,19 @@ def fix_code_blocks(file_path: Path) -> tuple[bool, list[str]]:
         fixed_lines = []
 
         in_code_block = False
-        in_frontmatter = False
-        frontmatter_count = 0
-        frontmatter_end_line = None
+        # The frontmatter block, delimiters included, is the one the validator
+        # and python-frontmatter see (docuchango.markdown.frontmatter_span); a
+        # '---' further down is a thematic break in the body.
+        span = frontmatter_span(lines)
+        frontmatter_end_line = span - 1 if span else None
         i = 0
 
         while i < len(lines):
             line = lines[i]
             stripped = line.strip()
 
-            # Track frontmatter
-            if stripped == "---":
-                frontmatter_count += 1
-                if frontmatter_count == 1:
-                    in_frontmatter = True
-                elif frontmatter_count == 2:
-                    in_frontmatter = False
-                    frontmatter_end_line = i
-                # Strip trailing whitespace from frontmatter delimiters
-                stripped_line = line.rstrip()
-                if stripped_line != line:
-                    changes.append(f"Line {i + 1}: Removed trailing whitespace")
-                    fixed_lines.append(stripped_line)
-                else:
-                    fixed_lines.append(line)
-                i += 1
-                continue
-
-            # Frontmatter content - strip trailing whitespace
-            if in_frontmatter:
+            # Frontmatter, delimiters included - strip trailing whitespace
+            if i < span:
                 stripped_line = line.rstrip()
                 if stripped_line != line:
                     changes.append(f"Line {i + 1}: Removed trailing whitespace")

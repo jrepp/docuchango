@@ -28,6 +28,8 @@ Usage:
 from dataclasses import dataclass, field
 from enum import Enum
 
+from docuchango.markdown import frontmatter_span
+
 try:
     import textstat  # type: ignore[import-untyped, import-not-found]
 
@@ -164,10 +166,11 @@ class ReadabilityScorer:
         current_paragraph: list[str] = []
         current_paragraph_start_line = 0
         in_code_block = False
-        in_frontmatter = False
         in_html_block = False
         in_html_comment = False
-        frontmatter_count = 0
+        # The frontmatter block is the one python-frontmatter parses; a later
+        # '---' is a thematic break in the body.
+        span = frontmatter_span(lines)
 
         def flush_current_paragraph() -> None:
             nonlocal current_paragraph
@@ -188,14 +191,8 @@ class ReadabilityScorer:
         for i, line in enumerate(lines, start=1):
             stripped = line.strip()
 
-            # Track frontmatter
-            if stripped == "---":
-                frontmatter_count += 1
-                if frontmatter_count <= 2:
-                    in_frontmatter = frontmatter_count == 1
-                    continue
-
-            if in_frontmatter:
+            # Skip frontmatter, delimiters included
+            if i <= span:
                 continue
 
             # Track code blocks
