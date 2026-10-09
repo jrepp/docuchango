@@ -229,7 +229,8 @@ class TestFixTags:
         changed, messages = fix_tags(doc)
 
         assert changed
-        assert any("Skipped non-string tag" in msg for msg in messages)
+        assert "FM-008: Skipped non-string tag: 123" in messages
+        assert "FM-008: Skipped non-string tag: True" in messages
 
         post = frontmatter.loads(doc.read_text())
         assert post.metadata["tags"] == ["backend"]
@@ -340,3 +341,88 @@ tags: ['backend', "frontend", api]
         assert "api" in tags
         assert "backend" in tags
         assert "frontend" in tags
+
+
+class TestFixTagsPreservesFileShape:
+    """FM-008: re-serializing the frontmatter keeps the final newline and line endings."""
+
+    def test_final_newline_is_kept(self, tmp_path):
+        """FM-008: sorting tags must not drop the newline that ends the file."""
+        doc = tmp_path / "test.md"
+        doc.write_bytes(b"---\ntags: [b, a]\n---\n\n# Test\n")
+
+        changed, messages = fix_tags(doc)
+
+        assert changed
+        assert "FM-008: Sorted tags alphabetically" in messages
+        assert doc.read_bytes() == b"---\ntags: [a, b]\n---\n\n# Test\n"
+
+    def test_missing_final_newline_is_not_added(self, tmp_path):
+        """FM-008: a file that had no final newline is not given one."""
+        doc = tmp_path / "test.md"
+        doc.write_bytes(b"---\ntags: [b, a]\n---\n\n# Test")
+
+        fix_tags(doc)
+
+        assert doc.read_bytes() == b"---\ntags: [a, b]\n---\n\n# Test"
+
+    def test_frontmatter_only_file_keeps_final_newline(self, tmp_path):
+        """FM-008: a document with no body still ends with a newline."""
+        doc = tmp_path / "test.md"
+        doc.write_bytes(b"---\ntags: [b, a]\n---\n")
+
+        fix_tags(doc)
+
+        assert doc.read_bytes() == b"---\ntags: [a, b]\n---\n"
+
+    def test_crlf_line_endings_are_kept(self, tmp_path):
+        """FM-008: a CRLF document stays CRLF, final newline included."""
+        doc = tmp_path / "test.md"
+        doc.write_bytes(b"---\r\ntags: [b, a]\r\n---\r\n\r\n# Test\r\n\r\nBody.\r\n")
+
+        fix_tags(doc)
+
+        assert doc.read_bytes() == b"---\r\ntags: [a, b]\r\n---\r\n\r\n# Test\r\n\r\nBody.\r\n"
+
+    def test_running_twice_is_idempotent(self, tmp_path):
+        """FM-008: the second run finds nothing to change and leaves the bytes alone."""
+        doc = tmp_path / "test.md"
+        doc.write_bytes(b"---\ntags: [B, a, a]\n---\n\n# Test\n")
+
+        fix_tags(doc)
+        first = doc.read_bytes()
+        changed, _ = fix_tags(doc)
+
+        assert not changed
+        assert doc.read_bytes() == first == b"---\ntags: [a, b]\n---\n\n# Test\n"
+
+
+class TestTagFixDelimiterForms:
+    """FM-008: the tag fix handles the delimiter forms the parser accepts."""
+
+    @pytest.mark.parametrize("delimiter", ["--- ", "---\t"])
+    def test_whitespace_suffixed_delimiters(self, tmp_path, delimiter):
+        """FM-008: tags are sorted and a second run changes nothing."""
+        doc = tmp_path / "test.md"
+        doc.write_text(f"{delimiter}\ntags: [b, a]\n{delimiter}\n\n# Test\n", encoding="utf-8")
+
+        changed, _ = fix_tags(doc)
+        first = doc.read_bytes()
+        changed_again, _ = fix_tags(doc)
+
+        assert changed
+        assert not changed_again
+        assert frontmatter.loads(first.decode()).metadata["tags"] == ["a", "b"]
+        assert first.endswith(b"\n\n# Test\n")
+        assert doc.read_bytes() == first
+
+    def test_bom_removal_is_reported(self, tmp_path):
+        """FMT-012: the rewrite drops the BOM, and the fix says so."""
+        doc = tmp_path / "test.md"
+        doc.write_bytes(b"\xef\xbb\xbf---\ntags: [b, a]\n---\n")
+
+        changed, messages = fix_tags(doc)
+
+        assert changed
+        assert "FMT-012: Removed UTF-8 byte-order mark" in messages
+        assert doc.read_bytes() == b"---\ntags: [a, b]\n---\n"

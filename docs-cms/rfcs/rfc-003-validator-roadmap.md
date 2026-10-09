@@ -74,6 +74,8 @@ reported.
 | FM-004 | Duplicate `doc_uuid` across documents | Implemented | report | `check_uuids` |
 | FM-005 | Missing `tags`, `project_id` or `doc_uuid` filled in | Implemented | fix | `fixes/whitespace.py` `ensure_required_fields` |
 | FM-006 | Recognized non-ISO date formats normalized | Implemented | fix | `fixes/frontmatter.py` |
+| FM-007 | Missing `created` added from the first git commit, and a legacy `date` migrated to `created`, inside the frontmatter block only | Implemented | fix | `fixes/timestamps.py` (`update_document_timestamps`, `insert_created_field`, `migrate_date_to_created`), `markdown.py` (`is_frontmatter_delimiter`, `opens_frontmatter`, `frontmatter_body_bounds`) |
+| FM-008 | Tags converted to a list, normalized to lowercase-with-dashes, de-duplicated and sorted, keeping the file's final newline | Implemented | fix | `fixes/frontmatter.py` (`_fix_tags_metadata`), `fixes/tags.py` (`fix_tags`), `fixes/yaml_utils.py` (`dumps`) |
 | FM-010 | `project_id` does not match the `project.id` of the config that governs the document's folder | Implemented | fix/report | `check_project_ids`, `_config_context_for_path`, `cli._discover_doc_claims`, `fixes/frontmatter.py` (`_fix_project_id_metadata`, `PROJECT_ID_PLACEHOLDER`) |
 | FM-011 | `created` or `updated` is not `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM:SSZ` | Implemented | report | `check_date_formats`, `is_accepted_date_format`, `frontmatter_date_source`, `Document.date_source` |
 | ID-001 | Top-level filename does not match the configured pattern (files in subfolders are support material and are not scanned, unless `structure.scan_subfolders` or a per-type override enables ID-011) | Implemented | report | `check_ids`, `_scan_document_folder` |
@@ -92,14 +94,66 @@ reported.
 | MDX-011 | Mask 4-space indented code blocks before the prose checks (only fenced blocks and inline spans are masked today) | Planned | report | see below |
 | FMT-001 | Trailing whitespace | Implemented | fix | `check_formatting`, `fixes/code_blocks.py` |
 | FMT-002 | More than two consecutive blank lines, outside code fences and frontmatter; FMT-011 is the repair | Implemented | report | `check_formatting`, `markdown.py` (`blank_line_runs`, `blank_line_finding_message`) |
-| FMT-010 | CRLF or mixed line endings | Implemented | fix | `check_formatting`, `text_io.py` (`find_carriage_returns`, `carriage_return_lines`, `write_text`), `fixes/frontmatter.py`, `fixes/whitespace.py` |
+| FMT-010 | CRLF or mixed line endings | Implemented | fix | `check_formatting`, `text_io.py` (`find_carriage_returns`, `carriage_return_lines`, `uses_crlf_throughout`, `write_text`), `fixes/frontmatter.py`, `fixes/whitespace.py` |
 | FMT-011 | Collapse runs of blank lines | Implemented | fix | `markdown.py` (`collapse_blank_lines`, `fence_mask`, `frontmatter_span`), `fixes/frontmatter.py`, `fixes/whitespace.py` |
-| FMT-012 | UTF-8 byte-order mark before the frontmatter | Implemented | fix | `check_formatting`, `text_io.py`, `fixes/frontmatter.py`, `fixes/whitespace.py` |
+| FMT-012 | UTF-8 byte-order mark before the frontmatter | Implemented | fix | `check_formatting`, `text_io.py`, `fixes/frontmatter.py`, `fixes/whitespace.py`, `fixes/tags.py`, `fixes/timestamps.py` |
 | CB-001 | Code fence without a language, or unclosed fence | Implemented | fix/report | `check_code_blocks`, `fixes/code_blocks.py` |
 | IDX-001 | Document index missing, unlinked, or missing bucket headings | Implemented | report | `check_document_indexes` |
 | RD-001 | Paragraph outside the readability thresholds of the (sub-)project that owns the document | Implemented | report | `check_readability`, `_readability_config_for`, `_config_context_for_path` |
 | BLD-001 | TypeScript config error | Implemented | report | `check_typescript_config` |
 | BLD-002 | Docusaurus build error | Implemented | report | `check_docusaurus_build` |
+
+**FM-007 `created` from git history (scope fix).** The timestamps fixer has
+added a missing `created` since before the registry existed, and it had no ID.
+It placed the field with a regular expression over the whole file: after the
+first line containing `status:`, else `id:`, else after the first `---`. In a
+document whose frontmatter had no `status`, the anchor was whatever came first
+in the body: the `status:` line of a frontmatter example in a code fence, or a
+bullet such as `- Work status: ...`. The match was not anchored to the start of
+a line, so `doc_uuid:` also counted as `id:`. Because the field never reached
+the frontmatter, the next run still saw no `created` and inserted another line,
+so every run made the document longer. The migration path had the mirror-image
+bug: it checked the whole file for `created:`, so a `created:` line in a code
+fence made it drop the legacy `date` and write nothing.
+
+Both the insert and the presence check now use the frontmatter field scanner
+that `update_frontmatter_field` already used. Only top-level keys between the
+`---` delimiters count, the field goes after the whole `status` value (or the
+`id` value), and a document that already has `created` in its block, or has no
+delimited block, is returned unchanged. That makes the fix idempotent. The
+regression fixtures in `tests/fixtures/regressions/` are reduced copies of the
+two documents in the Prism repository where the bug was found. Messages carry
+the `FM-007:` prefix.
+
+The scanner finds the block with `is_frontmatter_delimiter` and
+`frontmatter_body_bounds` in `docuchango/markdown.py`, the same rule the
+validator's `frontmatter_span` uses, and the boundary python-frontmatter
+matches: three or more dashes in column zero followed by optional
+whitespace, so `--- `, `---\t`, `----` and CRLF delimiters count. An indented `---`, such as a line of a `|`
+block scalar, is part of a value and does not close the block; only the
+opening line may be indented, because the parser strips the document first. The fixer had its own stricter scanner, so a delimiter
+with trailing whitespace hid the block. A whole-document fallback then removed
+a legacy `date` from anywhere in the file while the insert found no block, and
+the date was lost. There is no fallback now: no field outside a closed block on
+the first line is read, rewritten or removed. The migration is also all or
+nothing. `date` is removed only when `created` is already in the block or has
+just been inserted; otherwise the file is left as it is and the fixer reports
+`FM-007: Left legacy 'date' in place`. Run on its own, the fixer keeps a file
+that is CRLF throughout as CRLF and reports the BOM it drops as FMT-012.
+
+**FM-008 Tag normalization keeps the final newline (shipped).** The tag fix
+re-serializes the frontmatter through `fixes/yaml_utils.dumps`, and
+`frontmatter.dumps` never writes a final newline. Every document whose tags were
+sorted or normalized lost the newline at the end of the file. The same thing
+happened on every other path that re-serializes a document. `dumps` now ends the
+text with a newline, unless the caller passes the original text and that text
+did not end with one. `fix_frontmatter_metadata`, `fix_whitespace_and_fields`
+and `fix_tags` pass it. The standalone `fix_tags` also keeps a file that is
+CRLF throughout as CRLF, and reports the BOM its rewrite drops as FMT-012. Inside `validate`, CRLF is still converted to LF on
+purpose, as FMT-010, in the same rewrite. The `tags` field that FM-005 adds when
+it is missing is reported with the `FM-005:` prefix, and the conversion,
+normalization, de-duplication, removal of non-string tags and sorting are
+reported with `FM-008:`.
 
 **SCAN-001 Empty scan (shipped).** `validate` exited 0 and printed
 `All documents valid` whenever discovery turned up nothing, so a typo in
@@ -194,7 +248,8 @@ per-file summary, matching how FMT-001 and FMT-002 name the line.
 Trailing blank lines at end of file are collapsed like any other run, and are
 not otherwise touched: `frontmatter.dumps` already strips the body's trailing
 whitespace whenever any metadata fix re-serializes a document, and FMT-011 does
-not fight that.
+not fight that. The shared serializer puts back the single final newline that
+strip removed (see FM-008).
 
 FMT-002 is also the first existing check to take the ID prefix its message was
 promised in the "Error message format" section below: it had to be touched

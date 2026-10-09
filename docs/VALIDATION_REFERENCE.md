@@ -86,12 +86,21 @@ as `(empty)`.
 - Maps common status variants and misspellings to the valid value for the type
 - Converts dates in slash, dot and long-month formats (`2026/09/14`,
   `14.09.2026`, `September 14, 2026`) to ISO 8601
-- Normalizes tags to a sorted, de-duplicated, lowercase-with-dashes list
+- `FM-008`: normalizes tags to a sorted, de-duplicated, lowercase-with-dashes
+  list. Rewriting the frontmatter keeps the newline at the end of the file
 - Trims whitespace and removes empty or null values
-- Adds `created` from git history, but only when a frontmatter block already
-  exists and is missing that field; a document with no frontmatter at all
-  gets today's date when its block is generated. Also migrates a legacy
-  `date` field to `created`
+- `FM-007`: adds `created` from git history, but only when a frontmatter
+  block already exists and is missing that field; a document with no
+  frontmatter at all gets today's date when its block is generated. Also
+  migrates a legacy `date` field to `created`. The field is inserted inside
+  the `---` block only, after `status`, else after `id`, else first. A
+  `status:` or `created:` line in the body, such as a frontmatter example in a
+  code fence, is never used as the anchor, so a second run changes nothing.
+  A delimiter with trailing spaces or tabs, more than three dashes, or a CRLF
+  ending bounds the block just as it does for the validator; an indented
+  `---` inside a value does not. `date` is removed only when `created` is
+  written in the same edit, and a `date:` line outside the block is never
+  touched
 
 Generating a missing frontmatter block and mapping status variants both take
 the document type from the `schema` of the `doc_types` entry that owns the

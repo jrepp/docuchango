@@ -125,6 +125,22 @@ def carriage_return_lines(file_path: Path) -> list[tuple[int, str]]:
         return []
 
 
+def uses_crlf_throughout(file_path: Path) -> bool:
+    """Whether every line in ``file_path`` ends with CRLF.
+
+    The text read translates CRLF to LF, so the line endings have to be read
+    from the bytes on disk. A standalone fixer that rewrites one field uses
+    this to write a CRLF file back as CRLF. A mixed file is not reproduced: it
+    is written with LF, the normalization FMT-010 applies during ``validate``.
+    """
+    try:
+        data = file_path.read_bytes()
+    except OSError:
+        return False
+    line_feeds = data.count(b"\n")
+    return line_feeds > 0 and data.count(b"\r\n") == line_feeds and b"\r" not in data.replace(b"\r\n", b"")
+
+
 def line_ending_finding_message(line_number: int, kind: str) -> str:
     """The FMT-010 message the validator reports for one offending line."""
     return f"FMT-010: Line {line_number}: {kind} line ending"

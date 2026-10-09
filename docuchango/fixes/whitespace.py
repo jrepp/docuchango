@@ -209,7 +209,7 @@ def fix_whitespace_and_fields(file_path: Path, dry_run: bool = False) -> tuple[b
 
         if not dry_run:
             try:
-                new_content = frontmatter_dumps(post)
+                new_content = frontmatter_dumps(post, original=content)
                 write_text(file_path, new_content)
             except Exception as e:
                 return False, [f"Error writing file: {e}"]

@@ -18,7 +18,7 @@ import frontmatter
 from docuchango.fixes.tags import normalize_tag
 from docuchango.fixes.whitespace import ensure_required_fields, normalize_empty_values, trim_string_values
 from docuchango.fixes.yaml_utils import dumps as frontmatter_dumps
-from docuchango.markdown import blank_line_fix_message, collapse_blank_lines
+from docuchango.markdown import blank_line_fix_message, collapse_blank_lines, frontmatter_body_bounds
 from docuchango.text_io import (
     FMT_012_FIX_MESSAGE,
     carriage_return_lines,
@@ -201,6 +201,21 @@ def fix_status_value(file_path: Path, dry_run: bool = False, schema: str | None 
         return False, f"Error processing file: {e}"
 
 
+def _raw_frontmatter_lines(content: str) -> list[str]:
+    """The raw lines between the frontmatter delimiters, or ``[]`` without a block.
+
+    Uses the delimiter rule the validator and python-frontmatter share, so a
+    ``---`` inside a value (``title: "a --- b"``) does not end the block and a
+    delimiter with trailing whitespace still does.
+    """
+    lines = content.splitlines()
+    bounds = frontmatter_body_bounds(lines)
+    if bounds is None:
+        return []
+    start, end = bounds
+    return lines[start:end]
+
+
 def fix_date_format(file_path: Path, dry_run: bool = False) -> tuple[bool, str]:
     """Fix invalid date formats to ISO 8601 (YYYY-MM-DD).
 
@@ -232,7 +247,7 @@ def fix_date_format(file_path: Path, dry_run: bool = False) -> tuple[bool, str]:
         # Read the raw frontmatter line to check if it's already canonical.
         if isinstance(date_value, datetime) or (hasattr(date_value, "strftime") and hasattr(date_value, "year")):
             # Check the raw YAML to see if the value is already canonical
-            raw_lines = content.split("---")[1].strip().splitlines() if "---" in content else []
+            raw_lines = _raw_frontmatter_lines(content)
             raw_value = None
             for line in raw_lines:
                 if line.startswith(f"{date_field}:"):
@@ -500,7 +515,7 @@ def _fix_date_metadata(metadata: dict[str, Any], content: str) -> str | None:
     date_value = metadata[date_field]
 
     if isinstance(date_value, datetime | date):
-        raw_lines = content.split("---")[1].strip().splitlines() if "---" in content else []
+        raw_lines = _raw_frontmatter_lines(content)
         raw_value = None
         for line in raw_lines:
             if line.startswith(f"{date_field}:"):
@@ -575,12 +590,12 @@ def _fix_tags_metadata(metadata: dict[str, Any]) -> list[str]:
     messages = []
     if "tags" not in metadata:
         metadata["tags"] = []
-        return ["Added missing tags field (empty array)"]
+        return ["FM-005: Added missing tags field (empty array)"]
 
     tags = metadata["tags"]
     if isinstance(tags, str):
         tags = [tags.strip()] if tags.strip() else []
-        messages.append("Converted string tags to array")
+        messages.append("FM-008: Converted string tags to array")
     if not isinstance(tags, list):
         return messages
 
@@ -588,7 +603,7 @@ def _fix_tags_metadata(metadata: dict[str, Any]) -> list[str]:
     normalized_tags = []
     for tag in tags:
         if not isinstance(tag, str):
-            messages.append(f"Skipped non-string tag: {tag}")
+            messages.append(f"FM-008: Skipped non-string tag: {tag}")
             continue
         normalized = normalize_tag(tag)
         if normalized:
@@ -604,11 +619,11 @@ def _fix_tags_metadata(metadata: dict[str, Any]) -> list[str]:
     sorted_tags = sorted(unique_tags)
     if sorted_tags != original_tags:
         if len(sorted_tags) < len(original_tags):
-            messages.append(f"Removed {len(original_tags) - len(sorted_tags)} duplicate/invalid tags")
+            messages.append(f"FM-008: Removed {len(original_tags) - len(sorted_tags)} duplicate/invalid tags")
         if sorted_tags != normalized_tags:
-            messages.append("Sorted tags alphabetically")
+            messages.append("FM-008: Sorted tags alphabetically")
         if normalized_tags != original_tags:
-            messages.append(f"Normalized tags: {len(normalized_tags)} tags")
+            messages.append(f"FM-008: Normalized tags: {len(normalized_tags)} tags")
     metadata["tags"] = sorted_tags
     return messages
 
@@ -706,7 +721,7 @@ def fix_frontmatter_metadata(
     if changed:
         post.metadata = metadata
         if not dry_run:
-            write_text(file_path, frontmatter_dumps(post))
+            write_text(file_path, frontmatter_dumps(post, original=content))
         return True, messages
 
     if rewrite_only:
