@@ -128,8 +128,8 @@ the `FM-007:` prefix.
 The scanner finds the block with `is_frontmatter_delimiter` and
 `frontmatter_body_bounds` in `docuchango/markdown.py`, the same rule the
 validator's `frontmatter_span` uses, and the boundary python-frontmatter
-matches: `---` in column zero followed by optional whitespace, so `--- `,
-`---\t` and CRLF delimiters count. An indented `---`, such as a line of a `|`
+matches: three or more dashes in column zero followed by optional
+whitespace, so `--- `, `---\t`, `----` and CRLF delimiters count. An indented `---`, such as a line of a `|`
 block scalar, is part of a value and does not close the block; only the
 opening line may be indented, because the parser strips the document first. The fixer had its own stricter scanner, so a delimiter
 with trailing whitespace hid the block. A whole-document fallback then removed

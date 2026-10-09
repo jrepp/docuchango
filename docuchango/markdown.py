@@ -38,6 +38,10 @@ from dataclasses import dataclass
 #: number FMT-011 collapses a longer run down to.
 MAX_BLANK_LINES = 2
 
+#: A frontmatter delimiter once trailing whitespace is stripped: three or more
+#: dashes, as python-frontmatter's ``^-{3,}\s*$`` boundary allows.
+FRONTMATTER_DELIMITER_RE = re.compile(r"-{3,}")
+
 #: An opening or closing code fence: three or more backticks or tildes,
 #: optionally indented, optionally followed by an info string.
 FENCE_RE = re.compile(r"^(\s*)(`{3,}|~{3,})(.*)$")
@@ -46,8 +50,8 @@ FENCE_RE = re.compile(r"^(\s*)(`{3,}|~{3,})(.*)$")
 def is_frontmatter_delimiter(line: str) -> bool:
     """Whether ``line`` closes a YAML frontmatter block.
 
-    The line is ``---`` in column zero, optionally followed by spaces or tabs
-    and any line ending (``\\n``, ``\\r\\n``, a lone ``\\r``) -- the boundary
+    The line is three or more dashes (``---``, ``----``, ...) in column zero,
+    optionally followed by spaces or tabs and any line ending (``\\n``, ``\\r\\n``, a lone ``\\r``) -- the boundary
     python-frontmatter matches with ``^-{3,}\\s*$``. An indented ``---`` is
     not a delimiter: inside the block it is part of a YAML value, such as a
     line of a ``|`` block scalar. This is the one definition of a delimiter:
@@ -59,7 +63,7 @@ def is_frontmatter_delimiter(line: str) -> bool:
     read documents through :func:`docuchango.text_io.read_text`, which drops it
     (FMT-012), exactly as python-frontmatter needs.
     """
-    return line.rstrip() == "---"
+    return FRONTMATTER_DELIMITER_RE.fullmatch(line.rstrip()) is not None
 
 
 def opens_frontmatter(line: str) -> bool:

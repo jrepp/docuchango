@@ -11,13 +11,13 @@ class TestIsFrontmatterDelimiter:
 
     @pytest.mark.parametrize(
         "line",
-        ["---", "---\n", "---\r\n", "---\r", "--- ", "---\t", "--- \t\n", "---  \r\n"],
+        ["---", "---\n", "---\r\n", "---\r", "--- ", "---\t", "--- \t\n", "---  \r\n", "----", "------ \r\n"],
     )
     def test_accepts_dashes_with_trailing_whitespace_and_any_line_ending(self, line):
         assert is_frontmatter_delimiter(line)
 
     @pytest.mark.parametrize(
-        "line", ["----", "--", "--- x", "---x", "- - -", "", "\ufeff---", "title: ---", "  ---", "\t---\n"]
+        "line", ["--", "--- x", "---x", "----x", "- - -", "", "\ufeff---", "title: ---", "  ---", "\t---\n"]
     )
     def test_rejects_anything_else(self, line):
         assert not is_frontmatter_delimiter(line)
@@ -33,6 +33,7 @@ class TestFrontmatterBodyBounds:
             pytest.param("---\r\nid: doc\r\n---\r\n# Body\r\n", id="crlf"),
             pytest.param("--- \nid: doc\n---\t\n# Body\n", id="trailing-whitespace"),
             pytest.param("--- \r\nid: doc\r\n---\t\r\n# Body\r\n", id="trailing-whitespace-crlf"),
+            pytest.param("----\nid: doc\n-----\n# Body\n", id="more-than-three-dashes"),
         ],
     )
     def test_agrees_with_the_parser(self, content):

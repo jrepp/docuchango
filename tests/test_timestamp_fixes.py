@@ -999,13 +999,15 @@ class TestCreatedFieldStaysInFrontmatter:
         assert doc.read_text(encoding="utf-8") == first_pass
 
 
-#: Delimiter lines python-frontmatter and ``docuchango.markdown`` both accept:
-#: ``---`` followed by trailing spaces or tabs.
+#: Delimiter lines python-frontmatter and ``docuchango.markdown`` both accept
+#: besides a bare ``---``: trailing spaces or tabs, and more than three dashes.
 WHITESPACE_SUFFIXED_DELIMITERS = [
     pytest.param("--- ", id="trailing-space"),
     pytest.param("---  ", id="trailing-spaces"),
     pytest.param("---\t", id="trailing-tab"),
     pytest.param("--- \t", id="trailing-space-and-tab"),
+    pytest.param("----", id="four-dashes"),
+    pytest.param("----- ", id="five-dashes-trailing-space"),
 ]
 
 
