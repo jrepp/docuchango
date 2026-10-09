@@ -16,7 +16,7 @@ from pathlib import Path
 
 import frontmatter
 
-from docuchango.text_io import read_text
+from docuchango.text_io import read_text, write_text
 
 
 def get_git_dates(file_path: Path) -> tuple[str | None, str | None]:
@@ -218,15 +218,46 @@ def remove_frontmatter_field(content: str, field_name: str) -> str:
     return "".join(lines)
 
 
+def _delimited_frontmatter(lines: list[str]) -> tuple[int, int] | None:
+    """Return the ``[start, end)`` body range of a ``---`` delimited block, or None.
+
+    Unlike :func:`_frontmatter_bounds` there is no whole-document fallback:
+    inserting a key is only safe when the block's end is known, because
+    anything past it is Markdown body.
+    """
+    start, end = _frontmatter_bounds(lines)
+    if start == 0:
+        return None
+    return start, end
+
+
 def insert_created_field(content: str, created_date: str) -> str:
-    """Insert a created field into frontmatter near other identity metadata."""
-    created_line = f"created: {created_date}\n"
+    """Insert a ``created`` field into the frontmatter block (FM-007).
 
-    for pattern in (r"(status:.*\n)", r"(id:.*\n)", r"(^---\n)"):
-        if re.search(pattern, content, flags=re.MULTILINE):
-            return re.sub(pattern, rf"\1{created_line}", content, count=1, flags=re.MULTILINE)
+    The field goes after the ``status`` value, else after the ``id`` value,
+    else first in the block. Only top-level keys inside the ``---`` delimited
+    block are considered, so a ``status:`` line in a fenced example or a body
+    bullet such as ``- Work status: ...`` is never used as the anchor. A
+    multi-line value is skipped whole, so the field never lands inside it.
 
-    return content
+    The insert is idempotent: content whose block already has ``created``, or
+    that has no delimited block at all, is returned unchanged.
+    """
+    lines = content.splitlines(keepends=True)
+    bounds = _delimited_frontmatter(lines)
+    if bounds is None or _field_blocks(lines, "created"):
+        return content
+
+    line_ending = "\r\n" if lines[0].endswith("\r\n") else "\n"
+    insert_at = bounds[0]
+    for anchor in ("status", "id"):
+        blocks = _field_blocks(lines, anchor)
+        if blocks:
+            insert_at = blocks[0][1]
+            break
+
+    lines.insert(insert_at, f"created: {created_date}{line_ending}")
+    return "".join(lines)
 
 
 def frontmatter_value_to_string(value: object) -> str:
@@ -254,9 +285,9 @@ def migrate_date_to_created(content: str, created_date: str) -> str:
         Updated content with 'date' removed and 'created' added if needed
     """
     new_content = remove_frontmatter_field(content, "date")
-    if re.search(r"^created:.*$", new_content, flags=re.MULTILINE):
-        return new_content
-
+    # insert_created_field looks for an existing 'created' inside the
+    # frontmatter only; a 'created:' line in the body (a fenced example, say)
+    # must not stop the migration, or the legacy date would be lost.
     return insert_created_field(new_content, created_date)
 
 
@@ -300,7 +331,7 @@ def update_document_timestamps(file_path: Path, dry_run: bool = False) -> tuple[
         new_content = remove_frontmatter_field(new_content, "date")
         if new_content != content:
             modified = True
-            messages.append("Removed deprecated 'date' field")
+            messages.append("FM-007: Removed deprecated 'date' field")
     elif has_legacy_date:
         created_date, _ = get_git_dates(file_path)
         if not created_date:
@@ -309,7 +340,7 @@ def update_document_timestamps(file_path: Path, dry_run: bool = False) -> tuple[
         new_content = migrate_date_to_created(new_content, created_date)
         if new_content != content:
             modified = True
-            messages.append("Migrated 'date' → 'created'")
+            messages.append("FM-007: Migrated 'date' → 'created'")
     elif has_created:
         return False, []
     else:
@@ -320,12 +351,12 @@ def update_document_timestamps(file_path: Path, dry_run: bool = False) -> tuple[
         new_content = insert_created_field(new_content, created_date)
         if new_content != content:
             modified = True
-            messages.append(f"Added 'created': {created_date}")
+            messages.append(f"FM-007: Added 'created': {created_date}")
 
     # Write updated content
     if modified and not dry_run:
         try:
-            file_path.write_text(new_content, encoding="utf-8")
+            write_text(file_path, new_content)
         except Exception as e:
             return False, [f"Error writing file: {e}"]
 

@@ -88,10 +88,13 @@ as `(empty)`.
   `14.09.2026`, `September 14, 2026`) to ISO 8601
 - Normalizes tags to a sorted, de-duplicated, lowercase-with-dashes list
 - Trims whitespace and removes empty or null values
-- Adds `created` from git history, but only when a frontmatter block already
-  exists and is missing that field; a document with no frontmatter at all
-  gets today's date when its block is generated. Also migrates a legacy
-  `date` field to `created`
+- `FM-007`: adds `created` from git history, but only when a frontmatter
+  block already exists and is missing that field; a document with no
+  frontmatter at all gets today's date when its block is generated. Also
+  migrates a legacy `date` field to `created`. The field is inserted inside
+  the `---` block only, after `status`, else after `id`, else first. A
+  `status:` or `created:` line in the body, such as a frontmatter example in a
+  code fence, is never used as the anchor, so a second run changes nothing
 
 Generating a missing frontmatter block and mapping status variants both take
 the document type from the `schema` of the `doc_types` entry that owns the

@@ -11,6 +11,7 @@ from click.testing import CliRunner
 from docuchango.cli import main
 from docuchango.fixes.timestamps import (
     get_git_dates,
+    insert_created_field,
     migrate_date_to_created,
     update_document_timestamps,
     update_frontmatter_field,
@@ -629,7 +630,7 @@ created: 2020-01-01
         changed, messages = update_document_timestamps(doc)
 
         assert changed
-        assert messages == ["Removed deprecated 'date' field"]
+        assert messages == ["FM-007: Removed deprecated 'date' field"]
 
         post = frontmatter.loads(doc.read_text())
         assert "date" not in post.metadata
@@ -653,7 +654,7 @@ created: 2020-01-01
         changed, messages = update_document_timestamps(doc)
 
         assert changed
-        assert messages == ["Migrated 'date' → 'created'"]
+        assert messages == ["FM-007: Migrated 'date' → 'created'"]
 
         post = frontmatter.loads(doc.read_text())
         assert "date" not in post.metadata
@@ -803,7 +804,7 @@ date: 2025-01-26
         changed, messages = update_document_timestamps(doc)
 
         assert changed
-        assert messages == ["Migrated 'date' → 'created'"]
+        assert messages == ["FM-007: Migrated 'date' → 'created'"]
 
 
 class TestBulkTimestampsCliRelativePath:
@@ -877,3 +878,121 @@ structure:
         post = frontmatter.loads(doc.read_text(encoding="utf-8"))
         assert "date" not in post.metadata
         assert "created" in post.metadata
+
+
+REGRESSIONS_DIR = Path(__file__).resolve().parent / "fixtures" / "regressions"
+
+
+def _committed_copy(tmp_path: Path, fixture_name: str) -> Path:
+    """Copy a regression fixture into a fresh git repository and commit it."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True, capture_output=True)
+    doc = repo / fixture_name
+    doc.write_bytes((REGRESSIONS_DIR / fixture_name).read_bytes())
+    subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "add"], cwd=repo, check=True, capture_output=True)
+    return doc
+
+
+def _split_frontmatter(content: str) -> tuple[str, str]:
+    """Return ``(frontmatter block, everything after it)`` split at the closing ``---``."""
+    end = content.index("\n---\n", 4) + len("\n---\n")
+    return content[:end], content[end:]
+
+
+class TestCreatedFieldStaysInFrontmatter:
+    """FM-007: 'created' is only ever inserted inside the frontmatter block."""
+
+    def test_status_line_in_code_block_is_not_an_anchor(self):
+        """FM-007: a `status:` line in a fenced example must not receive the field."""
+        content = "---\nid: doc\ntitle: T\n---\n\n```yaml\nstatus: Accepted\n```\n"
+
+        result = insert_created_field(content, "2026-01-01")
+
+        assert result == "---\nid: doc\ncreated: 2026-01-01\ntitle: T\n---\n\n```yaml\nstatus: Accepted\n```\n"
+
+    def test_status_text_in_body_bullet_is_not_an_anchor(self):
+        """FM-007: `Work status:` mid-line in the body is not the `status` key."""
+        content = "---\nid: doc\n---\n\n- Work status: tracked elsewhere\n"
+
+        result = insert_created_field(content, "2026-01-01")
+
+        assert result == "---\nid: doc\ncreated: 2026-01-01\n---\n\n- Work status: tracked elsewhere\n"
+
+    def test_key_must_start_the_line(self):
+        """FM-007: `doc_uuid:` contains `id:` but is not the `id` key."""
+        content = "---\ndoc_uuid: abc\nid: doc\n---\n"
+
+        result = insert_created_field(content, "2026-01-01")
+
+        assert result == "---\ndoc_uuid: abc\nid: doc\ncreated: 2026-01-01\n---\n"
+
+    def test_status_in_frontmatter_is_still_preferred(self):
+        """FM-007: the existing placement after `status` is unchanged."""
+        content = "---\nid: doc\nstatus: Draft\n---\n\nstatus: body\n"
+
+        result = insert_created_field(content, "2026-01-01")
+
+        assert result == "---\nid: doc\nstatus: Draft\ncreated: 2026-01-01\n---\n\nstatus: body\n"
+
+    def test_no_anchor_key_inserts_after_opening_delimiter(self):
+        """FM-007: with neither `status` nor `id` the field goes first in the block."""
+        content = "---\ntitle: T\n---\n\nid: body\nstatus: body\n"
+
+        result = insert_created_field(content, "2026-01-01")
+
+        assert result == "---\ncreated: 2026-01-01\ntitle: T\n---\n\nid: body\nstatus: body\n"
+
+    def test_existing_created_in_frontmatter_is_left_alone(self):
+        """FM-007: inserting is a no-op when the block already has the key."""
+        content = "---\nid: doc\ncreated: 2025-01-01\n---\n"
+
+        assert insert_created_field(content, "2026-01-01") == content
+
+    def test_document_without_frontmatter_is_unchanged(self):
+        """FM-007: there is no block to insert into, so nothing is written."""
+        content = "# Title\n\nstatus: body\n"
+
+        assert insert_created_field(content, "2026-01-01") == content
+
+    def test_migration_ignores_created_line_in_body(self):
+        """FM-007: a `created:` line in a code block must not stop the migration.
+
+        Before the fix the presence check scanned the whole file, so the legacy
+        `date` was removed and no `created` was written: the date was lost.
+        """
+        content = "---\nid: doc\ndate: 2020-01-01\n---\n\n```yaml\ncreated: 2025-10-08\n```\n"
+
+        result = migrate_date_to_created(content, "2020-01-01")
+
+        assert result == "---\nid: doc\ncreated: 2020-01-01\n---\n\n```yaml\ncreated: 2025-10-08\n```\n"
+
+    @pytest.mark.parametrize(
+        "fixture_name",
+        ["adr-index-frontmatter-example.md", "rfc-index-status-bullet.md"],
+    )
+    def test_regression_fixture_gets_created_in_frontmatter_once(self, tmp_path, fixture_name):
+        """FM-007: real documents that were damaged are fixed once and then left alone."""
+        doc = _committed_copy(tmp_path, fixture_name)
+        original = doc.read_text(encoding="utf-8")
+        _, original_body = _split_frontmatter(original)
+
+        changed, messages = update_document_timestamps(doc)
+
+        assert changed
+        assert len(messages) == 1
+        assert messages[0].startswith("FM-007: Added 'created': ")
+        first_pass = doc.read_text(encoding="utf-8")
+        block, body = _split_frontmatter(first_pass)
+        assert body == original_body
+        assert block.count("\ncreated: ") == 1
+        assert "created" in frontmatter.loads(first_pass).metadata
+
+        changed_again, messages_again = update_document_timestamps(doc)
+
+        assert not changed_again
+        assert messages_again == []
+        assert doc.read_text(encoding="utf-8") == first_pass

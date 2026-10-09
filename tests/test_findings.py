@@ -349,6 +349,11 @@ KNOWN_GAPS: set[str] = {
     # tests/test_whitespace_fixes.py and tests/test_frontmatter_fixes.py.
     "FM-005",
     "FM-006",
+    # Reads the first commit date from git, and the harness copies each case
+    # into a tmp_path that is not a repository, so there is nothing to add.
+    # Covered by TestCreatedFieldStaysInFrontmatter in
+    # tests/test_timestamp_fixes.py, which commits the regression fixtures.
+    "FM-007",
     # Needs Node.js and the @mdx-js/mdx toolchain on PATH. The harness stays
     # hermetic; covered by tests/test_mdx_syntax.py at the unit level.
     "MDX-002",
