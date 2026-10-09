@@ -97,7 +97,7 @@ reported.
 | FMT-010 | CRLF or mixed line endings | Implemented | fix | `check_formatting`, `text_io.py` (`find_carriage_returns`, `carriage_return_lines`, `uses_crlf_throughout`, `write_text`), `fixes/frontmatter.py`, `fixes/whitespace.py` |
 | FMT-011 | Collapse runs of blank lines | Implemented | fix | `markdown.py` (`collapse_blank_lines`, `fence_mask`, `frontmatter_span`), `fixes/frontmatter.py`, `fixes/whitespace.py` |
 | FMT-012 | UTF-8 byte-order mark before the frontmatter | Implemented | fix | `check_formatting`, `text_io.py`, `fixes/frontmatter.py`, `fixes/whitespace.py`, `fixes/tags.py`, `fixes/timestamps.py` |
-| CB-001 | Code fence without a language, or unclosed fence | Implemented | fix/report | `check_code_blocks`, `fixes/code_blocks.py` |
+| CB-001 | Code fence without a language, or unclosed fence | Implemented | fix/report | `check_code_blocks`, `fixes/code_blocks.py`, `markdown.py` (`frontmatter_span`) |
 | IDX-001 | Document index missing, unlinked, or missing bucket headings | Implemented | report | `check_document_indexes` |
 | RD-001 | Paragraph outside the readability thresholds of the (sub-)project that owns the document | Implemented | report | `check_readability`, `_readability_config_for`, `_config_context_for_path` |
 | BLD-001 | TypeScript config error | Implemented | report | `check_typescript_config` |
@@ -131,7 +131,13 @@ validator's `frontmatter_span` uses, and the boundary python-frontmatter
 matches: three or more dashes in column zero followed by optional
 whitespace, so `--- `, `---\t`, `----` and CRLF delimiters count. An indented `---`, such as a line of a `|`
 block scalar, is part of a value and does not close the block; only the
-opening line may be indented, because the parser strips the document first. The fixer had its own stricter scanner, so a delimiter
+opening line may be indented, because the parser strips the document first. The
+CB-001 check and fix (`check_code_blocks`, `fix_code_blocks`) and the RD-001
+paragraph extraction skip frontmatter through `frontmatter_span` too. They used
+to treat the first two `---` lines anywhere in the file as the block, so a
+`----` block or an indented `---` in a value exposed YAML to the fence check,
+and two thematic breaks in a document without frontmatter hid the text between
+them. The fixer had its own stricter scanner, so a delimiter
 with trailing whitespace hid the block. A whole-document fallback then removed
 a legacy `date` from anywhere in the file while the insert found no block, and
 the date was lost. There is no fallback now: no field outside a closed block on

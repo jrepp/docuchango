@@ -763,3 +763,38 @@ class TestScanOrderIsDeterministic:
         errors = {doc.file_path.name: doc.errors for doc in validator.documents}
         assert errors["adr-004-first.md"] == []
         assert any("also used by adr-004-first.md" in error for error in errors["adr-005-second.md"])
+
+
+class TestCodeBlockCheckFrontmatterBounds:
+    """``check_code_blocks`` skips exactly the frontmatter block python-frontmatter parses."""
+
+    @staticmethod
+    def _code_block_errors(tmp_path: Path, content: str) -> list[str]:
+        target_dir = tmp_path / "docs-cms" / "memos"
+        target_dir.mkdir(parents=True)
+        (target_dir / "memo-001-test.md").write_text(content, encoding="utf-8")
+        validator = DocValidator(repo_root=tmp_path, verbose=False)
+        validator.scan_documents()
+        validator.check_code_blocks()
+        errors = [error for doc in validator.documents for error in doc.errors]
+        return [error for error in errors if "fence" in error or "code block" in error]
+
+    @pytest.mark.parametrize(
+        "content",
+        [
+            pytest.param("----\nid: memo-001\nexample: |\n  ```\n  code\n----\n\n# Body\n", id="four-dash-delimiters"),
+            pytest.param(
+                "---\nid: memo-001\nexample: |\n  ---\n  ```\n  code\n---\n\n# Body\n", id="indented-dashes-in-value"
+            ),
+        ],
+    )
+    def test_fence_inside_a_frontmatter_value_is_not_reported(self, tmp_path, content):
+        assert self._code_block_errors(tmp_path, content) == []
+
+    def test_thematic_breaks_do_not_hide_a_bare_fence(self, tmp_path):
+        """A ``---`` break in the body is not frontmatter, so the fence after it is checked."""
+        content = "---\nid: memo-001\n---\n\n# Body\n\n---\n\n```\ncode\n```\n\n---\n"
+
+        errors = self._code_block_errors(tmp_path, content)
+
+        assert any("Opening code fence missing language" in error for error in errors), errors
