@@ -1061,6 +1061,17 @@ class TestFrontmatterDelimiterForms:
         assert messages_again == []
         assert doc.read_text(encoding="utf-8") == first_pass
 
+    def test_indented_dashes_in_a_block_scalar_are_not_a_delimiter(self):
+        """FM-007: an indented ``---`` inside a value does not end the block early."""
+        content = "---\nid: doc\ndescription: |\n  ---\n  text\ndate: 2020-01-01\n---\n\n# Body\n"
+
+        result = migrate_date_to_created(content, "2020-01-01")
+
+        assert result == "---\nid: doc\ncreated: 2020-01-01\ndescription: |\n  ---\n  text\n---\n\n# Body\n"
+        post = frontmatter.loads(result)
+        assert "date" not in post.metadata
+        assert post.metadata["description"] == "---\ntext\n"
+
     def test_crlf_migration(self):
         """FM-007: CRLF delimiters bound the block and the new line keeps CRLF."""
         content = "---\r\nid: doc\r\ndate: 2020-01-01\r\n---\r\n\r\n# Body\r\n"

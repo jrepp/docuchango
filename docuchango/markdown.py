@@ -44,19 +44,31 @@ FENCE_RE = re.compile(r"^(\s*)(`{3,}|~{3,})(.*)$")
 
 
 def is_frontmatter_delimiter(line: str) -> bool:
-    """Whether ``line`` opens or closes a YAML frontmatter block.
+    """Whether ``line`` closes a YAML frontmatter block.
 
-    The line is exactly ``---`` once surrounding whitespace is stripped, so
-    trailing spaces or tabs and any line ending (``\\n``, ``\\r\\n``, a lone
-    ``\\r``) are all accepted, as python-frontmatter accepts them. This is the
-    one definition of a delimiter: the validator and the fixers both call it,
-    so they cannot disagree about where a block starts or ends.
+    The line is ``---`` in column zero, optionally followed by spaces or tabs
+    and any line ending (``\\n``, ``\\r\\n``, a lone ``\\r``) -- the boundary
+    python-frontmatter matches with ``^-{3,}\\s*$``. An indented ``---`` is
+    not a delimiter: inside the block it is part of a YAML value, such as a
+    line of a ``|`` block scalar. This is the one definition of a delimiter:
+    the validator and the fixers both call it, so they cannot disagree about
+    where a block starts or ends. The opening line is checked by
+    :func:`opens_frontmatter`, which also allows indentation.
 
     A UTF-8 byte-order mark is not whitespace and is not accepted here; callers
     read documents through :func:`docuchango.text_io.read_text`, which drops it
     (FMT-012), exactly as python-frontmatter needs.
     """
-    return line.strip() == "---"
+    return line.rstrip() == "---"
+
+
+def opens_frontmatter(line: str) -> bool:
+    """Whether ``line``, the first line of a document, opens a frontmatter block.
+
+    python-frontmatter strips the document before it looks for the opening
+    boundary, so leading indentation on the first line is accepted too.
+    """
+    return is_frontmatter_delimiter(line.lstrip(" \t"))
 
 
 def frontmatter_body_bounds(lines: list[str]) -> tuple[int, int] | None:
@@ -72,7 +84,7 @@ def frontmatter_body_bounds(lines: list[str]) -> tuple[int, int] | None:
         block is never closed. There is no fallback to the whole document: a
         fixer that edits fields must know where the Markdown body begins.
     """
-    if not lines or not is_frontmatter_delimiter(lines[0]):
+    if not lines or not opens_frontmatter(lines[0]):
         return None
     for index in range(1, len(lines)):
         if is_frontmatter_delimiter(lines[index]):
@@ -91,7 +103,7 @@ def frontmatter_span(lines: list[str]) -> int:
         the document does not open with a frontmatter block. An unterminated
         block spans the whole document, which is what the parser sees too.
     """
-    if not lines or not is_frontmatter_delimiter(lines[0]):
+    if not lines or not opens_frontmatter(lines[0]):
         return 0
     bounds = frontmatter_body_bounds(lines)
     if bounds is None:

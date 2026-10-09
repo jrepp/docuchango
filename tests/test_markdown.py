@@ -16,7 +16,9 @@ class TestIsFrontmatterDelimiter:
     def test_accepts_dashes_with_trailing_whitespace_and_any_line_ending(self, line):
         assert is_frontmatter_delimiter(line)
 
-    @pytest.mark.parametrize("line", ["----", "--", "--- x", "---x", "- - -", "", "﻿---", "title: ---"])
+    @pytest.mark.parametrize(
+        "line", ["----", "--", "--- x", "---x", "- - -", "", "\ufeff---", "title: ---", "  ---", "\t---\n"]
+    )
     def test_rejects_anything_else(self, line):
         assert not is_frontmatter_delimiter(line)
 
@@ -41,6 +43,22 @@ class TestFrontmatterBodyBounds:
         assert frontmatter_span(content.split("\n")) == 3
         assert frontmatter.loads(content).metadata == {"id": "doc"}
 
+    def test_indented_dashes_in_a_block_scalar_do_not_end_the_block(self):
+        """python-frontmatter only closes the block on a ``---`` in column zero."""
+        content = "---\nid: doc\ndescription: |\n  ---\n  text\ncreated: 2020-01-01\n---\n# Body\n"
+        lines = content.splitlines(keepends=True)
+
+        assert frontmatter_body_bounds(lines) == (1, 6)
+        assert frontmatter_span(content.split("\n")) == 7
+        assert str(frontmatter.loads(content).metadata["created"]) == "2020-01-01"
+
+    def test_opening_delimiter_may_be_indented(self):
+        """python-frontmatter strips the document before it looks for the opening ``---``."""
+        content = "  ---\nid: doc\n---\n"
+
+        assert frontmatter_body_bounds(content.splitlines(keepends=True)) == (1, 2)
+        assert frontmatter.loads(content).metadata == {"id": "doc"}
+
     def test_value_containing_dashes_does_not_end_the_block(self):
         lines = '---\ntitle: "a --- b"\nid: doc\n---\n'.splitlines(keepends=True)
 
@@ -53,7 +71,7 @@ class TestFrontmatterBodyBounds:
             pytest.param("# Title\n", id="no-block"),
             pytest.param("---\nid: doc\n", id="unterminated"),
             pytest.param("\n---\nid: doc\n---\n", id="not-on-first-line"),
-            pytest.param("﻿---\nid: doc\n---\n", id="bom-not-stripped"),
+            pytest.param("\ufeff---\nid: doc\n---\n", id="bom-not-stripped"),
         ],
     )
     def test_no_closed_block_on_the_first_line(self, content):
