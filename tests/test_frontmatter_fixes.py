@@ -835,7 +835,7 @@ date: 2025/01/26
         doc.write_bytes(b"\xff\xfe\x00\x01\x02\x03")
 
         with pytest.raises((ValueError, UnicodeDecodeError)):
-            fix_all_frontmatter(doc)
+            fix_frontmatter_metadata(doc)
 
     def test_frontmatter_with_a_thousand_extra_fields_is_still_fixed(self, tmp_path):
         """Test that a very large frontmatter block doesn't prevent status/date fixes."""
@@ -1145,3 +1145,59 @@ class TestBlankLineCollapse:
 
         assert fix_frontmatter_metadata(doc, schema="adr") == (False, [])
         assert doc.read_bytes() == after_first
+
+
+class TestTagFixKeepsFinalNewline:
+    """FM-008: the validate-time tag fix keeps the file's final newline."""
+
+    def test_sorting_tags_keeps_final_newline(self, tmp_path):
+        """FM-008: Prism's docs lost their last newline whenever tags were sorted."""
+        doc = tmp_path / "adr" / "adr-001-test.md"
+        doc.parent.mkdir()
+        doc.write_bytes(
+            b'---\ntitle: "ADR-001: Test"\nstatus: Accepted\ncreated: 2026-01-01\n'
+            b"deciders: Team\ntags: [zeta, alpha]\nid: adr-001\nproject_id: demo\n"
+            b"doc_uuid: 6f1c2f9e-3b1a-4d0e-9f5a-2b7c8d9e0f1a\n---\n\n# ADR-001: Test\n\nBody.\n"
+        )
+
+        changed, messages = fix_frontmatter_metadata(doc)
+
+        assert changed
+        assert "FM-008: Sorted tags alphabetically" in messages
+        content = doc.read_bytes()
+        assert content.endswith(b"\n\nBody.\n")
+        assert b"tags: [alpha, zeta]" in content
+
+    def test_crlf_document_is_normalized_but_keeps_final_newline(self, tmp_path):
+        """FM-008 with FMT-010: CRLF becomes LF by design, the final newline stays."""
+        doc = tmp_path / "adr" / "adr-001-test.md"
+        doc.parent.mkdir()
+        doc.write_bytes(
+            b'---\r\ntitle: "ADR-001: Test"\r\nstatus: Accepted\r\ncreated: 2026-01-01\r\n'
+            b"deciders: Team\r\ntags: [zeta, alpha]\r\nid: adr-001\r\nproject_id: demo\r\n"
+            b"doc_uuid: 6f1c2f9e-3b1a-4d0e-9f5a-2b7c8d9e0f1a\r\n---\r\n\r\n# ADR-001: Test\r\n"
+        )
+
+        fix_frontmatter_metadata(doc)
+
+        content = doc.read_bytes()
+        assert b"\r" not in content
+        assert content.endswith(b"# ADR-001: Test\n")
+
+
+class TestDumpsFinalNewline:
+    """FM-008: the shared serializer ends a document the way the original ended."""
+
+    def test_ends_with_newline_by_default(self):
+        post = frontmatter.loads("---\ntags: [a]\n---\n\n# T\n")
+        assert frontmatter_dumps(post) == "---\ntags: [a]\n---\n\n# T\n"
+
+    def test_follows_original_without_final_newline(self):
+        original = "---\ntags: [a]\n---\n\n# T"
+        post = frontmatter.loads(original)
+        assert frontmatter_dumps(post, original=original) == original
+
+    def test_follows_original_with_final_newline(self):
+        original = "---\ntags: [a]\n---\n\n# T\n"
+        post = frontmatter.loads(original)
+        assert frontmatter_dumps(post, original=original) == original

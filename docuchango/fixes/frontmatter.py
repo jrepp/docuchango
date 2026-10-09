@@ -575,12 +575,12 @@ def _fix_tags_metadata(metadata: dict[str, Any]) -> list[str]:
     messages = []
     if "tags" not in metadata:
         metadata["tags"] = []
-        return ["Added missing tags field (empty array)"]
+        return ["FM-005: Added missing tags field (empty array)"]
 
     tags = metadata["tags"]
     if isinstance(tags, str):
         tags = [tags.strip()] if tags.strip() else []
-        messages.append("Converted string tags to array")
+        messages.append("FM-008: Converted string tags to array")
     if not isinstance(tags, list):
         return messages
 
@@ -604,11 +604,11 @@ def _fix_tags_metadata(metadata: dict[str, Any]) -> list[str]:
     sorted_tags = sorted(unique_tags)
     if sorted_tags != original_tags:
         if len(sorted_tags) < len(original_tags):
-            messages.append(f"Removed {len(original_tags) - len(sorted_tags)} duplicate/invalid tags")
+            messages.append(f"FM-008: Removed {len(original_tags) - len(sorted_tags)} duplicate/invalid tags")
         if sorted_tags != normalized_tags:
-            messages.append("Sorted tags alphabetically")
+            messages.append("FM-008: Sorted tags alphabetically")
         if normalized_tags != original_tags:
-            messages.append(f"Normalized tags: {len(normalized_tags)} tags")
+            messages.append(f"FM-008: Normalized tags: {len(normalized_tags)} tags")
     metadata["tags"] = sorted_tags
     return messages
 
@@ -706,7 +706,7 @@ def fix_frontmatter_metadata(
     if changed:
         post.metadata = metadata
         if not dry_run:
-            write_text(file_path, frontmatter_dumps(post))
+            write_text(file_path, frontmatter_dumps(post, original=content))
         return True, messages
 
     if rewrite_only:

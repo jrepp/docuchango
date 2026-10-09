@@ -340,3 +340,57 @@ tags: ['backend', "frontend", api]
         assert "api" in tags
         assert "backend" in tags
         assert "frontend" in tags
+
+
+class TestFixTagsPreservesFileShape:
+    """FM-008: re-serializing the frontmatter keeps the final newline and line endings."""
+
+    def test_final_newline_is_kept(self, tmp_path):
+        """FM-008: sorting tags must not drop the newline that ends the file."""
+        doc = tmp_path / "test.md"
+        doc.write_bytes(b"---\ntags: [b, a]\n---\n\n# Test\n")
+
+        changed, messages = fix_tags(doc)
+
+        assert changed
+        assert "FM-008: Sorted tags alphabetically" in messages
+        assert doc.read_bytes() == b"---\ntags: [a, b]\n---\n\n# Test\n"
+
+    def test_missing_final_newline_is_not_added(self, tmp_path):
+        """FM-008: a file that had no final newline is not given one."""
+        doc = tmp_path / "test.md"
+        doc.write_bytes(b"---\ntags: [b, a]\n---\n\n# Test")
+
+        fix_tags(doc)
+
+        assert doc.read_bytes() == b"---\ntags: [a, b]\n---\n\n# Test"
+
+    def test_frontmatter_only_file_keeps_final_newline(self, tmp_path):
+        """FM-008: a document with no body still ends with a newline."""
+        doc = tmp_path / "test.md"
+        doc.write_bytes(b"---\ntags: [b, a]\n---\n")
+
+        fix_tags(doc)
+
+        assert doc.read_bytes() == b"---\ntags: [a, b]\n---\n"
+
+    def test_crlf_line_endings_are_kept(self, tmp_path):
+        """FM-008: a CRLF document stays CRLF, final newline included."""
+        doc = tmp_path / "test.md"
+        doc.write_bytes(b"---\r\ntags: [b, a]\r\n---\r\n\r\n# Test\r\n\r\nBody.\r\n")
+
+        fix_tags(doc)
+
+        assert doc.read_bytes() == b"---\r\ntags: [a, b]\r\n---\r\n\r\n# Test\r\n\r\nBody.\r\n"
+
+    def test_running_twice_is_idempotent(self, tmp_path):
+        """FM-008: the second run finds nothing to change and leaves the bytes alone."""
+        doc = tmp_path / "test.md"
+        doc.write_bytes(b"---\ntags: [B, a, a]\n---\n\n# Test\n")
+
+        fix_tags(doc)
+        first = doc.read_bytes()
+        changed, _ = fix_tags(doc)
+
+        assert not changed
+        assert doc.read_bytes() == first == b"---\ntags: [a, b]\n---\n\n# Test\n"

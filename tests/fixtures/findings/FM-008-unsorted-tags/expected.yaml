@@ -1,0 +1,15 @@
+summary: >-
+  An ADR whose tags are out of order, mixed case and repeated. The schema
+  rejects the mixed-case tag, so a dry run reports it; a fixing run
+  normalizes, de-duplicates and sorts the list (FM-008), and a second fixing
+  run changes nothing. tests/test_tags_fixes.py and
+  tests/test_frontmatter_fixes.py check that the rewrite keeps the file's
+  final newline.
+messages:
+  - "Invalid tag 'Alpha'"
+fixed: true
+fix_messages:
+  - "FM-008: Removed 1 duplicate/invalid tags"
+  - "FM-008: Sorted tags alphabetically"
+dry_run_exit_code: 1
+exit_code: 0

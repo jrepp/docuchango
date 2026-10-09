@@ -15,7 +15,7 @@ from pathlib import Path
 import frontmatter
 
 from docuchango.fixes.yaml_utils import dumps as frontmatter_dumps
-from docuchango.text_io import read_text
+from docuchango.text_io import read_text, write_text
 
 
 def normalize_tag(tag: str) -> str:
@@ -43,6 +43,18 @@ def normalize_tag(tag: str) -> str:
     return tag.strip("-")
 
 
+def _uses_crlf(file_path: Path) -> bool:
+    """Whether every line in ``file_path`` ends with CRLF.
+
+    The text read translates CRLF to LF, so the line endings have to be read
+    from the bytes on disk. A mixed file is not reproduced: it is written with
+    LF, the normalization FMT-010 applies during ``validate``.
+    """
+    data = file_path.read_bytes()
+    line_feeds = data.count(b"\n")
+    return line_feeds > 0 and data.count(b"\r\n") == line_feeds and b"\r" not in data.replace(b"\r\n", b"")
+
+
 def fix_tags(file_path: Path, dry_run: bool = False) -> tuple[bool, list[str]]:
     """Fix tags field issues in frontmatter.
 
@@ -68,7 +80,7 @@ def fix_tags(file_path: Path, dry_run: bool = False) -> tuple[bool, list[str]]:
     if "tags" not in post.metadata:
         # Add empty tags array
         post.metadata["tags"] = []
-        messages.append("Added missing tags field (empty array)")
+        messages.append("FM-005: Added missing tags field (empty array)")
         changed = True
     else:
         tags = post.metadata["tags"]
@@ -77,7 +89,7 @@ def fix_tags(file_path: Path, dry_run: bool = False) -> tuple[bool, list[str]]:
         # Convert string to array
         if isinstance(tags, str):
             tags = [tags.strip()] if tags.strip() else []
-            messages.append("Converted string tags to array")
+            messages.append("FM-008: Converted string tags to array")
             changed = True
 
         # Ensure it's a list
@@ -113,11 +125,11 @@ def fix_tags(file_path: Path, dry_run: bool = False) -> tuple[bool, list[str]]:
             changed = True
             if len(sorted_tags) < len(original_tags):
                 removed = len(original_tags) - len(sorted_tags)
-                messages.append(f"Removed {removed} duplicate/invalid tags")
+                messages.append(f"FM-008: Removed {removed} duplicate/invalid tags")
             if sorted_tags != normalized_tags:
-                messages.append("Sorted tags alphabetically")
+                messages.append("FM-008: Sorted tags alphabetically")
             if normalized_tags != original_tags:
-                messages.append(f"Normalized tags: {len(normalized_tags)} tags")
+                messages.append(f"FM-008: Normalized tags: {len(normalized_tags)} tags")
 
         post.metadata["tags"] = sorted_tags
 
@@ -125,8 +137,12 @@ def fix_tags(file_path: Path, dry_run: bool = False) -> tuple[bool, list[str]]:
     if changed:
         if not dry_run:
             try:
-                new_content = frontmatter_dumps(post)
-                file_path.write_text(new_content, encoding="utf-8")
+                # FM-008: keep the final newline and the line endings the file
+                # had; only the tags are meant to change.
+                new_content = frontmatter_dumps(post, original=content)
+                if _uses_crlf(file_path):
+                    new_content = new_content.replace("\n", "\r\n")
+                write_text(file_path, new_content)
             except Exception as e:
                 return False, [f"Error writing file: {e}"]
 

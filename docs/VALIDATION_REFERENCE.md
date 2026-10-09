@@ -86,7 +86,8 @@ as `(empty)`.
 - Maps common status variants and misspellings to the valid value for the type
 - Converts dates in slash, dot and long-month formats (`2026/09/14`,
   `14.09.2026`, `September 14, 2026`) to ISO 8601
-- Normalizes tags to a sorted, de-duplicated, lowercase-with-dashes list
+- `FM-008`: normalizes tags to a sorted, de-duplicated, lowercase-with-dashes
+  list. Rewriting the frontmatter keeps the newline at the end of the file
 - Trims whitespace and removes empty or null values
 - `FM-007`: adds `created` from git history, but only when a frontmatter
   block already exists and is missing that field; a document with no

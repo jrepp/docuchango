@@ -75,6 +75,7 @@ reported.
 | FM-005 | Missing `tags`, `project_id` or `doc_uuid` filled in | Implemented | fix | `fixes/whitespace.py` `ensure_required_fields` |
 | FM-006 | Recognized non-ISO date formats normalized | Implemented | fix | `fixes/frontmatter.py` |
 | FM-007 | Missing `created` added from the first git commit, and a legacy `date` migrated to `created`, inside the frontmatter block only | Implemented | fix | `fixes/timestamps.py` (`update_document_timestamps`, `insert_created_field`, `migrate_date_to_created`) |
+| FM-008 | Tags converted to a list, normalized to lowercase-with-dashes, de-duplicated and sorted, keeping the file's final newline | Implemented | fix | `fixes/frontmatter.py` (`_fix_tags_metadata`), `fixes/tags.py` (`fix_tags`), `fixes/yaml_utils.py` (`dumps`) |
 | FM-010 | `project_id` does not match the `project.id` of the config that governs the document's folder | Implemented | fix/report | `check_project_ids`, `_config_context_for_path`, `cli._discover_doc_claims`, `fixes/frontmatter.py` (`_fix_project_id_metadata`, `PROJECT_ID_PLACEHOLDER`) |
 | FM-011 | `created` or `updated` is not `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM:SSZ` | Implemented | report | `check_date_formats`, `is_accepted_date_format`, `frontmatter_date_source`, `Document.date_source` |
 | ID-001 | Top-level filename does not match the configured pattern (files in subfolders are support material and are not scanned, unless `structure.scan_subfolders` or a per-type override enables ID-011) | Implemented | report | `check_ids`, `_scan_document_folder` |
@@ -123,6 +124,19 @@ delimited block, is returned unchanged. That makes the fix idempotent. The
 regression fixtures in `tests/fixtures/regressions/` are reduced copies of the
 two documents in the Prism repository where the bug was found. Messages carry
 the `FM-007:` prefix.
+
+**FM-008 Tag normalization keeps the final newline (shipped).** The tag fix
+re-serializes the frontmatter through `fixes/yaml_utils.dumps`, and
+`frontmatter.dumps` never writes a final newline. Every document whose tags were
+sorted or normalized lost the newline at the end of the file. The same thing
+happened on every other path that re-serializes a document. `dumps` now ends the
+text with a newline, unless the caller passes the original text and that text
+did not end with one. `fix_frontmatter_metadata`, `fix_whitespace_and_fields`
+and `fix_tags` pass it. The standalone `fix_tags` also keeps a file that is
+CRLF throughout as CRLF. Inside `validate`, CRLF is still converted to LF on
+purpose, as FMT-010, in the same rewrite. The `tags` field that FM-005 adds when
+it is missing is reported with the `FM-005:` prefix, and the conversion,
+normalization, de-duplication and sorting are reported with `FM-008:`.
 
 **SCAN-001 Empty scan (shipped).** `validate` exited 0 and printed
 `All documents valid` whenever discovery turned up nothing, so a typo in
@@ -217,7 +231,8 @@ per-file summary, matching how FMT-001 and FMT-002 name the line.
 Trailing blank lines at end of file are collapsed like any other run, and are
 not otherwise touched: `frontmatter.dumps` already strips the body's trailing
 whitespace whenever any metadata fix re-serializes a document, and FMT-011 does
-not fight that.
+not fight that. The shared serializer puts back the single final newline that
+strip removed (see FM-008).
 
 FMT-002 is also the first existing check to take the ID prefix its message was
 promised in the "Error message format" section below: it had to be touched

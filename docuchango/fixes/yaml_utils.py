@@ -87,18 +87,30 @@ _ConsistentDumper.add_representer(date, _represent_date)
 _ConsistentDumper.add_representer(list, _represent_list)
 
 
-def dumps(post: frontmatter.Post) -> str:
+def dumps(post: frontmatter.Post, original: str | None = None) -> str:
     """Serialize a frontmatter Post with consistent formatting.
 
     Drop-in replacement for frontmatter.dumps() that:
     - Preserves field order
     - Outputs dates unquoted in ISO 8601 format
     - Keeps short lists in flow style
+    - Ends the document with a newline (FM-008)
+
+    ``frontmatter.dumps`` never writes a final newline, so every fixer that
+    re-serialized a document used to strip the one the file ended with. The
+    result now ends with a newline, unless ``original`` is given and did not
+    end with one: a fixer passes the text it read so the file keeps the ending
+    it had.
 
     Args:
         post: A python-frontmatter Post object
+        original: The document text the post was parsed from, if available
 
     Returns:
         Serialized markdown string with frontmatter
     """
-    return frontmatter.dumps(post, Dumper=_ConsistentDumper, sort_keys=False)
+    text = frontmatter.dumps(post, Dumper=_ConsistentDumper, sort_keys=False)
+    wants_final_newline = original is None or original.endswith(("\n", "\r"))
+    if wants_final_newline and not text.endswith("\n"):
+        text += "\n"
+    return text
