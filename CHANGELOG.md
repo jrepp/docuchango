@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.19.1-rc.3 (2026-10-09)
+
+### Bug Fixes
+
+- **fixes**: Skip leading blank lines in the FM-006 raw date lookup
+  ([`5c7d322`](https://github.com/jrepp/docuchango/commit/5c7d3221306f379ba66e0a9962d566d1e2ae1d7b))
+
+- **validate**: Use the shared frontmatter span in CB-001 and RD-001
+  ([`d977f47`](https://github.com/jrepp/docuchango/commit/d977f47ba1db1463703f61850b29e4c2696cb5d2))
+
+
 ## v1.19.1-rc.2 (2026-10-09)
 
 ### Bug Fixes
