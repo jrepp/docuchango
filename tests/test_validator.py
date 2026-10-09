@@ -724,3 +724,42 @@ class TestDateFormats:
     def test_legacy_date_field_is_not_reported(self, tmp_path: Path) -> None:
         """Phase 1 migrates `date` to `created`, so FM-011 leaves it alone."""
         assert self._findings(tmp_path, "created: 2026-01-02\ndate: 02/01/2026\n") == []
+
+
+class TestScanOrderIsDeterministic:
+    """FM-004: duplicate reports must not depend on the filesystem's listing order."""
+
+    def test_duplicate_uuid_names_the_first_file_in_sorted_order(self, tmp_path, monkeypatch):
+        """FM-004: the later file is reported, naming the earlier one, whatever order the OS lists them in."""
+        adr_dir = tmp_path / "docs-cms" / "adr"
+        adr_dir.mkdir(parents=True)
+        for number, name in ((4, "first"), (5, "second")):
+            (adr_dir / f"adr-00{number}-{name}.md").write_text(
+                "---\n"
+                f'id: "adr-00{number}"\n'
+                f'title: "ADR-00{number}: {name.title()}"\n'
+                "status: Accepted\n"
+                'deciders: "Team"\n'
+                "created: 2026-01-02\n"
+                "tags: []\n"
+                'project_id: "fixture"\n'
+                'doc_uuid: "22222222-2222-4222-8222-222222222222"\n'
+                "---\n"
+                f"# ADR-00{number}: {name.title()}\n",
+                encoding="utf-8",
+            )
+
+        # Simulate a filesystem that lists directory entries in reverse order,
+        # as ext4 on CI runners may.
+        original_rglob = Path.rglob
+        monkeypatch.setattr(
+            Path, "rglob", lambda self, pattern: iter(sorted(original_rglob(self, pattern), reverse=True))
+        )
+
+        validator = DocValidator(repo_root=tmp_path, verbose=False)
+        validator.scan_documents()
+        validator.check_uuids()
+
+        errors = {doc.file_path.name: doc.errors for doc in validator.documents}
+        assert errors["adr-004-first.md"] == []
+        assert any("also used by adr-004-first.md" in error for error in errors["adr-005-second.md"])

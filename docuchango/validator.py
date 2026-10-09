@@ -641,7 +641,9 @@ class DocValidator:
             self.log(f"   ⊘ Folder {folder_path} does not exist, skipping")
             return
 
-        for md_file in folder_path.rglob("*.md"):
+        # Sorted, so duplicate reports (FM-004, ID-004) name the same file on
+        # every filesystem rather than following the directory listing order.
+        for md_file in sorted(folder_path.rglob("*.md")):
             # Skip README and index files (landing pages)
             if md_file.name in ["README.md", "index.md"]:
                 continue
@@ -759,7 +761,7 @@ class DocValidator:
         for docs_dir in roots_to_scan:
             if not docs_dir.exists():
                 continue
-            for md_file in docs_dir.glob("*.md"):
+            for md_file in sorted(docs_dir.glob("*.md")):
                 if md_file.name in ["README.md", "docs-project.yaml"]:
                     continue
                 doc = self._parse_document(md_file, "doc")
