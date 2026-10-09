@@ -899,3 +899,34 @@ class TestSubProjectReadabilityConfig:
         assert errors["root-doc.md"] == []
         assert errors["sub-doc.md"]
         assert errors["nested-doc.md"]
+
+
+class TestParagraphExtractionFrontmatterBounds:
+    """Paragraph extraction skips exactly the frontmatter block python-frontmatter parses."""
+
+    LONG = "This paragraph is long enough to be scored because it has plenty of ordinary words in it."
+
+    @pytest.mark.parametrize(
+        "content",
+        [
+            pytest.param(f"----\ntitle: T\n----\n\n{LONG}\n", id="four-dash-delimiters"),
+            pytest.param(f"--- \ntitle: T\n---\t\n\n{LONG}\n", id="whitespace-suffixed"),
+        ],
+    )
+    def test_body_after_the_block_is_extracted(self, content):
+        scorer = ReadabilityScorer(ReadabilityConfig(min_paragraph_length=20))
+
+        assert scorer.extract_paragraphs(content) == [(self.LONG, 5)]
+
+    def test_text_between_body_thematic_breaks_is_extracted(self):
+        """Without frontmatter, two ``---`` breaks do not hide the prose between them."""
+        content = f"# Title\n\n---\n\n{self.LONG}\n\n---\n"
+        scorer = ReadabilityScorer(ReadabilityConfig(min_paragraph_length=20))
+
+        assert scorer.extract_paragraphs(content) == [(self.LONG, 5)]
+
+    def test_indented_dashes_in_a_value_do_not_end_the_block(self):
+        content = f"---\ntitle: T\nnote: |\n  ---\n  {self.LONG}\n---\n\n{self.LONG}\n"
+        scorer = ReadabilityScorer(ReadabilityConfig(min_paragraph_length=20))
+
+        assert scorer.extract_paragraphs(content) == [(self.LONG, 8)]

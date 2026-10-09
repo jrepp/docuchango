@@ -93,6 +93,7 @@ from docuchango.links import (
 from docuchango.markdown import (
     blank_line_finding_message,
     blank_line_runs,
+    frontmatter_span,
     mask_code,
     mdx_finding_message,
     mdx_tags,
@@ -1561,31 +1562,23 @@ class DocValidator:
                 lines = content.split("\n")
 
                 in_code_block = False
-                in_frontmatter = False
-                frontmatter_count = 0
                 opening_line = None
                 opening_language = None
                 doc_valid_blocks = 0
                 doc_invalid_blocks = 0
                 closing_fence_line = None  # Track last closing fence for newline check
                 previous_line_blank = True  # Track if previous line was blank
-                frontmatter_end_line = None  # Track where frontmatter ends
+                # The frontmatter block is the one python-frontmatter parses
+                # (docuchango.markdown.frontmatter_span); its closing '---' is
+                # line `span`, and a later '---' is a thematic break.
+                span = frontmatter_span(lines)
+                frontmatter_end_line = span or None  # Track where frontmatter ends
 
                 for line_num, line in enumerate(lines, start=1):
                     stripped = line.strip()
 
-                    # Track frontmatter (first --- to second ---)
-                    if stripped == "---":
-                        frontmatter_count += 1
-                        if frontmatter_count == 1:
-                            in_frontmatter = True
-                        elif frontmatter_count == 2:
-                            in_frontmatter = False
-                            frontmatter_end_line = line_num
-                        continue
-
-                    # Skip frontmatter content
-                    if in_frontmatter:
+                    # Skip frontmatter, delimiters included
+                    if line_num <= span:
                         continue
 
                     # Check if this line is a code fence (must start with exactly ``` or more backticks)

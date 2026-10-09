@@ -206,9 +206,11 @@ def _raw_frontmatter_lines(content: str) -> list[str]:
 
     Uses the delimiter rule the validator and python-frontmatter share, so a
     ``---`` inside a value (``title: "a --- b"``) does not end the block and a
-    delimiter with trailing whitespace still does.
+    delimiter with trailing whitespace still does. Leading blank lines are
+    skipped, as python-frontmatter strips the document before parsing; this
+    lookup only reads, so it may follow the parser that far.
     """
-    lines = content.splitlines()
+    lines = content.lstrip().splitlines()
     bounds = frontmatter_body_bounds(lines)
     if bounds is None:
         return []
