@@ -18,7 +18,7 @@ import frontmatter
 from docuchango.fixes.tags import normalize_tag
 from docuchango.fixes.whitespace import ensure_required_fields, normalize_empty_values, trim_string_values
 from docuchango.fixes.yaml_utils import dumps as frontmatter_dumps
-from docuchango.markdown import blank_line_fix_message, collapse_blank_lines
+from docuchango.markdown import blank_line_fix_message, collapse_blank_lines, frontmatter_body_bounds
 from docuchango.text_io import (
     FMT_012_FIX_MESSAGE,
     carriage_return_lines,
@@ -201,6 +201,21 @@ def fix_status_value(file_path: Path, dry_run: bool = False, schema: str | None 
         return False, f"Error processing file: {e}"
 
 
+def _raw_frontmatter_lines(content: str) -> list[str]:
+    """The raw lines between the frontmatter delimiters, or ``[]`` without a block.
+
+    Uses the delimiter rule the validator and python-frontmatter share, so a
+    ``---`` inside a value (``title: "a --- b"``) does not end the block and a
+    delimiter with trailing whitespace still does.
+    """
+    lines = content.splitlines()
+    bounds = frontmatter_body_bounds(lines)
+    if bounds is None:
+        return []
+    start, end = bounds
+    return lines[start:end]
+
+
 def fix_date_format(file_path: Path, dry_run: bool = False) -> tuple[bool, str]:
     """Fix invalid date formats to ISO 8601 (YYYY-MM-DD).
 
@@ -232,7 +247,7 @@ def fix_date_format(file_path: Path, dry_run: bool = False) -> tuple[bool, str]:
         # Read the raw frontmatter line to check if it's already canonical.
         if isinstance(date_value, datetime) or (hasattr(date_value, "strftime") and hasattr(date_value, "year")):
             # Check the raw YAML to see if the value is already canonical
-            raw_lines = content.split("---")[1].strip().splitlines() if "---" in content else []
+            raw_lines = _raw_frontmatter_lines(content)
             raw_value = None
             for line in raw_lines:
                 if line.startswith(f"{date_field}:"):
@@ -500,7 +515,7 @@ def _fix_date_metadata(metadata: dict[str, Any], content: str) -> str | None:
     date_value = metadata[date_field]
 
     if isinstance(date_value, datetime | date):
-        raw_lines = content.split("---")[1].strip().splitlines() if "---" in content else []
+        raw_lines = _raw_frontmatter_lines(content)
         raw_value = None
         for line in raw_lines:
             if line.startswith(f"{date_field}:"):

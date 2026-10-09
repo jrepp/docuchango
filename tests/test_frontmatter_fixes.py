@@ -567,6 +567,50 @@ date: 2025-01-26
             post = frontmatter.loads(doc.read_text())
             assert post.metadata["date"] == date(2025, 2, 1)
 
+    def test_dashes_inside_a_value_do_not_hide_a_canonical_date(self, tmp_path):
+        """A ``---`` inside a frontmatter value is not the closing delimiter.
+
+        The raw date check used to split the file on every ``---``, so the
+        ``created`` line after the title was never seen and an already
+        canonical date was reported as normalized.
+        """
+        doc = tmp_path / "adr" / "adr-001-test.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text(
+            '---\nid: "adr-001"\ntitle: "Before --- after"\nstatus: Accepted\ncreated: 2025-01-26\n---\n\n# Test\n'
+        )
+
+        changed, msg = fix_date_format(doc)
+
+        assert not changed
+        assert msg == "Date already in ISO 8601 format"
+
+    @pytest.mark.parametrize("delimiter", ["--- ", "---\t"])
+    def test_whitespace_suffixed_delimiters_bound_the_raw_date_check(self, tmp_path, delimiter):
+        """The raw date check finds the block python-frontmatter parsed."""
+        doc = tmp_path / "adr" / "adr-001-test.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text(
+            f'{delimiter}\nid: "adr-001"\ntitle: "T"\nstatus: Accepted\ncreated: 2025-01-26\n{delimiter}\n\n# Test\n'
+        )
+
+        changed, msg = fix_date_format(doc)
+
+        assert not changed
+        assert msg == "Date already in ISO 8601 format"
+
+    def test_metadata_fix_does_not_renormalize_a_canonical_date_after_dashes(self, tmp_path):
+        """``fix_frontmatter_metadata`` reads the raw date line from the real block."""
+        doc = tmp_path / "adr" / "adr-001-test.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text(
+            '---\nid: "adr-001"\ntitle: "Before --- after"\nstatus: Accepted\ncreated: 2025-01-26\n---\n\n# Test\n'
+        )
+
+        _, messages = fix_frontmatter_metadata(doc, dry_run=True)
+
+        assert not any("Normalized created" in message for message in messages)
+
 
 class TestAddMissingFrontmatter:
     """Test adding missing frontmatter."""
