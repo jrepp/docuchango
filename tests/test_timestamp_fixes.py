@@ -13,6 +13,7 @@ from docuchango.fixes.timestamps import (
     get_git_dates,
     insert_created_field,
     migrate_date_to_created,
+    remove_frontmatter_field,
     update_document_timestamps,
     update_frontmatter_field,
 )
@@ -996,3 +997,149 @@ class TestCreatedFieldStaysInFrontmatter:
         assert not changed_again
         assert messages_again == []
         assert doc.read_text(encoding="utf-8") == first_pass
+
+
+#: Delimiter lines python-frontmatter and ``docuchango.markdown`` both accept:
+#: ``---`` followed by trailing spaces or tabs.
+WHITESPACE_SUFFIXED_DELIMITERS = [
+    pytest.param("--- ", id="trailing-space"),
+    pytest.param("---  ", id="trailing-spaces"),
+    pytest.param("---\t", id="trailing-tab"),
+    pytest.param("--- \t", id="trailing-space-and-tab"),
+]
+
+
+class TestFrontmatterDelimiterForms:
+    """FM-007: the fixer finds the same frontmatter block the parser and validator do."""
+
+    @pytest.mark.parametrize("delimiter", WHITESPACE_SUFFIXED_DELIMITERS)
+    def test_insert_accepts_whitespace_suffixed_delimiters(self, delimiter):
+        """FM-007: `--- ` delimits the block, so `created` goes inside it."""
+        content = f"{delimiter}\nid: doc\nstatus: Draft\n{delimiter}\n\n# Body\n"
+
+        result = insert_created_field(content, "2026-01-01")
+
+        assert result == f"{delimiter}\nid: doc\nstatus: Draft\ncreated: 2026-01-01\n{delimiter}\n\n# Body\n"
+
+    @pytest.mark.parametrize("delimiter", WHITESPACE_SUFFIXED_DELIMITERS)
+    def test_update_accepts_whitespace_suffixed_delimiters(self, delimiter):
+        """FM-007: a field inside a `--- ` block is found and rewritten."""
+        content = f"{delimiter}\nid: doc\ncreated: 2020-01-01\n{delimiter}\n"
+
+        result = update_frontmatter_field(content, "created", "2021-01-01")
+
+        assert result == f"{delimiter}\nid: doc\ncreated: 2021-01-01\n{delimiter}\n"
+
+    @pytest.mark.parametrize("delimiter", WHITESPACE_SUFFIXED_DELIMITERS)
+    def test_migration_with_whitespace_suffixed_delimiters_keeps_the_date(self, delimiter):
+        """FM-007: the legacy `date` becomes `created`; it is never just dropped."""
+        content = f"{delimiter}\nid: doc\ndate: 2020-01-01\n{delimiter}\n\n# Body\n"
+
+        result = migrate_date_to_created(content, "2020-01-01")
+
+        assert result == f"{delimiter}\nid: doc\ncreated: 2020-01-01\n{delimiter}\n\n# Body\n"
+
+    @pytest.mark.parametrize("delimiter", WHITESPACE_SUFFIXED_DELIMITERS)
+    def test_document_migration_with_whitespace_suffixed_delimiters(self, tmp_path, delimiter):
+        """FM-007: end to end, the date survives as `created` and a rerun is a no-op."""
+        doc = tmp_path / "test.md"
+        doc.write_text(f"{delimiter}\nid: doc\ndate: 2020-01-01\n{delimiter}\n\n# Body\n", encoding="utf-8")
+
+        changed, messages = update_document_timestamps(doc)
+
+        assert changed
+        assert messages == ["FM-007: Migrated 'date' → 'created'"]
+        first_pass = doc.read_text(encoding="utf-8")
+        assert first_pass == f"{delimiter}\nid: doc\ncreated: 2020-01-01\n{delimiter}\n\n# Body\n"
+        post = frontmatter.loads(first_pass)
+        assert "date" not in post.metadata
+        assert str(post.metadata["created"]) == "2020-01-01"
+
+        changed_again, messages_again = update_document_timestamps(doc)
+
+        assert not changed_again
+        assert messages_again == []
+        assert doc.read_text(encoding="utf-8") == first_pass
+
+    def test_crlf_migration(self):
+        """FM-007: CRLF delimiters bound the block and the new line keeps CRLF."""
+        content = "---\r\nid: doc\r\ndate: 2020-01-01\r\n---\r\n\r\n# Body\r\n"
+
+        result = migrate_date_to_created(content, "2020-01-01")
+
+        assert result == "---\r\nid: doc\r\ncreated: 2020-01-01\r\n---\r\n\r\n# Body\r\n"
+
+    def test_crlf_whitespace_suffixed_delimiters(self):
+        """FM-007: trailing whitespace before a CRLF still delimits the block."""
+        content = "--- \r\nid: doc\r\n--- \r\n"
+
+        result = insert_created_field(content, "2026-01-01")
+
+        assert result == "--- \r\nid: doc\r\ncreated: 2026-01-01\r\n--- \r\n"
+
+
+class TestFixerStaysInsideFrontmatter:
+    """FM-007: no field is ever removed, rewritten or inserted outside the block."""
+
+    def test_body_date_line_survives_migration(self):
+        """FM-007: only the frontmatter `date` is migrated; a body `date:` line stays."""
+        content = "---\nid: doc\ndate: 2020-01-01\n---\n\ndate: 1999-12-31\n"
+
+        result = migrate_date_to_created(content, "2020-01-01")
+
+        assert result == "---\nid: doc\ncreated: 2020-01-01\n---\n\ndate: 1999-12-31\n"
+
+    def test_body_date_line_survives_removal_when_created_exists(self, tmp_path):
+        """FM-007: removing a deprecated `date` never reaches into the body."""
+        doc = tmp_path / "test.md"
+        doc.write_text("---\nid: doc\ndate: 2020-01-01\ncreated: 2020-01-01\n---\n\ndate: 1999-12-31\n")
+
+        changed, messages = update_document_timestamps(doc)
+
+        assert changed
+        assert messages == ["FM-007: Removed deprecated 'date' field"]
+        assert doc.read_text() == "---\nid: doc\ncreated: 2020-01-01\n---\n\ndate: 1999-12-31\n"
+
+    @pytest.mark.parametrize(
+        "content",
+        [
+            pytest.param("id: doc\ndate: 2020-01-01\n", id="no-delimiters"),
+            pytest.param("# Title\n\ndate: 2020-01-01\n", id="body-only"),
+            pytest.param("---\nid: doc\ndate: 2020-01-01\n", id="unterminated-block"),
+            pytest.param("\n---\nid: doc\ndate: 2020-01-01\n---\n", id="block-not-on-first-line"),
+        ],
+    )
+    def test_nothing_outside_a_delimited_block_is_touched(self, content):
+        """FM-007: with no `---` block at the top there is nothing to edit."""
+        assert remove_frontmatter_field(content, "date") == content
+        assert update_frontmatter_field(content, "date", "2021-01-01") == content
+        assert migrate_date_to_created(content, "2020-01-01") == content
+
+    def test_migration_is_all_or_nothing(self, tmp_path):
+        """FM-007: when `created` cannot be written, `date` is not removed either.
+
+        python-frontmatter strips leading blank lines before it looks for the
+        opening ``---``, so it reports a legacy ``date`` here. The fixer only
+        edits a block that opens on the first line; it must leave the file as
+        it is rather than drop the date and write nothing.
+        """
+        doc = tmp_path / "test.md"
+        original = "\n---\nid: doc\ndate: 2020-01-01\n---\n\n# Body\n"
+        doc.write_text(original)
+        assert "date" in frontmatter.loads(original).metadata
+
+        changed, _ = update_document_timestamps(doc)
+
+        assert not changed
+        assert doc.read_text() == original
+
+    def test_date_removal_needs_created_in_the_block(self, tmp_path):
+        """FM-007: a `created` the fixer cannot see in the block does not license dropping `date`."""
+        doc = tmp_path / "test.md"
+        original = "\n---\nid: doc\ndate: 2020-01-01\ncreated: 2020-01-01\n---\n"
+        doc.write_text(original)
+
+        changed, _ = update_document_timestamps(doc)
+
+        assert not changed
+        assert doc.read_text() == original

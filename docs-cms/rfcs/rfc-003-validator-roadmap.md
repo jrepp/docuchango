@@ -74,7 +74,7 @@ reported.
 | FM-004 | Duplicate `doc_uuid` across documents | Implemented | report | `check_uuids` |
 | FM-005 | Missing `tags`, `project_id` or `doc_uuid` filled in | Implemented | fix | `fixes/whitespace.py` `ensure_required_fields` |
 | FM-006 | Recognized non-ISO date formats normalized | Implemented | fix | `fixes/frontmatter.py` |
-| FM-007 | Missing `created` added from the first git commit, and a legacy `date` migrated to `created`, inside the frontmatter block only | Implemented | fix | `fixes/timestamps.py` (`update_document_timestamps`, `insert_created_field`, `migrate_date_to_created`) |
+| FM-007 | Missing `created` added from the first git commit, and a legacy `date` migrated to `created`, inside the frontmatter block only | Implemented | fix | `fixes/timestamps.py` (`update_document_timestamps`, `insert_created_field`, `migrate_date_to_created`), `markdown.py` (`is_frontmatter_delimiter`, `frontmatter_body_bounds`) |
 | FM-008 | Tags converted to a list, normalized to lowercase-with-dashes, de-duplicated and sorted, keeping the file's final newline | Implemented | fix | `fixes/frontmatter.py` (`_fix_tags_metadata`), `fixes/tags.py` (`fix_tags`), `fixes/yaml_utils.py` (`dumps`) |
 | FM-010 | `project_id` does not match the `project.id` of the config that governs the document's folder | Implemented | fix/report | `check_project_ids`, `_config_context_for_path`, `cli._discover_doc_claims`, `fixes/frontmatter.py` (`_fix_project_id_metadata`, `PROJECT_ID_PLACEHOLDER`) |
 | FM-011 | `created` or `updated` is not `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM:SSZ` | Implemented | report | `check_date_formats`, `is_accepted_date_format`, `frontmatter_date_source`, `Document.date_source` |
@@ -124,6 +124,19 @@ delimited block, is returned unchanged. That makes the fix idempotent. The
 regression fixtures in `tests/fixtures/regressions/` are reduced copies of the
 two documents in the Prism repository where the bug was found. Messages carry
 the `FM-007:` prefix.
+
+The scanner finds the block with `is_frontmatter_delimiter` and
+`frontmatter_body_bounds` in `docuchango/markdown.py`, the same rule the
+validator's `frontmatter_span` uses: a line that is `---` once whitespace is
+stripped, so `--- `, `---\t` and CRLF delimiters count, as they do for
+python-frontmatter. The fixer had its own stricter scanner, so a delimiter
+with trailing whitespace hid the block. A whole-document fallback then removed
+a legacy `date` from anywhere in the file while the insert found no block, and
+the date was lost. There is no fallback now: no field outside a closed block on
+the first line is read, rewritten or removed. The migration is also all or
+nothing. `date` is removed only when `created` is already in the block or has
+just been inserted; otherwise the file is left as it is and the fixer reports
+`FM-007: Left legacy 'date' in place`.
 
 **FM-008 Tag normalization keeps the final newline (shipped).** The tag fix
 re-serializes the frontmatter through `fixes/yaml_utils.dumps`, and

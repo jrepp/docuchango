@@ -2,8 +2,10 @@
 
 Two regions of a Markdown document are content rather than prose, and every
 check and fix that walks lines has to agree on where they are: the leading YAML
-frontmatter block, and fenced code blocks. :func:`frontmatter_span` and
-:func:`fence_mask` are the single implementation of both, used by
+frontmatter block, and fenced code blocks. :func:`is_frontmatter_delimiter`
+(with :func:`frontmatter_body_bounds` and :func:`frontmatter_span` built on it)
+and :func:`fence_mask` are the single implementation of both, used by the
+FM-007 field edits in ``docuchango.fixes.timestamps``, by
 :func:`mask_code` (which blanks code before the prose checks and before the
 LNK-010 link rewrite) and by the blank-line helpers below.
 
@@ -41,6 +43,43 @@ MAX_BLANK_LINES = 2
 FENCE_RE = re.compile(r"^(\s*)(`{3,}|~{3,})(.*)$")
 
 
+def is_frontmatter_delimiter(line: str) -> bool:
+    """Whether ``line`` opens or closes a YAML frontmatter block.
+
+    The line is exactly ``---`` once surrounding whitespace is stripped, so
+    trailing spaces or tabs and any line ending (``\\n``, ``\\r\\n``, a lone
+    ``\\r``) are all accepted, as python-frontmatter accepts them. This is the
+    one definition of a delimiter: the validator and the fixers both call it,
+    so they cannot disagree about where a block starts or ends.
+
+    A UTF-8 byte-order mark is not whitespace and is not accepted here; callers
+    read documents through :func:`docuchango.text_io.read_text`, which drops it
+    (FMT-012), exactly as python-frontmatter needs.
+    """
+    return line.strip() == "---"
+
+
+def frontmatter_body_bounds(lines: list[str]) -> tuple[int, int] | None:
+    """The ``[start, end)`` line range of a closed frontmatter block's body.
+
+    Args:
+        lines: The document's lines, either ``content.split("\\n")`` or
+            ``content.splitlines(keepends=True)``.
+
+    Returns:
+        ``(1, closing)`` where ``closing`` is the index of the closing
+        delimiter, or ``None`` when the first line is not a delimiter or the
+        block is never closed. There is no fallback to the whole document: a
+        fixer that edits fields must know where the Markdown body begins.
+    """
+    if not lines or not is_frontmatter_delimiter(lines[0]):
+        return None
+    for index in range(1, len(lines)):
+        if is_frontmatter_delimiter(lines[index]):
+            return 1, index
+    return None
+
+
 def frontmatter_span(lines: list[str]) -> int:
     """Number of leading lines taken up by a YAML frontmatter block.
 
@@ -52,14 +91,12 @@ def frontmatter_span(lines: list[str]) -> int:
         the document does not open with a frontmatter block. An unterminated
         block spans the whole document, which is what the parser sees too.
     """
-    if not lines or lines[0].strip() != "---":
+    if not lines or not is_frontmatter_delimiter(lines[0]):
         return 0
-    index = 1
-    while index < len(lines) and lines[index].strip() != "---":
-        index += 1
-    if index < len(lines):  # the closing '---'
-        index += 1
-    return index
+    bounds = frontmatter_body_bounds(lines)
+    if bounds is None:
+        return len(lines)
+    return bounds[1] + 1
 
 
 def fence_mask(lines: list[str]) -> list[bool]:

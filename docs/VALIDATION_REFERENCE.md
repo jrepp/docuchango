@@ -95,7 +95,11 @@ as `(empty)`.
   migrates a legacy `date` field to `created`. The field is inserted inside
   the `---` block only, after `status`, else after `id`, else first. A
   `status:` or `created:` line in the body, such as a frontmatter example in a
-  code fence, is never used as the anchor, so a second run changes nothing
+  code fence, is never used as the anchor, so a second run changes nothing.
+  A delimiter with trailing spaces or tabs, or a CRLF ending, bounds the block
+  just as it does for the validator. `date` is removed only when `created` is
+  written in the same edit, and a `date:` line outside the block is never
+  touched
 
 Generating a missing frontmatter block and mapping status variants both take
 the document type from the `schema` of the `doc_types` entry that owns the

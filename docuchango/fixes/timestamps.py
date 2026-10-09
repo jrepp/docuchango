@@ -16,6 +16,7 @@ from pathlib import Path
 
 import frontmatter
 
+from docuchango.markdown import frontmatter_body_bounds
 from docuchango.text_io import read_text, write_text
 
 
@@ -83,21 +84,8 @@ def _line_indent(line: str) -> int:
     return len(line) - len(stripped)
 
 
-def _frontmatter_bounds(lines: list[str]) -> tuple[int, int]:
-    """Return the ``[start, end)`` line range covering the frontmatter body.
-
-    Falls back to the whole document when no ``---`` delimited block is found,
-    which keeps these helpers usable on bare frontmatter snippets.
-    """
-    if lines and lines[0].rstrip("\r\n") == "---":
-        for index in range(1, len(lines)):
-            if lines[index].rstrip("\r\n") == "---":
-                return 1, index
-    return 0, len(lines)
-
-
 def _field_blocks(lines: list[str], field_name: str) -> list[tuple[int, int]]:
-    """Locate every top-level ``field_name:`` block inside the frontmatter.
+    """Locate every top-level ``field_name:`` block inside the frontmatter (FM-007).
 
     A "block" is the key's own line plus any continuation lines that belong to
     its value: block scalars (``|``/``>``), multi-line quoted or plain scalars,
@@ -105,10 +93,19 @@ def _field_blocks(lines: list[str], field_name: str) -> list[tuple[int, int]]:
     indented further than the key, so any following line that is indented (or a
     blank line followed by an indented line) is part of the value.
 
+    Only the ``---`` delimited block on the first line is searched, using the
+    delimiter rule the validator and python-frontmatter share (see
+    :func:`docuchango.markdown.is_frontmatter_delimiter`). Without a closed
+    block there is nothing to search: a ``field_name:`` line in the Markdown
+    body is never a field.
+
     Returns:
         A list of ``(start, end)`` half-open line-index ranges.
     """
-    start, end = _frontmatter_bounds(lines)
+    bounds = frontmatter_body_bounds(lines)
+    if bounds is None:
+        return []
+    start, end = bounds
     key_pattern = re.compile(rf"^{re.escape(field_name)}:")
 
     blocks: list[tuple[int, int]] = []
@@ -171,6 +168,9 @@ def update_frontmatter_field(content: str, field_name: str, new_value: str) -> s
     block sequence) the whole value is replaced: the continuation lines are
     dropped instead of being left dangling under the new value.
 
+    Only fields inside the ``---`` delimited block are touched; content with
+    no such block is returned unchanged.
+
     All other lines are left byte-identical, which line-oriented editing gives
     us and a YAML round-trip would not (it would drop comments, collapse
     duplicate keys and renormalize quoting).
@@ -206,7 +206,12 @@ def update_frontmatter_field(content: str, field_name: str, new_value: str) -> s
 
 
 def remove_frontmatter_field(content: str, field_name: str) -> str:
-    """Remove a top-level field, including any multi-line value it carries."""
+    """Remove a top-level frontmatter field, including any multi-line value it carries.
+
+    Only fields inside the ``---`` delimited block are removed (FM-007); a
+    look-alike line in the Markdown body, or in content with no block at all,
+    is left alone.
+    """
     lines = content.splitlines(keepends=True)
     blocks = _field_blocks(lines, field_name)
     if not blocks:
@@ -216,19 +221,6 @@ def remove_frontmatter_field(content: str, field_name: str) -> str:
         del lines[start:end]
 
     return "".join(lines)
-
-
-def _delimited_frontmatter(lines: list[str]) -> tuple[int, int] | None:
-    """Return the ``[start, end)`` body range of a ``---`` delimited block, or None.
-
-    Unlike :func:`_frontmatter_bounds` there is no whole-document fallback:
-    inserting a key is only safe when the block's end is known, because
-    anything past it is Markdown body.
-    """
-    start, end = _frontmatter_bounds(lines)
-    if start == 0:
-        return None
-    return start, end
 
 
 def insert_created_field(content: str, created_date: str) -> str:
@@ -244,7 +236,7 @@ def insert_created_field(content: str, created_date: str) -> str:
     that has no delimited block at all, is returned unchanged.
     """
     lines = content.splitlines(keepends=True)
-    bounds = _delimited_frontmatter(lines)
+    bounds = frontmatter_body_bounds(lines)
     if bounds is None or _field_blocks(lines, "created"):
         return content
 
@@ -274,21 +266,39 @@ def frontmatter_value_to_string(value: object) -> str:
     return str(value)
 
 
+def _has_field(content: str, field_name: str) -> bool:
+    """Whether the frontmatter block of ``content`` has a top-level ``field_name``."""
+    return bool(_field_blocks(content.splitlines(keepends=True), field_name))
+
+
 def migrate_date_to_created(content: str, created_date: str) -> str:
-    """Migrate legacy 'date' field to 'created' field.
+    """Migrate the legacy ``date`` field to ``created`` (FM-007).
+
+    The migration is all or nothing. ``date`` is only removed once ``created``
+    is in the frontmatter block: either it was already there, or it has just
+    been inserted. When neither holds -- there is no closed ``---`` block on
+    the first line, say -- the content is returned unchanged, so the date is
+    never dropped without its replacement being written.
 
     Args:
         content: The full file content
-        created_date: Creation date to use
+        created_date: Creation date to write when ``created`` is missing
 
     Returns:
-        Updated content with 'date' removed and 'created' added if needed
+        The content with ``created`` in the block and ``date`` removed, or the
+        original content when that cannot be done.
     """
-    new_content = remove_frontmatter_field(content, "date")
-    # insert_created_field looks for an existing 'created' inside the
-    # frontmatter only; a 'created:' line in the body (a fenced example, say)
-    # must not stop the migration, or the legacy date would be lost.
-    return insert_created_field(new_content, created_date)
+    if not _has_field(content, "date"):
+        return content
+
+    with_created = content if _has_field(content, "created") else insert_created_field(content, created_date)
+    if not _has_field(with_created, "created"):
+        return content
+
+    migrated = remove_frontmatter_field(with_created, "date")
+    if _has_field(migrated, "date"):
+        return content
+    return migrated
 
 
 def update_document_timestamps(file_path: Path, dry_run: bool = False) -> tuple[bool, list[str]]:
@@ -327,18 +337,23 @@ def update_document_timestamps(file_path: Path, dry_run: bool = False) -> tuple[
     has_legacy_date = "date" in post.metadata
     has_created = "created" in post.metadata
 
-    if has_legacy_date and has_created:
-        new_content = remove_frontmatter_field(new_content, "date")
-        if new_content != content:
-            modified = True
-            messages.append("FM-007: Removed deprecated 'date' field")
-    elif has_legacy_date:
-        created_date, _ = get_git_dates(file_path)
-        if not created_date:
-            created_date = frontmatter_value_to_string(post.metadata["date"])
+    if has_legacy_date:
+        # FM-007: 'date' is removed only together with a 'created' in the
+        # block, so the date is never lost; see migrate_date_to_created.
+        if has_created:
+            created_date = frontmatter_value_to_string(post.metadata["created"])
+        else:
+            created_date, _ = get_git_dates(file_path)
+            if not created_date:
+                created_date = frontmatter_value_to_string(post.metadata["date"])
 
         new_content = migrate_date_to_created(new_content, created_date)
-        if new_content != content:
+        if new_content == content:
+            messages.append("FM-007: Left legacy 'date' in place: no closed '---' block on the first line")
+        elif _has_field(content, "created"):
+            modified = True
+            messages.append("FM-007: Removed deprecated 'date' field")
+        else:
             modified = True
             messages.append("FM-007: Migrated 'date' → 'created'")
     elif has_created:
