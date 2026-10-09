@@ -152,7 +152,8 @@ and `fix_tags` pass it. The standalone `fix_tags` also keeps a file that is
 CRLF throughout as CRLF, and reports the BOM its rewrite drops as FMT-012. Inside `validate`, CRLF is still converted to LF on
 purpose, as FMT-010, in the same rewrite. The `tags` field that FM-005 adds when
 it is missing is reported with the `FM-005:` prefix, and the conversion,
-normalization, de-duplication and sorting are reported with `FM-008:`.
+normalization, de-duplication, removal of non-string tags and sorting are
+reported with `FM-008:`.
 
 **SCAN-001 Empty scan (shipped).** `validate` exited 0 and printed
 `All documents valid` whenever discovery turned up nothing, so a typo in

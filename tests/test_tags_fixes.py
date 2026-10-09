@@ -229,7 +229,8 @@ class TestFixTags:
         changed, messages = fix_tags(doc)
 
         assert changed
-        assert any("Skipped non-string tag" in msg for msg in messages)
+        assert "FM-008: Skipped non-string tag: 123" in messages
+        assert "FM-008: Skipped non-string tag: True" in messages
 
         post = frontmatter.loads(doc.read_text())
         assert post.metadata["tags"] == ["backend"]

@@ -90,7 +90,7 @@ def fix_tags(file_path: Path, dry_run: bool = False) -> tuple[bool, list[str]]:
 
         for tag in tags:
             if not isinstance(tag, str):
-                messages.append(f"Skipped non-string tag: {tag}")
+                messages.append(f"FM-008: Skipped non-string tag: {tag}")
                 continue
 
             normalized = normalize_tag(tag)

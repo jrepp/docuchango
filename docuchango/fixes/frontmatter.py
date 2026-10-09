@@ -603,7 +603,7 @@ def _fix_tags_metadata(metadata: dict[str, Any]) -> list[str]:
     normalized_tags = []
     for tag in tags:
         if not isinstance(tag, str):
-            messages.append(f"Skipped non-string tag: {tag}")
+            messages.append(f"FM-008: Skipped non-string tag: {tag}")
             continue
         normalized = normalize_tag(tag)
         if normalized:

@@ -1212,6 +1212,22 @@ class TestTagFixKeepsFinalNewline:
         assert content.endswith(b"\n\nBody.\n")
         assert b"tags: [alpha, zeta]" in content
 
+    def test_non_string_tag_removal_carries_the_finding_id(self, tmp_path):
+        """FM-008: every tag normalization message names the finding."""
+        doc = tmp_path / "adr" / "adr-001-test.md"
+        doc.parent.mkdir()
+        doc.write_text(
+            '---\ntitle: "ADR-001: Test"\nstatus: Accepted\ncreated: 2026-01-01\n'
+            "deciders: Team\ntags: [alpha, 123]\nid: adr-001\nproject_id: demo\n"
+            "doc_uuid: 6f1c2f9e-3b1a-4d0e-9f5a-2b7c8d9e0f1a\n---\n\n# ADR-001: Test\n"
+        )
+
+        changed, messages = fix_frontmatter_metadata(doc)
+
+        assert changed
+        assert "FM-008: Skipped non-string tag: 123" in messages
+        assert frontmatter.loads(doc.read_text()).metadata["tags"] == ["alpha"]
+
     def test_crlf_document_is_normalized_but_keeps_final_newline(self, tmp_path):
         """FM-008 with FMT-010: CRLF becomes LF by design, the final newline stays."""
         doc = tmp_path / "adr" / "adr-001-test.md"
