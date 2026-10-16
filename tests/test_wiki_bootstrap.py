@@ -306,6 +306,34 @@ def test_overlay_bundle_failure_does_not_register_or_create_wiki(tmp_path):
     assert not (root / "wiki").exists()
 
 
+@pytest.mark.parametrize("mode", ["new", "force", "overlay"])
+def test_bundle_schema_ancestor_collision_preserves_existing_tree(tmp_path, mode):
+    bundle = tmp_path / "bundle"
+    shutil.copytree(Path(__file__).parents[1] / "docuchango/templates/wiki", bundle)
+    (bundle / "docs-project.schema.json").mkdir()
+    (bundle / "docs-project.schema.json/notes.md").write_text("Custom bundle notes\n")
+    root = tmp_path / "docs-cms"
+    if mode != "new":
+        root.mkdir()
+        (root / "README.md").write_bytes(b"Existing home\n")
+        (root / "docs-project.yaml").write_bytes(b"project: {id: existing, name: Existing}\n")
+        (root / "local.txt").write_bytes(b"Unrelated content\n")
+
+    def snapshot():
+        return {
+            path.relative_to(tmp_path): path.read_bytes() if path.is_file() else None for path in tmp_path.rglob("*")
+        }
+
+    before = snapshot()
+    args = ["--template-dir", str(bundle)]
+    if mode != "new":
+        args.append(f"--{mode}")
+    result = bootstrap(tmp_path, *args)
+    assert result.exit_code == 1
+    assert "Bundle file is also a destination ancestor: docs-project.schema.json" in result.output
+    assert snapshot() == before
+
+
 @pytest.mark.parametrize("service_config", [None, "directory", "docs-root"])
 def test_overlay_external_pages_keep_rd_001_and_fm_010_settings(tmp_path, service_config):
     root = tmp_path / "docs-cms"

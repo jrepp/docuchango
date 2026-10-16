@@ -86,6 +86,9 @@ def initialize_wiki(
             resources.files("docuchango") / "templates" / "docs-project.schema.json"
         ).read_text(encoding="utf-8")
         for relative in rendered:
+            for ancestor in relative.parents:
+                if ancestor in rendered:
+                    raise ValueError(f"Bundle file is also a destination ancestor: {ancestor}")
             destination = target / relative
             component = destination
             while component != target:
