@@ -76,7 +76,7 @@ reported.
 | FM-006 | Recognized non-ISO date formats normalized | Implemented | fix | `fixes/frontmatter.py` |
 | FM-007 | Missing `created` added from the first git commit, and a legacy `date` migrated to `created`, inside the frontmatter block only | Implemented | fix | `fixes/timestamps.py` (`update_document_timestamps`, `insert_created_field`, `migrate_date_to_created`), `markdown.py` (`is_frontmatter_delimiter`, `opens_frontmatter`, `frontmatter_body_bounds`) |
 | FM-008 | Tags converted to a list, normalized to lowercase-with-dashes, de-duplicated and sorted, keeping the file's final newline | Implemented | fix | `fixes/frontmatter.py` (`_fix_tags_metadata`), `fixes/tags.py` (`fix_tags`), `fixes/yaml_utils.py` (`dumps`) |
-| FM-010 | `project_id` does not match the `project.id` of the config that governs the document's folder | Implemented | fix/report | `check_project_ids`, `_config_context_for_path`, `cli._discover_doc_claims`, `fixes/frontmatter.py` (`_fix_project_id_metadata`, `PROJECT_ID_PLACEHOLDER`) |
+| FM-010 | `project_id` does not match the `project.id` of the config that governs the document's folder | Implemented | fix/report | `check_project_ids`, `_config_context_for_path`, `_config_ownership_roots`, `cli._discover_doc_claims`, `fixes/frontmatter.py` (`_fix_project_id_metadata`, `PROJECT_ID_PLACEHOLDER`) |
 | FM-011 | `created` or `updated` is not `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM:SSZ` | Implemented | report | `check_date_formats`, `is_accepted_date_format`, `frontmatter_date_source`, `Document.date_source` |
 | ID-001 | Top-level filename does not match the configured pattern (files in subfolders are support material and are not scanned, unless `structure.scan_subfolders` or a per-type override enables ID-011) | Implemented | report | `check_ids`, `_scan_document_folder` |
 | ID-002 | `id` does not match the filename; an ADR amendment `adr-NNN-amendment-MM-*` is expected to carry id `adr-NNN-aMM` | Implemented | report | `check_ids`, `_scan_document_folder` |
@@ -99,7 +99,7 @@ reported.
 | FMT-012 | UTF-8 byte-order mark before the frontmatter | Implemented | fix | `check_formatting`, `text_io.py`, `fixes/frontmatter.py`, `fixes/whitespace.py`, `fixes/tags.py`, `fixes/timestamps.py` |
 | CB-001 | Code fence without a language, or unclosed fence | Implemented | fix/report | `check_code_blocks`, `fixes/code_blocks.py`, `markdown.py` (`frontmatter_span`) |
 | IDX-001 | Document index missing, unlinked, or missing bucket headings | Implemented | report | `check_document_indexes` |
-| RD-001 | Paragraph outside the readability thresholds of the (sub-)project that owns the document | Implemented | report | `check_readability`, `_readability_config_for`, `_config_context_for_path` |
+| RD-001 | Paragraph outside the readability thresholds of the (sub-)project that owns the document | Implemented | report | `check_readability`, `_readability_config_for`, `_config_context_for_path`, `_config_ownership_roots` |
 | BLD-001 | TypeScript config error | Implemented | report | `check_typescript_config` |
 | BLD-002 | Docusaurus build error | Implemented | report | `check_docusaurus_build` |
 
@@ -266,12 +266,20 @@ moved with it.
 root config only, so a sub-project could not enable, disable or tune
 readability even though its schema, folder and index rules were honored.
 Settings are now resolved per document: `_config_context_for_path` maps a
-file to the deepest config whose directory or `docs_roots` contain it, and
+file to the config with the deepest owning directory, permitted scan folder,
+or `docs_roots` entry containing it, and
 `_readability_config_for` returns that config's `readability` block, or the
 nearest declared block up the `subprojects` chain when it has none. The block
 is taken whole and never merged key by key, so a sub-project that declares
 one gets schema defaults for the keys it omits. Documents that resolve to
 different settings are scored by separate scorers in one pass. Report only.
+
+Colocated wiki folders are included in ownership even when outside the config
+directory. At equal path depth, an explicit scan folder takes precedence over
+a config directory or docs root; blocked paths never claim ownership. This also
+keeps FM-010 project identity checks attached to the registering wiki config
+when a service subproject surrounds the wiki's documentation folder. Avoid
+registering the same scan folder in multiple configs.
 
 **FM-010 `project_id` match (shipped).** Every schema requires `project_id`,
 but nothing compared it to the project it names, so a document copied from

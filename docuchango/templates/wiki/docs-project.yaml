@@ -1,0 +1,23 @@
+# yaml-language-server: $schema=./docs-project.schema.json
+version: "1"
+docuchango_version: "{{version}}"
+project:
+  id: {{project_id_yaml}}
+  name: {{project_name_yaml}}
+structure:
+  doc_types:
+    wiki:
+      schema: generic
+      folders:
+        - pages
+        # Register system docs relative to this config, for example:
+        # - {{system_docs_example}}
+      naming_standard: kebab-case
+      scan_subfolders: true
+      require_frontmatter: true
+      report_numbering_gaps: false
+security:
+  # Set true when registering folders outside docs-cms, within your repository.
+  allow_external_paths: false
+readability:
+  enabled: false

@@ -66,6 +66,13 @@ against the sub-project's ID. A document whose frontmatter has no `project_id`
 key at all is left to the schema check above, and a document that no config
 governs is skipped.
 
+Ownership includes permitted registered scan folders, including folders outside
+the config directory. The deepest owning directory wins; at equal depth, an
+explicit scan folder takes precedence over a config directory or `docs_roots`
+entry. A colocated wiki page therefore uses its registering wiki's project ID
+even when a service config surrounds that folder. Blocked external paths do not
+contribute ownership. Avoid registering the same scan folder in multiple configs.
+
 `FM-011` accepts exactly the two forms the bundled templates use:
 `YYYY-MM-DD` and `YYYY-MM-DDTHH:MM:SSZ`. Quoting makes no difference, but a
 UTC offset does: `2026-09-14T09:35:12+00:00` is reported, because only `Z` is
@@ -405,6 +412,10 @@ readability on its own. A config that does not declare a `readability` block
 inherits the nearest one up the `subprojects` chain, ending at the root
 config. A declared block is used whole and is never merged key by key with its
 parent's.
+
+`RD-001` uses the same scan-folder ownership rules as `FM-010`. An overlay's
+explicit `readability.enabled: false` also applies to its registered colocated
+pages, rather than falling back to the root or a surrounding service config.
 
 ## Docusaurus build
 

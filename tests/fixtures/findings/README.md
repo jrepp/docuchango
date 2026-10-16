@@ -98,6 +98,38 @@ Three assertions run for every case: the `--dry-run` pass must report the
 messages and leave the files byte-identical on disk, the fixing pass must match
 `fixed`, and a second fixing pass must reach a fixed point.
 
+## Wiki acceptance cases
+
+Cases with `wiki` in their directory name also run through
+`tests/test_wiki_acceptance.py`. This launches `python -m docuchango` in separate
+processes, using a temporary repository whose path contains spaces. It tests the
+public CLI entry point, configuration discovery, and real filesystem writes.
+
+The collection includes nested colocated system pages, repeated `overview.md`
+basenames, relative cross-system links, code examples, unregistered Markdown,
+malformed UUIDs, project mismatches, external-folder opt-in, unique and ambiguous
+link targets, CRLF repairs, and atomic withholding when a broken link remains.
+
+Repair cases must additionally declare `files_after`, mapping each changed path
+to its exact expected UTF-8 text. The subprocess harness compares the entire tree
+against the original bytes plus these replacements. This checks the repair's
+content and proves unrelated pages and code examples stay unchanged. A subsequent
+dry run must pass for repaired cases, and a second repair must change nothing.
+Report-only and withheld cases must preserve every file and keep reporting their
+declared findings.
+
+```yaml
+files_after:
+  docs-cms/pages/example.md: |
+    Complete expected file contents go here, including frontmatter.
+```
+
+Run both layers with:
+
+```bash
+pytest tests/test_wiki_acceptance.py tests/test_findings.py -q
+```
+
 ## Adding a failing-document case
 
 ```bash

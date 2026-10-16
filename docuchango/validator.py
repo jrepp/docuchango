@@ -398,21 +398,38 @@ class DocValidator:
     def _config_ownership_roots(self) -> list[tuple[Path, ProjectConfigContext]]:
         """Directories owned by each loaded config, deepest first.
 
-        A config owns the directory that holds it plus every docs root it
-        configures, so a document can be mapped back to the (sub-)project
-        whose settings apply to it.
+        Include permitted scan folders as well as config directories and docs
+        roots, so colocated pages retain the registering config's settings.
+        At equal depth, explicit scan folders take precedence over broad roots.
         """
         if self._ownership_roots is None:
             roots: list[tuple[Path, ProjectConfigContext]] = []
+            scan_roots: list[tuple[Path, ProjectConfigContext]] = []
             for context in self.project_configs:
                 owned = {context.base_dir.resolve()}
-                for path_value in context.config.structure.docs_roots:
+                structure = context.config.structure
+                folders = (
+                    [folder for cfg in structure.doc_types.values() for folder in cfg.folders]
+                    if structure.doc_types
+                    else [folder for _, folder in structure.legacy_folder_bindings()]
+                )
+                for path_value in structure.effective_docs_roots():
                     resolved = resolve_config_path(
                         context.base_dir, path_value, context.base_dir, context.allow_external_paths
                     )
                     if resolved:
                         owned.add(resolved)
+                        for folder in folders:
+                            scan_root = resolve_config_path(
+                                resolved,
+                                structure.folder_under_root(path_value, folder),
+                                resolved,
+                                context.allow_external_paths,
+                            )
+                            if scan_root:
+                                scan_roots.append((scan_root, context))
                 roots.extend((path, context) for path in owned)
+            roots = scan_roots + roots
             roots.sort(key=lambda item: len(item[0].parts), reverse=True)
             self._ownership_roots = roots
         return self._ownership_roots

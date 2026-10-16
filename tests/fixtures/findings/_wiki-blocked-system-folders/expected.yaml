@@ -1,0 +1,6 @@
+summary: System folders outside docs-cms require the explicit external-path opt-in.
+messages:
+- Blocked document folder path
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1

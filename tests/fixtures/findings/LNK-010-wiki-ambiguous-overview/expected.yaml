@@ -1,0 +1,8 @@
+summary: Two systems have overview.md; a broken overview link must not be guessed.
+messages:
+- 'LNK-001:'
+- 2 scanned documents
+- overview.md
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1

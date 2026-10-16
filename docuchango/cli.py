@@ -815,8 +815,29 @@ def init(path: Path | None, project_id: str, project_name: str, force: bool):
     type=click.Path(path_type=Path),
     help="Save guide to file instead of displaying",
 )
-def bootstrap(guide: str, output: Path | None):
-    """Display or save docs-cms bootstrap and agent guides.
+@click.option("--wiki", is_flag=True, help="Initialize an unnumbered wiki rooted at docs-cms.")
+@click.option("--overlay", is_flag=True, help="Add a wiki subproject to an existing docs-cms layout.")
+@click.option("--path", type=click.Path(path_type=Path), help="Wiki root (default: ./docs-cms).")
+@click.option("--project-id", default="my-project", help="Project ID for a new wiki.")
+@click.option("--project-name", default="My Project", help="Project name for a new wiki.")
+@click.option(
+    "--template-dir",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help="Replace the built-in wiki bundle with this directory.",
+)
+@click.option("--force", is_flag=True, help="Overwrite wiki bundle files in an existing directory.")
+def bootstrap(
+    guide: str,
+    output: Path | None,
+    wiki: bool,
+    overlay: bool,
+    path: Path | None,
+    project_id: str,
+    project_name: str,
+    template_dir: Path | None,
+    force: bool,
+):
+    """Display setup guides, or initialize a wiki with --wiki.
 
     Provides quick access to documentation for setting up and using docs-cms:
 
@@ -838,6 +859,37 @@ def bootstrap(guide: str, output: Path | None):
         # Save bootstrap guide to file
         docuchango bootstrap --output /path/to/BOOTSTRAP_GUIDE.md
     """
+    if wiki:
+        if output is not None or guide != "bootstrap":
+            raise click.UsageError("--wiki cannot be combined with --output or --guide.")
+        from docuchango.wiki import initialize_wiki
+
+        target = path or Path.cwd() / "docs-cms"
+        if overlay:
+            if force or project_id != "my-project" or project_name != "My Project":
+                raise click.UsageError(
+                    "--overlay inherits project identity and cannot use --force or project overrides."
+                )
+            from docuchango.wiki import initialize_wiki_overlay
+
+            initialize_wiki_overlay(target, template_dir)
+            target = target / "wiki"
+        else:
+            initialize_wiki(target, project_id, project_name, template_dir, force)
+        console.print(f"[green]Initialized wiki at {target}[/green]")
+        console.print(f"Start at {target / 'README.md'}")
+        console.print(f"Initialization prompt: {target / 'templates' / 'INITIALIZE.md'}")
+        return
+    if (
+        path is not None
+        or template_dir is not None
+        or force
+        or overlay
+        or project_id != "my-project"
+        or project_name != "My Project"
+    ):
+        raise click.UsageError("Wiki initialization options require --wiki.")
+
     # Map guide names to file names
     guide_files = {
         "bootstrap": "BOOTSTRAP_GUIDE.md",
