@@ -104,6 +104,37 @@ def test_generated_bundle_uses_lf_on_windows(tmp_path, monkeypatch):
     assert result.exit_code == 0, result.output
 
 
+@pytest.mark.parametrize("kind", ["file", "directory", "dangling"])
+def test_force_rejects_destination_symlinks_without_writes(tmp_path, kind):
+    root = tmp_path / "docs-cms"
+    root.mkdir()
+    (root / "AGENTS.md").write_bytes(b"Existing rules\n")
+    if kind == "directory":
+        (root / "local").mkdir()
+        (root / "local/page.md").write_bytes(b"Unrelated page\n")
+        (root / "templates").symlink_to("local", target_is_directory=True)
+    else:
+        if kind == "file":
+            (root / "local.txt").write_bytes(b"Unrelated content\n")
+        (root / "README.md").symlink_to("local.txt")
+
+    def snapshot():
+        return {
+            str(file.relative_to(root)): ("link", str(file.readlink()))
+            if file.is_symlink()
+            else ("file", file.read_bytes())
+            if file.is_file()
+            else ("directory", None)
+            for file in root.rglob("*")
+        }
+
+    before = snapshot()
+    result = bootstrap(tmp_path, "--force")
+    assert result.exit_code == 1
+    assert "Destination symlinks are not supported" in result.output
+    assert snapshot() == before
+
+
 @pytest.mark.parametrize(
     ("filename", "content"),
     [("docs-project.yaml", "project: ["), ("docs-project.yaml", "version: '1'"), ("README.md", "{{unknown}}")],
@@ -273,3 +304,68 @@ def test_overlay_bundle_failure_does_not_register_or_create_wiki(tmp_path):
     assert "existing project's ID and name" in result.output
     assert config_path.read_bytes() == before
     assert not (root / "wiki").exists()
+
+
+@pytest.mark.parametrize("service_config", [None, "directory", "docs-root"])
+def test_overlay_external_pages_keep_rd_001_and_fm_010_settings(tmp_path, service_config):
+    root = tmp_path / "docs-cms"
+    root.mkdir()
+    parent = {
+        "project": {"id": "existing", "name": "Existing"},
+        "readability": {"enabled": True, "flesch_reading_ease_min": 100.0},
+        "security": {"allow_external_paths": True},
+    }
+    service = tmp_path / "services/auth"
+    service.mkdir(parents=True)
+    if service_config:
+        parent["subprojects"] = ["../services/auth"]
+        (service / "docs-project.yaml").write_text(
+            yaml.safe_dump(
+                {
+                    "project": {"id": "service", "name": "Service"},
+                    "structure": {
+                        "document_folders": [],
+                        "docs_roots": ["docs"] if service_config == "docs-root" else ["."],
+                    },
+                }
+            )
+        )
+    (root / "docs-project.yaml").write_text(yaml.safe_dump(parent))
+    result = bootstrap(tmp_path, "--overlay")
+    assert result.exit_code == 0, result.output
+    wiki_config_path = root / "wiki/docs-project.yaml"
+    wiki_config = yaml.safe_load(wiki_config_path.read_text())
+    wiki_config["security"]["allow_external_paths"] = True
+    wiki_config["structure"]["doc_types"]["wiki"]["folders"].append("../../services/auth/docs")
+    wiki_config_path.write_text(yaml.safe_dump(wiki_config))
+    page = frontmatter.load(root / "wiki/templates/page.md")
+    page["tags"] = ["wiki"]
+    page.content = (
+        "# Authentication\n\n"
+        + (
+            "Interdisciplinary authentication orchestration necessitates comprehensive "
+            "cryptographic interoperability throughout heterogeneous infrastructure. "
+        )
+        * 5
+    )
+    page_path = service / "docs/operations/authentication.md"
+    page_path.parent.mkdir(parents=True)
+    page_path.write_text(frontmatter.dumps(page) + "\n", newline="\n")
+
+    validator = DocValidator(repo_root=tmp_path)
+    validator.scan_documents()
+    assert page_path in validator.file_to_doc
+    context = validator._config_context_for_path(page_path)
+    assert context is not None and context.config.project.id == "existing", "FM-010: use the wiki registration"
+    settings = validator._readability_config_for(page_path)
+    assert settings is not None and not settings.enabled, "RD-001: retain wiki readability settings"
+    result = CliRunner().invoke(main, ["validate", "--repo-root", str(tmp_path), "--dry-run", "--skip-build"])
+    assert result.exit_code == 0, result.output
+
+    wiki_config["security"]["allow_external_paths"] = False
+    wiki_config_path.write_text(yaml.safe_dump(wiki_config))
+    blocked = DocValidator(repo_root=tmp_path)
+    blocked.scan_documents()
+    assert page_path not in blocked.file_to_doc
+    settings = blocked._readability_config_for(page_path)
+    assert settings is not None and settings.enabled, "RD-001: blocked folders must not claim ownership"

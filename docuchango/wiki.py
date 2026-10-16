@@ -87,6 +87,11 @@ def initialize_wiki(
         ).read_text(encoding="utf-8")
         for relative in rendered:
             destination = target / relative
+            component = destination
+            while component != target:
+                if component.is_symlink():
+                    raise ValueError(f"Destination symlinks are not supported: {component}")
+                component = component.parent
             if not destination.resolve().is_relative_to(target.resolve()):
                 raise ValueError(f"Destination escapes wiki root: {destination}")
             if destination.exists() and not destination.is_file():

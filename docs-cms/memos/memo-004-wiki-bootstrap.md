@@ -80,3 +80,9 @@ copied source, exhaustive trees, and speculative claims do not belong in context
 Overlay integration tests cover legacy and custom layouts, continued RFC and wiki
 validation, identity inheritance, preservation of existing files, conflicting
 destinations, and repeat invocation without changes.
+
+Bootstrap preflight rejects symlinks in destination components below the wiki
+root, including links to unrelated files inside that root. Overlay pages beside
+code retain the registering config's FM-010 project identity and RD-001
+readability settings through scan-folder ownership, including when a service
+subproject surrounds the folder. Blocked external paths do not claim ownership.
