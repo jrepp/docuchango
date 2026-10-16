@@ -60,10 +60,13 @@ def initialize_wiki(target: Path, project_id: str, project_name: str, template_d
                 raise ValueError(f"Destination escapes wiki root: {destination}")
             if destination.exists() and not destination.is_file():
                 raise ValueError(f"Destination is not a file: {destination}")
+            for ancestor in destination.parents:
+                if ancestor.exists() and not ancestor.is_dir():
+                    raise ValueError(f"Destination ancestor is not a directory: {ancestor}")
     except (OSError, ValueError, yaml.YAMLError) as exc:
         raise click.ClickException(str(exc)) from exc
 
     for relative, content in rendered.items():
         destination = target / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_text(content, encoding="utf-8")
+        destination.write_text(content, encoding="utf-8", newline="\n")

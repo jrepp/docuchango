@@ -68,6 +68,42 @@ def test_invalid_bundle_writes_nothing(tmp_path):
     assert not (tmp_path / "docs-cms").exists()
 
 
+@pytest.mark.parametrize("conflict", ["templates", "pages"])
+def test_force_rejects_file_ancestors_without_changing_existing_tree(tmp_path, conflict):
+    root = tmp_path / "docs-cms"
+    root.mkdir()
+    for name in ("README.md", "docs-project.yaml", "local.txt", conflict):
+        (root / name).write_bytes(f"Original {name}\n".encode())
+    before = {file.relative_to(root): file.read_bytes() for file in root.rglob("*") if file.is_file()}
+
+    result = bootstrap(tmp_path, "--force")
+
+    assert result.exit_code == 1
+    assert "Destination ancestor is not a directory:" in result.output
+    assert str(root / conflict) in result.output
+    assert {file.relative_to(root): file.read_bytes() for file in root.rglob("*") if file.is_file()} == before
+    assert set(root.rglob("*")) == {root / name for name in before}
+
+
+def test_generated_bundle_uses_lf_on_windows(tmp_path, monkeypatch):
+    original_open = Path.open
+
+    def windows_open(self, mode="r", buffering=-1, encoding=None, errors=None, newline=None):
+        # Reproduce Windows text-mode newline translation on every test platform.
+        if "w" in mode and "b" not in mode and newline is None:
+            newline = "\r\n"
+        return original_open(self, mode, buffering, encoding, errors, newline)
+
+    monkeypatch.setattr(Path, "open", windows_open)
+    result = bootstrap(tmp_path)
+    assert result.exit_code == 0, result.output
+    for file in (tmp_path / "docs-cms").rglob("*"):
+        if file.is_file():
+            assert b"\r" not in file.read_bytes(), file
+    result = CliRunner().invoke(main, ["validate", "--repo-root", str(tmp_path), "--dry-run", "--skip-build"])
+    assert result.exit_code == 0, result.output
+
+
 @pytest.mark.parametrize(
     ("filename", "content"),
     [("docs-project.yaml", "project: ["), ("docs-project.yaml", "version: '1'"), ("README.md", "{{unknown}}")],
