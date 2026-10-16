@@ -2,6 +2,28 @@
 
 <!-- version list -->
 
+## v1.20.0-rc.1 (2026-10-16)
+
+### Bug Fixes
+
+- Preflight wiki ancestors and preserve LF output
+  ([`9f7370a`](https://github.com/jrepp/docuchango/commit/9f7370a4012bbf5e606bbc390d4d2454229775c1))
+
+- Reject planned wiki bundle file and ancestor collisions
+  ([`f105350`](https://github.com/jrepp/docuchango/commit/f105350353a6ceb648911192ec06b56d87448171))
+
+- Reject wiki symlinks and preserve FM-010/RD-001 folder ownership
+  ([`5b9d75e`](https://github.com/jrepp/docuchango/commit/5b9d75e2a535f7e707eb07a9014187b6e426c927))
+
+### Features
+
+- Add opt-in wiki bootstrap and filesystem acceptance tests
+  ([`6407a38`](https://github.com/jrepp/docuchango/commit/6407a386c95e9322f464b9c1f2fdedd3ea9afee8))
+
+- Overlay existing docs layouts with focused wiki routes
+  ([`950b03f`](https://github.com/jrepp/docuchango/commit/950b03fee0d3da6bd5ddf9c89142f5ce1a9e10aa))
+
+
 ## v1.19.1 (2026-10-09)
 
 
