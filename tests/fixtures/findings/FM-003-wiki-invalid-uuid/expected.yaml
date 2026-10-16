@@ -1,0 +1,7 @@
+summary: A nested system page with a malformed UUID stays a manual finding.
+messages:
+- Frontmatter field 'doc_uuid'
+- UUID
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1

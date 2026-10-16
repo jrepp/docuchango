@@ -1,0 +1,33 @@
+summary: Repair a uniquely named moved system page, preserving the fragment and leaving
+  code examples alone.
+messages:
+- 'LNK-001:'
+- Broken link
+fixed: true
+dry_run_exit_code: 1
+exit_code: 0
+fix_messages:
+- 'LNK-010:'
+files_after:
+  docs-cms/pages/systems.md: |
+    ---
+    title: System map
+    project_id: wiki-example
+    doc_uuid: caa218ab-b9a8-4449-addc-9debeb7b6681
+    created: '2026-10-16'
+    tags:
+    - wiki
+    ---
+
+    # System map
+
+    The authentication service issues sessions. The client refreshes them.
+
+    [Authentication](../../services/auth/docs/operations/recovery.md#restart)
+    [Client](../../packages/client/docs/overview.md)
+
+    ```markdown
+    [Example only](./recovery.md#restart)
+    ```
+
+    Inline example: `[Example only](./recovery.md#restart)`.

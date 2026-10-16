@@ -1,0 +1,10 @@
+summary: A missing page with no matching candidate withholds a CRLF repair elsewhere
+  in the wiki.
+messages:
+- 'LNK-001:'
+- never-existed.md
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1
+fix_messages:
+- withheld

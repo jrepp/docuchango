@@ -1,0 +1,16 @@
+version: '1'
+project:
+  id: wiki-example
+  name: Example system wiki
+structure:
+  doc_types:
+    wiki:
+      schema: generic
+      folders: [pages, ../services/auth/docs, ../packages/client/docs]
+      naming_standard: kebab-case
+      scan_subfolders: true
+      require_frontmatter: true
+security:
+  allow_external_paths: false
+readability:
+  enabled: false

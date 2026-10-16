@@ -1,0 +1,6 @@
+summary: Unnumbered nested system pages, repeated overview basenames, cross-system
+  links, and code examples validate. Unregistered source Markdown is not scanned.
+messages: []
+fixed: false
+dry_run_exit_code: 0
+exit_code: 0

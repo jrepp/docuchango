@@ -74,6 +74,23 @@ docs-cms/
 └── templates/                # adr-000, rfc-000, memo-000, prd-000
 ```
 
+For an unnumbered wiki, opt in during bootstrap:
+
+```bash
+docuchango bootstrap --wiki --project-id my-app --project-name "My App"
+```
+
+This creates a `docs-cms/` wiki home, shared pages, a page template, agent rules,
+and an initialization prompt. Give `docs-cms/templates/INITIALIZE.md` to your
+agent to map the systems and extend the wiki into documentation folders beside
+their code. Files use descriptive names such as `authentication.md`, without
+`NNN` sequences or public document IDs.
+
+The bundle is replaceable with `--template-dir ./my-wiki-bundle`; `--path` sets
+the destination. See [wiki bundles](docs/WIKI.md) for folder registration,
+metadata, and the template contract. Plain `bootstrap` still prints the setup
+guide, and `init` keeps its numbered document layout.
+
 Here is a real `--dry-run` against an example `docs-cms/` with two ADRs, one
 with a fixable date format and the other with a copy-paste mistake:
 

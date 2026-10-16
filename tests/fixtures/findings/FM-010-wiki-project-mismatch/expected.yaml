@@ -1,0 +1,7 @@
+summary: A colocated system page must use the wiki project ID.
+messages:
+- 'FM-010:'
+- unrelated-project
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1
