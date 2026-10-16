@@ -12,13 +12,19 @@ existing instructions and preserve existing documents.
    to docs-project.yaml. Enable security.allow_external_paths when needed to reach
    system folders outside the wiki root. Keep all selected folders inside the
    repository, and avoid broad or overlapping scan roots.
-4. Create concise overview pages using templates/page.md, each with a fresh UUID.
+4. Create focused task routes using templates/page.md, each with a fresh UUID.
    Use descriptive filenames and titles; never add NNN sequences or id fields.
    Ground claims in inspected code and flag unknowns rather than inventing details.
+   Link entry points, key symbols, tests, verification commands, and relevant
+   RFCs/ADRs. Keep decision records authoritative and retain proposal status.
 5. Link system overviews from the wiki home and link them back to the home. Use
    standard relative Markdown links, not double-bracket wiki links.
 6. Apply the wiki authoring rules to system pages. If repository-level agent
    instructions need an update to reference those rules, preserve existing guidance.
+   Add a short pointer to this wiki home; do not inline its contents. Aim for
+   always-loaded instructions under 100 lines and wiki pages under 500 words.
+   Split unrelated tasks into linked pages. Exclude transcripts and copied source.
+   Read only relevant routes on demand, not the entire wiki or decision archive.
 7. Run docuchango validate --dry-run --skip-build from the repository root. Resolve
    issues within scope and summarize pages created, folders registered, and any
    remaining manual issues.

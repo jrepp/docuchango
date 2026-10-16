@@ -11,7 +11,7 @@ structure:
       folders:
         - pages
         # Register system docs relative to this config, for example:
-        # - ../services/auth/docs
+        # - {{system_docs_example}}
       naming_standard: kebab-case
       scan_subfolders: true
       require_frontmatter: true

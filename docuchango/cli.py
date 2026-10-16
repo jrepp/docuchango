@@ -816,6 +816,7 @@ def init(path: Path | None, project_id: str, project_name: str, force: bool):
     help="Save guide to file instead of displaying",
 )
 @click.option("--wiki", is_flag=True, help="Initialize an unnumbered wiki rooted at docs-cms.")
+@click.option("--overlay", is_flag=True, help="Add a wiki subproject to an existing docs-cms layout.")
 @click.option("--path", type=click.Path(path_type=Path), help="Wiki root (default: ./docs-cms).")
 @click.option("--project-id", default="my-project", help="Project ID for a new wiki.")
 @click.option("--project-name", default="My Project", help="Project name for a new wiki.")
@@ -829,6 +830,7 @@ def bootstrap(
     guide: str,
     output: Path | None,
     wiki: bool,
+    overlay: bool,
     path: Path | None,
     project_id: str,
     project_name: str,
@@ -863,7 +865,17 @@ def bootstrap(
         from docuchango.wiki import initialize_wiki
 
         target = path or Path.cwd() / "docs-cms"
-        initialize_wiki(target, project_id, project_name, template_dir, force)
+        if overlay:
+            if force or project_id != "my-project" or project_name != "My Project":
+                raise click.UsageError(
+                    "--overlay inherits project identity and cannot use --force or project overrides."
+                )
+            from docuchango.wiki import initialize_wiki_overlay
+
+            initialize_wiki_overlay(target, template_dir)
+            target = target / "wiki"
+        else:
+            initialize_wiki(target, project_id, project_name, template_dir, force)
         console.print(f"[green]Initialized wiki at {target}[/green]")
         console.print(f"Start at {target / 'README.md'}")
         console.print(f"Initialization prompt: {target / 'templates' / 'INITIALIZE.md'}")
@@ -872,6 +884,7 @@ def bootstrap(
         path is not None
         or template_dir is not None
         or force
+        or overlay
         or project_id != "my-project"
         or project_name != "My Project"
     ):

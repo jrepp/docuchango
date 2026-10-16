@@ -21,4 +21,7 @@ No sequence number or public document ID is needed.
 
 Use [the initialization prompt](../templates/INITIALIZE.md) to identify system
 boundaries and create useful navigation. Keep each page focused on the system
-it explains.
+it explains. Aim for 500 words or fewer and one task per page. Include links to
+code entry points, relevant tests, verification commands, and decision records.
+Split other tasks into linked pages; keep transcripts and copied source out.
+Read only the routes needed for the current change.

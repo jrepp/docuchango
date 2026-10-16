@@ -96,3 +96,35 @@ def test_bootstrap_wiki_then_validate_in_separate_processes(tmp_path):
     code, output = run_cli(root, "validate", "--skip-build")
     assert code == 0, output
     assert snapshot(root) == before
+
+
+def test_overlay_existing_rfc_layout_in_separate_processes(tmp_path):
+    root = tmp_path / "existing repository"
+    root.mkdir()
+    code, output = run_cli(root, "init", "--project-id", "docuchango")
+    assert code == 0, output
+    config_path = root / "docs-cms/docs-project.yaml"
+    config = yaml.safe_load(config_path.read_text())
+    config["readability"] = {"enabled": False}
+    config_path.write_text(yaml.safe_dump(config), newline="\n")
+    rfc = "rfcs/rfc-001-document-template-system.md"
+    (root / "docs-cms" / rfc).write_text((REPO_ROOT / "docs-cms" / rfc).read_text().rstrip() + "\n", newline="\n")
+    before = snapshot(root)
+
+    code, output = run_cli(root, "bootstrap", "--wiki", "--overlay")
+    assert code == 0, output
+    for path, content in before.items():
+        if path != "docs-cms/docs-project.yaml":
+            assert (root / path).read_bytes() == content
+    page = root / "docs-cms/wiki/pages/getting-started.md"
+    page.write_text(page.read_text() + f"\n[Template rationale](../../{rfc})\n", newline="\n")
+    after = snapshot(root)
+    code, output = run_cli(root, "validate", "--dry-run", "--skip-build")
+    assert code == 0, output
+    code, output = run_cli(root, "validate", "--skip-build")
+    assert code == 0, output
+    assert snapshot(root) == after
+    code, output = run_cli(root, "bootstrap", "--wiki", "--overlay")
+    assert code == 1, output
+    assert "already registered" in output
+    assert snapshot(root) == after

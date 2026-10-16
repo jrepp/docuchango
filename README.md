@@ -86,6 +86,11 @@ agent to map the systems and extend the wiki into documentation folders beside
 their code. Files use descriptive names such as `authentication.md`, without
 `NNN` sequences or public document IDs.
 
+To add task-to-code navigation beside an existing RFC/ADR layout, run
+`docuchango bootstrap --wiki --overlay`. This registers `docs-cms/wiki/` while
+preserving existing documents and validation rules. Generated guidance keeps
+pages focused, with a 500-word target and links to source, tests, and decisions.
+
 The bundle is replaceable with `--template-dir ./my-wiki-bundle`; `--path` sets
 the destination. See [wiki bundles](docs/WIKI.md) for folder registration,
 metadata, and the template contract. Plain `bootstrap` still prints the setup

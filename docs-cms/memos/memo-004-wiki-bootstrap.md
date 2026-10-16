@@ -54,3 +54,29 @@ pages, repeated basenames, cross-system links, code examples, scan boundaries,
 invalid metadata, link repairs, CRLF normalization, and atomic withholding.
 Repair cases specify exact expected file contents. Tests compare the entire
 tree, revalidate the repaired content, and verify a second repair changes nothing.
+
+## Existing layouts and focused context
+
+The additional requirement is to extend existing RFC/ADR documentation with a
+wiki overlay that gives agents direct routes through the code. Existing decision
+records remain authoritative; wiki pages link to their rationale and status.
+
+`bootstrap --wiki --overlay` adds `docs-cms/wiki/` as a registered subproject,
+using the existing project's identity. This retains both legacy folder bindings
+and custom document types without converting their validation rules. Existing
+documents, templates, and instructions are preserved. The parent configuration
+keeps its values and receives the subproject reference; YAML reserialization
+can change formatting and remove comments. Existing overlays are rejected to
+avoid replacing authored pages. The initialization prompt guides adding a short
+navigation pointer to existing repository instructions.
+
+The implementation uses authoring budgets of 500 words per wiki page and fewer
+than 100 lines of always-loaded instructions. These are review guidance, with
+exceptions explained in review, rather than new validator checks. A page covers
+one task or question and links entry points, symbols, tests, verification commands,
+and decision records. Agents load relevant pages on demand. Session transcripts,
+copied source, exhaustive trees, and speculative claims do not belong in context.
+
+Overlay integration tests cover legacy and custom layouts, continued RFC and wiki
+validation, identity inheritance, preservation of existing files, conflicting
+destinations, and repeat invocation without changes.

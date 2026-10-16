@@ -2,11 +2,15 @@
 
 Start with [Getting started](pages/getting-started.md).
 
+Keep this home a short map from common tasks to focused code routes. Each route
+should link entry points, tests, and relevant RFCs/ADRs. Read routes on demand;
+the numbered decision records remain authoritative for proposals and rationale.
+
 This folder is the wiki home and configuration root. Keep shared concepts in
 `pages/`. Keep system documentation beside its code, such as
 `services/auth/docs/overview.md`, and link to it from here using relative paths.
 
-To extend the wiki, add `../services/auth/docs` to
+To extend the wiki, add `{{system_docs_example}}` to
 `structure.doc_types.wiki.folders` in `docs-project.yaml` and set
 `security.allow_external_paths: true`. Paths are relative to the config file.
 Only register intended documentation folders; do not register the whole repository

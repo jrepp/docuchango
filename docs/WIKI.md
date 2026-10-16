@@ -28,6 +28,74 @@ Bootstrap writes the bundle; it does not execute the initialization prompt or
 invent system documentation. Give the generated prompt to an agent to inspect
 the repository, choose system folders, write grounded pages, and update navigation.
 
+## Overlay an existing RFC/ADR layout
+
+```bash
+docuchango bootstrap --wiki --overlay
+# Give docs-cms/wiki/templates/INITIALIZE.md to your agent.
+docuchango validate --dry-run --skip-build
+```
+
+`--path` selects the existing docs-cms directory. Overlay requires a valid
+`docs-project.yaml`, inherits its project ID and name, and creates a wiki under
+`wiki/`. It registers `wiki/docs-project.yaml` in the parent's `subprojects`.
+Existing numbered pages, templates, home pages, and agent instructions keep
+their original bytes. Existing configuration values and subprojects are retained;
+the parent YAML is reserialized, so comments and formatting may change.
+Legacy folder bindings and custom `doc_types` continue to validate as before.
+
+```text
+docs-cms/
+  docs-project.yaml             # Existing config plus wiki subproject
+  rfcs/                        # Existing proposals
+  adr/                         # Existing decisions
+  templates/                   # Existing numbered templates
+  wiki/
+    docs-project.yaml           # Generic wiki validation
+    README.md                  # Task-to-code navigation
+    AGENTS.md                  # Focus and context budgets
+    pages/getting-started.md
+    templates/page.md
+    templates/INITIALIZE.md
+```
+
+Add a short link to `docs-cms/wiki/README.md` and its authoring rules from your
+repository's existing instructions and documentation home. The initialization
+prompt guides that edit; bootstrap preserves those files. Wiki pages explain the
+current code route for a task, linking to RFCs/ADRs for rationale and status.
+They do not replace decision records or turn proposals into approved decisions.
+
+System folders registered in the overlay config need one extra `../`, for example
+`../../services/auth/docs`. Enable external paths in the **wiki** config when
+registering those folders. Root validation follows the registered wiki subproject
+and validates both documentation styles. Avoid overlapping scan folders.
+
+An existing nonempty `wiki/` or an already registered overlay is rejected before
+writing files. Edit that wiki directly to extend it. Overlay does not allow
+`--force` or project identity overrides. `--template-dir` can supply the same
+replaceable bundle used for a new wiki.
+
+## Keep agent context focused
+
+Use the wiki as a short route from a task to the code and checks needed to do it:
+
+1. Read repository instructions and the wiki's task map.
+2. Open only the relevant page, then its linked entry points and tests.
+3. Consult linked RFCs/ADRs when the change touches their constraints.
+4. Run the page's verification command and update stale navigation with the code.
+
+Each page should answer one question or cover one change task, with source links,
+key symbols, tests, a verification command, and constraints. Aim for **500 words
+or fewer per page** and **under 100 lines of always-loaded agent instructions**.
+Split independent topics before growing a page; explain necessary exceptions in
+review. Keep the home a short task map instead of an exhaustive directory tree.
+
+Link to authoritative code and decisions rather than copying them. Keep session
+transcripts, progress logs, pasted source, and speculative architecture out of
+durable context. Update an existing page before adding another and remove stale
+instructions. The generated rules and prompt include these guardrails. They are
+authoring and review guidance; `validate` does not enforce these size budgets.
+
 ## Extend the wiki into project folders
 
 Register each system's documentation folder in `docs-cms/docs-project.yaml`:
@@ -102,6 +170,7 @@ Rendering substitutes these exact tokens once, without executing code:
 | `{{doc_uuid}}` | Fresh UUID v4 per file |
 | `{{date}}` | Current date in ISO format |
 | `{{version}}` | Installed Docuchango version |
+| `{{system_docs_example}}` | Example system folder relative to the config, adjusted for overlay depth |
 
 Unknown lowercase token names are rejected. Missing required files, invalid
 config, and rendering errors are reported before files are written. Use the YAML

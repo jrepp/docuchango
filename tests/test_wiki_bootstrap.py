@@ -140,3 +140,136 @@ def test_guide_mode_unchanged():
     result = CliRunner().invoke(main, ["bootstrap"])
     assert result.exit_code == 0
     assert "wiki at" not in result.output
+
+
+@pytest.mark.parametrize("custom_types", [False, True])
+def test_overlay_preserves_numbered_layout_and_validates_both(tmp_path, custom_types):
+    root = tmp_path / "docs-cms"
+    result = CliRunner().invoke(main, ["init", "--path", str(root), "--project-id", "existing-app"])
+    assert result.exit_code == 0, result.output
+    config_path = root / "docs-project.yaml"
+    config = yaml.safe_load(config_path.read_text())
+    config["readability"] = {"enabled": False}
+    if custom_types:
+        config["structure"]["doc_types"] = {
+            "rfc": {"schema": "rfc", "folders": ["rfcs"], "scan_subfolders": True, "report_numbering_gaps": True}
+        }
+    config_path.write_text(yaml.safe_dump(config))
+    rfc = frontmatter.load(root / "templates/rfc-000-template.md")
+    rfc["id"] = "rfc-001"
+    rfc["title"] = "Existing system proposal"
+    rfc["project_id"] = "existing-app"
+    rfc["created"] = "2026-10-16"
+    rfc["tags"] = ["design"]
+    rfc.content = "# RFC-001: Existing system proposal\n\nAn existing proposal."
+    rfc_path = root / "rfcs/rfc-001-existing-system.md"
+    rfc_path.write_text(frontmatter.dumps(rfc) + "\n", newline="\n")
+    rules = frontmatter.Post("# Existing rules\n\nPreserve existing instructions.")
+    rules.metadata = {
+        "title": "Existing rules",
+        "project_id": "existing-app",
+        "doc_uuid": "3a5b59f7-b738-4b2e-a5e0-1e8cf9bc5829",
+        "created": "2026-10-16",
+        "tags": ["documentation"],
+    }
+    (root / "AGENTS.md").write_text(frontmatter.dumps(rules) + "\n", newline="\n")
+    before = {file: file.read_bytes() for file in root.rglob("*") if file.is_file() and file != config_path}
+
+    result = bootstrap(tmp_path, "--overlay")
+
+    assert result.exit_code == 0, result.output
+    updated = yaml.safe_load(config_path.read_text())
+    assert updated.pop("subprojects") == [{"path": "wiki/docs-project.yaml"}]
+    assert updated == config
+    assert all(file.read_bytes() == content for file, content in before.items())
+    child = yaml.safe_load((root / "wiki/docs-project.yaml").read_text())
+    assert child["project"]["id"] == "existing-app"
+    assert "../../services/auth/docs" in (root / "wiki/README.md").read_text()
+    validator = DocValidator(repo_root=tmp_path)
+    validator.scan_documents()
+    assert rfc_path in validator.file_to_doc
+    assert root / "wiki/pages/getting-started.md" in validator.file_to_doc
+    result = CliRunner().invoke(main, ["validate", "--repo-root", str(tmp_path), "--dry-run", "--skip-build"])
+    assert result.exit_code == 0, result.output
+
+    before_rerun = {file: file.read_bytes() for file in root.rglob("*") if file.is_file()}
+    result = bootstrap(tmp_path, "--overlay")
+    assert result.exit_code == 1
+    assert "already registered" in result.output
+    assert before_rerun == {file: file.read_bytes() for file in root.rglob("*") if file.is_file()}
+
+    rfc["status"] = "Invalid"
+    rfc_path.write_text(frontmatter.dumps(rfc) + "\n", newline="\n")
+    result = CliRunner().invoke(main, ["validate", "--repo-root", str(tmp_path), "--dry-run", "--skip-build"])
+    assert result.exit_code == 1
+    assert "status" in result.output
+    assert "Input should be" in result.output
+
+
+@pytest.mark.parametrize("conflict", ["missing-config", "invalid-config", "existing-wiki", "file-wiki"])
+def test_overlay_conflicts_preserve_existing_tree(tmp_path, conflict):
+    root = tmp_path / "docs-cms"
+    root.mkdir()
+    if conflict != "missing-config":
+        (root / "docs-project.yaml").write_text(
+            "project: [" if conflict == "invalid-config" else "project: {id: existing, name: Existing}\n"
+        )
+    if conflict == "existing-wiki":
+        (root / "wiki").mkdir()
+        (root / "wiki/README.md").write_text("Existing wiki\n")
+    elif conflict == "file-wiki":
+        (root / "wiki").write_text("Existing file\n")
+    before = {file: file.read_bytes() for file in root.rglob("*") if file.is_file()}
+    result = bootstrap(tmp_path, "--overlay")
+    assert result.exit_code == 1
+    assert before == {file: file.read_bytes() for file in root.rglob("*") if file.is_file()}
+
+
+@pytest.mark.parametrize(
+    "args", [["--overlay"], ["--wiki", "--overlay", "--force"], ["--wiki", "--overlay", "--project-id", "other"]]
+)
+def test_overlay_rejects_conflicting_options(args):
+    result = CliRunner().invoke(main, ["bootstrap", *args])
+    assert result.exit_code == 2
+
+
+def test_overlay_retains_other_subproject_registrations(tmp_path):
+    root = tmp_path / "docs-cms"
+    root.mkdir()
+    config = {"project": {"id": "existing", "name": "Existing"}, "subprojects": ["other/docs-project.yaml"]}
+    (root / "docs-project.yaml").write_text(yaml.safe_dump(config))
+    result = bootstrap(tmp_path, "--overlay")
+    assert result.exit_code == 0, result.output
+    updated = yaml.safe_load((root / "docs-project.yaml").read_text())
+    assert updated["subprojects"] == ["other/docs-project.yaml", {"path": "wiki/docs-project.yaml"}]
+
+
+@pytest.mark.parametrize("registration", ["wiki", "./wiki/docs-project.yaml"])
+def test_overlay_rejects_preexisting_registration_without_writes(tmp_path, registration):
+    root = tmp_path / "docs-cms"
+    root.mkdir()
+    config = {"project": {"id": "existing", "name": "Existing"}, "subprojects": [registration]}
+    config_path = root / "docs-project.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+    before = config_path.read_bytes()
+    result = bootstrap(tmp_path, "--overlay")
+    assert result.exit_code == 1
+    assert "already registered" in result.output
+    assert config_path.read_bytes() == before
+    assert not (root / "wiki").exists()
+
+
+def test_overlay_bundle_failure_does_not_register_or_create_wiki(tmp_path):
+    root = tmp_path / "docs-cms"
+    root.mkdir()
+    config_path = root / "docs-project.yaml"
+    config_path.write_text("project: {id: existing, name: Existing}\n")
+    before = config_path.read_bytes()
+    bundle = tmp_path / "bundle"
+    shutil.copytree(Path(__file__).parents[1] / "docuchango/templates/wiki", bundle)
+    (bundle / "docs-project.yaml").write_text("project: {id: wrong, name: Wrong}\n")
+    result = bootstrap(tmp_path, "--overlay", "--template-dir", str(bundle))
+    assert result.exit_code == 1
+    assert "existing project's ID and name" in result.output
+    assert config_path.read_bytes() == before
+    assert not (root / "wiki").exists()

@@ -12,14 +12,17 @@ tags: [wiki]
 
 Explain what this system or concept does and who uses it.
 
-## How it works
+## Code route
 
-Describe its responsibilities, boundaries, and key behavior.
+Link the entry point, key symbols, and relevant tests. Describe the shortest path
+through the code needed for this task, including boundaries that matter.
 
 ## Operation and changes
 
-Explain how to test, operate, and safely change it.
+Give a verification command and the constraints for safely changing this system.
 
 ## Related pages
 
-Add relative links to the wiki home, related systems, and relevant source files.
+Link the wiki home and authoritative RFCs/ADRs for rationale. Preserve decision
+status. Aim for 500 words or fewer and one question per page; split other tasks
+into linked pages instead of copying source or recording session history.
