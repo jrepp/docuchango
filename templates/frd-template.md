@@ -94,6 +94,13 @@ Feature is considered complete when:
 
 ### Detailed User Stories
 
+Give acceptance criteria stable `AC-*` IDs and reference their source requirement
+in this FRD or the parent PRD. The RFC adds technical contracts and verification
+methods without creating a competing requirement statement. Include relevant
+failure/boundary outcomes and preserved state; mark unresolved decisions with
+an owner and blocking impact. A small change may need only a few scenarios.
+See the [worked example](../docs/ACCEPTANCE_CRITERIA.md).
+
 #### Story 1: [Story Name] (P0 - Must Have)
 
 **As a** [specific user type]
@@ -101,9 +108,9 @@ Feature is considered complete when:
 **So that** [specific benefit]
 
 **Acceptance Criteria:**
-- [ ] **Given** [context], **When** [action], **Then** [expected outcome]
-- [ ] **Given** [context], **When** [action], **Then** [expected outcome]
-- [ ] **Given** [context], **When** [action], **Then** [expected outcome]
+- [ ] **AC-1** (source requirement): **Given** [context], **When** [action], **Then** [observable outcome]
+- [ ] **AC-2** (source requirement): **Given** [failure condition], **When** [action], **Then** [response and preserved state]
+- [ ] **AC-3** (source requirement): **Given** [relevant boundary], **When** [action], **Then** [observable outcome]
 
 **Priority**: P0 (Must Have)
 **Story Points**: X (or T-shirt size: S/M/L/XL)

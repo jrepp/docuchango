@@ -60,6 +60,20 @@ How will we know this is successful?
 
 Detailed description of the proposed solution.
 
+### Requirements Coverage
+
+Reference the parent PRD's requirements and acceptance criteria. Without a parent
+PRD, state requirements and their rationale here. Preserve IDs across revisions.
+
+| Source requirement | Acceptance criterion | Design section | Verification |
+|--------------------|----------------------|----------------|--------------|
+| [PRD reference / FR-1] | AC-1 | [Relevant section] | [Test level and evidence] |
+
+Identify deferred requirements explicitly. Keep one authoritative requirement
+statement and reference it; technical details supplement rather than rewrite
+the product contract. A short list is enough for a small change.
+See the [worked example](../docs/ACCEPTANCE_CRITERIA.md).
+
 ### High-Level Design
 
 Overview of the approach and key components:
@@ -214,7 +228,29 @@ Expected performance characteristics:
 
 ## Testing Strategy
 
-How will this be tested?
+### Technical Acceptance Criteria
+
+For each source criterion, define the technical contract and its rationale:
+responses, payloads, errors, persistence, compatibility, and recovery as relevant.
+Label new technical decisions as proposed until agreed.
+
+**Technical contract for AC-1**
+- Source: [requirement or agreed decision]
+- Given [state], when [action], then [observable technical result].
+- On failure: [response, allowed side effects, preserved state, recovery].
+- Verification: [test level and evidence that establishes this contract].
+
+Describe necessary guarantees, not incidental helper names or file layouts.
+Internal constraints may need unit or integration tests rather than API-level
+acceptance tests. For quantitative targets, specify metric/percentile, workload,
+dataset, environment, measurement period, and the source of the target.
+
+### Verification Plan
+
+How will each acceptance criterion be tested? Link criteria to tests or planned
+evidence and explain which incorrect behavior each check detects. Planned
+coverage is not a passing result. Keep execution results with tests or release
+records instead of maintaining stale results in this RFC.
 
 ### Unit Tests
 
@@ -238,6 +274,11 @@ How will this be tested?
 2. **Error Cases**: Failure modes and recovery
 3. **Edge Cases**: Boundary conditions
 4. **Scale Tests**: High load behavior
+
+Select scenarios based on the change's risks: invalid input, empty results,
+partial completion, retries, concurrency, and compatibility where applicable.
+Specify what must remain unchanged on failure; “returns an error” alone does
+not establish that persistent state is safe. Omit irrelevant scenarios.
 
 ## Migration and Rollout Plan
 
@@ -294,6 +335,11 @@ Estimated implementation timeline:
 ## Open Questions
 
 Unresolved questions that need discussion:
+
+For each question, name an owner, the affected criterion, whether it blocks
+implementation, and the next step or agreed resolution. Do not silently turn an
+assumption into a requirement. Resolve “warn or reject” before testing unless
+both outcomes intentionally satisfy a stated invariant.
 
 1. **Question 1**: What needs to be decided?
    - Options being considered

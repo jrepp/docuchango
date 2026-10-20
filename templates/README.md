@@ -46,6 +46,21 @@ Templates for creating structured documentation with proper frontmatter validati
 
 ## Usage
 
+### Requirements and acceptance criteria
+
+PRD and FRD criteria describe observable product behavior. RFCs reference those
+criteria and add technical contracts and verification plans. Keep IDs stable,
+identify deferred requirements, and leave unresolved decisions explicit.
+Use only the detail appropriate to the change; these prompts add no required
+metadata or validator rules.
+
+See [From Requirements to Acceptance Evidence](../docs/ACCEPTANCE_CRITERIA.md)
+for a worked PRD → RFC → verification example. The compact templates installed by
+`docuchango init` include the same core guidance; the templates here provide more
+detail.
+
+### Creating a document
+
 1. Copy the appropriate template
 2. Rename with proper ID/number (e.g., adr-042-feature-name.md)
 3. Update all frontmatter fields:
