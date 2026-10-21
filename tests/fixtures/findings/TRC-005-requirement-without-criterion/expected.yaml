@@ -1,0 +1,13 @@
+summary: >-
+  A PRD that has adopted acceptance criteria defines FR-2, but no criterion
+  names it in a Requirement clause, so nothing says how it would be accepted.
+messages:
+  - "FR-2 has no acceptance criterion naming it in a 'Requirement:' clause"
+forbidden:
+  - "TRC-001"
+  - "TRC-002"
+  - "TRC-003"
+  - "TRC-004"
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1

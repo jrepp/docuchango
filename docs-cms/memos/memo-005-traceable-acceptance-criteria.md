@@ -24,7 +24,7 @@ speculative constraints, and inconsistent measurement or release scope.
 
 ## Implementation scope
 
-The user requested implementation of the template enhancement proposal. Both
+Both
 bundled and detailed PRD/RFC templates now prompt stable criterion references,
 failure/boundary behavior, measurement conditions, and owned open questions.
 The detailed FRD reuses its existing Given / When / Then format with criterion IDs.
@@ -39,8 +39,8 @@ That example does not decide CLI defaults or accept the separate
 ### Follow-up: evidence and change maintenance
 
 After a broader scan of authoring skills and bundled resources,
-the user requested the documentation
-follow-ups while excluding deferred integrations and workflow orchestration.
+the documentation follow-ups were
+scoped to exclude deferred integrations and workflow orchestration.
 
 The templates and guides now cover source baselines, covered/deferred/unresolved
 dispositions, meaning-preserving amendments, and acceptance versus Definition of
@@ -62,7 +62,9 @@ synchronization, automatic resource updates, and orchestration remain out of sco
 ### Compatibility
 
 - These are optional authoring prompts, not mandatory frontmatter or new schemas.
-- No validator behavior or finding registry entries change.
+- Enforcement is a separate opt-in: `check_traceability` enables `TRC-001` to `TRC-005`, which check
+  that `FR-n` / `AC-n` references resolve (see [RFC-003](../rfcs/rfc-003-validator-roadmap.md)).
+  Projects that do not set it see no change in `validate`.
 - Keep one authoritative requirement and reference it from technical criteria.
 - Label new decisions as proposed; do not fill missing decisions with assumptions.
 - Keep the bundled guidance self-contained because `init` distributes it.
@@ -73,8 +75,8 @@ synchronization, automatic resource updates, and orchestration remain out of sco
 
 The initialization content test checks that generated PRD/RFC templates include
 acceptance criteria, coverage, and verification guidance. Existing initialization
-tests cover custom paths and template distribution. Documentation validation checks
-the project memo and links; it does not assess the semantic quality of criteria.
+tests cover custom paths and template distribution. With `check_traceability` on, `validate` also
+checks that the IDs line up; it does not assess the semantic quality of criteria.
 
 Evaluate usefulness through real reviews: did the guidance reveal missing behavior
 or decisions, and was the writing effort proportionate? Do not assume quantified

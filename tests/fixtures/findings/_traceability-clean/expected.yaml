@@ -1,0 +1,11 @@
+summary: >-
+  A PRD and an RFC that use the IDs correctly: every reference resolves, the
+  coverage row has a disposition, the criterion names its requirement and the
+  RFC covers everything. Not keyed to a finding; guards against false
+  positives.
+messages: []
+forbidden:
+  - "TRC-"
+fixed: false
+dry_run_exit_code: 0
+exit_code: 0

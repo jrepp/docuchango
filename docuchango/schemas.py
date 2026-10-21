@@ -90,6 +90,15 @@ class DocTypeConfig(BaseModel):
             "(a withdrawn proposal), so this is opt-in and defaults to false."
         ),
     )
+    check_traceability: bool = Field(
+        default=False,
+        description=(
+            "Whether TRC-001..TRC-005 check the FR/NFR/AC IDs of this document type: references that "
+            "no linked requirements document defines, duplicate definitions, coverage rows without a "
+            "disposition, criteria no RFC claims, and requirements no criterion tests. Opt in the "
+            "requirement types (prd, generic) and the rfc type together. Defaults to false."
+        ),
+    )
     model_config = ConfigDict(populate_by_name=True)
 
     frontmatter_schema: Literal["adr", "rfc", "memo", "prd", "generic"] = Field(

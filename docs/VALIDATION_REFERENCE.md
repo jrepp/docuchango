@@ -387,6 +387,29 @@ Filename problems are always left to you, because renaming can break
 links elsewhere. `docuchango bulk compress-ids` can renumber documents and
 update references in one step.
 
+## Requirement traceability
+
+Opt-in per document type with `check_traceability: true` (see
+[configuration](CONFIGURATION.md#requirement-traceability)). Requirement
+documents (`prd`, `generic`) define `FR-n`, `NFR-n` and `AC-n` IDs; every opted-in
+document references them. Nothing here judges whether a criterion is meaningful
+or a test passes.
+
+**Detected**
+
+- `TRC-001`: an ID that no requirements document defines, or that two or more define. A reference resolves against the requirements documents the citing document links to, or, with no such link, every one in the project
+- `TRC-002`: the same ID defined more than once in a document
+- `TRC-003`: a row of an RFC's Requirements Coverage table with no covered, deferred or unresolved disposition
+- `TRC-004`: an `FR-n` or `AC-n` that no document references, in a requirements document an RFC links to
+- `TRC-005`: an `AC-n` with no `Requirement:` clause, or an `FR-n` that no criterion names, in a document that already defines at least one `AC-n`
+
+**Left to you**
+
+All five are report-only. Decide whether the missing definition, disposition or
+criterion exists, then write it; the validator does not invent one. `NFR-n` is
+exempt from TRC-004 and TRC-005 because it is measured rather than
+scenario-tested.
+
 ## Index files
 
 When `indexes` are configured, an index file is checked for:

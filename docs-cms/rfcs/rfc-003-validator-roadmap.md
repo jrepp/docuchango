@@ -55,6 +55,7 @@ be read at a glance. IDs are never reused or renumbered once a check ships.
 | `FMT` | Markdown formatting |
 | `CB` | Code blocks |
 | `IDX` | Document indexes |
+| `TRC` | Requirement traceability |
 | `RD` | Readability |
 | `BLD` | Docusaurus build |
 
@@ -100,6 +101,11 @@ reported.
 | CB-001 | Code fence without a language, or unclosed fence | Implemented | fix/report | `check_code_blocks`, `fixes/code_blocks.py`, `markdown.py` (`frontmatter_span`) |
 | IDX-001 | Document index missing, unlinked, or missing bucket headings | Implemented | report | `check_document_indexes` |
 | RD-001 | Paragraph outside the readability thresholds of the (sub-)project that owns the document | Implemented | report | `check_readability`, `_readability_config_for`, `_config_context_for_path`, `_config_ownership_roots` |
+| TRC-001 | FR/NFR/AC reference that no requirements document defines, or that two define, opt-in per type via `structure.doc_types.<type>.check_traceability` | Implemented | report | `check_traceability`, `_check_traceability_group`, `_traceability_types`, `traceability.py`, `schemas.py` (`DocTypeConfig.check_traceability`) |
+| TRC-002 | Same FR/NFR/AC ID defined more than once in one document | Implemented | report | `check_traceability`, `_check_traceability_group`, `_traceability_types`, `traceability.py`, `schemas.py` (`DocTypeConfig.check_traceability`) |
+| TRC-003 | Requirements Coverage table row with no covered, deferred or unresolved disposition | Implemented | report | `check_traceability`, `_check_traceability_group`, `_traceability_types`, `traceability.py`, `schemas.py` (`DocTypeConfig.check_traceability`) |
+| TRC-004 | Criterion or requirement that no document references, in a requirements document an RFC links to | Implemented | report | `check_traceability`, `_check_traceability_group`, `_traceability_types`, `traceability.py`, `schemas.py` (`DocTypeConfig.check_traceability`) |
+| TRC-005 | Acceptance criterion with no `Requirement:` clause, or functional requirement no criterion names, in a document that defines criteria | Implemented | report | `check_traceability`, `_check_traceability_group`, `_traceability_types`, `traceability.py`, `schemas.py` (`DocTypeConfig.check_traceability`) |
 | BLD-001 | TypeScript config error | Implemented | report | `check_typescript_config` |
 | BLD-002 | Docusaurus build error | Implemented | report | `check_docusaurus_build` |
 
@@ -537,6 +543,31 @@ message that agrees with a dry run of a different document. MDX-011 is
 untouched and stays `Planned`: an indented code block is still masked as prose
 by both the check and the fix, so a `<token>` in one is reported and escaped
 together, which is at least consistent.
+
+**TRC-001..005 Requirement traceability (shipped).** The PRD, FRD and RFC
+templates ask for stable `FR-n`, `NFR-n` and `AC-n` IDs and for the RFC to
+account for each criterion as covered, deferred or unresolved. Nothing checked
+that the IDs line up. These five findings do, opt-in per type via
+`structure.doc_types.<type>.check_traceability: true` (default off), keyed by
+the bound schema like ID-010. Opt in the requirement types (`prd`, `generic`)
+and `rfc` together; documents with no IDs are silent.
+
+Only `prd` and `generic` documents define IDs, in a heading (`### AC-1: ...`),
+a bold list item (`**AC-1** ...`) or a first table cell (`| FR-1 | ...`). An RFC
+that starts a coverage row with `FR-1` is citing it. Every other mention is a
+reference. References resolve against the requirements documents the citing
+document links to, or, when it links to none, every requirements document of
+the same (sub-)project; zero matches is TRC-001 "not defined", two or more is
+TRC-001 "defined in N documents; link the one this document implements".
+Ranges are never expanded (`AC-1 through AC-5` mentions two IDs): the authoring
+guide says not to assume a range contains a defined AC-3.
+
+TRC-004 fires only for a requirements document an RFC links to, so a PRD nobody
+has designed yet is not a wall of findings. TRC-005 fires only for a document
+that already defines at least one `AC-n`, and exempts `NFR-n`, which are
+measured rather than scenario-tested. All five are report-only: the remedy is
+a decision, and inventing a missing criterion is the failure the guide warns
+against. Meaning, test quality and pass/fail evidence stay with review and CI.
 
 ### Planned validators
 

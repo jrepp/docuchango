@@ -532,6 +532,7 @@ def validate(
         validator.check_date_formats()
         validator.check_ids()
         validator.check_numbering_gaps()
+        validator.check_traceability()
         validator.check_uuids()
         validator.check_code_blocks()
         validator.check_mdx_compilation()

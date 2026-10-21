@@ -1,0 +1,15 @@
+summary: >-
+  An RFC links the PRD and covers FR-1 and AC-1 but never mentions AC-2.
+  Because an RFC claims the PRD by linking to it, TRC-004 reports the
+  criterion no design accounts for.
+messages:
+  - "AC-2 is not referenced by any document; an RFC links here but does not cover or defer it"
+forbidden:
+  - "TRC-001"
+  - "TRC-002"
+  - "TRC-003"
+  - "TRC-005"
+  - "AC-1 is not referenced"
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1

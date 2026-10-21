@@ -81,6 +81,13 @@ structure:
   #     schema: rfc
   #     folders: [rfcs]
   #     report_numbering_gaps: true  # Report rfc-004 missing between 003 and 005
+  #   # Example opting into requirement traceability (TRC-001..TRC-005). Off by
+  #   # default. Opt in the requirement type and the rfc type together, so RFC
+  #   # references to FR-/AC- IDs can be checked against the PRD that defines them.
+  #   prd:
+  #     schema: prd
+  #     folders: [prd]
+  #     check_traceability: true
 
   # Named naming standards for document names.
   # Built-in standards: nnn-name, year-month-day-name, kebab-case, snake_case,
