@@ -20,6 +20,29 @@ Keep one authoritative requirement statement. Reference it rather than duplicati
 it in each artifact. Stable IDs help reviewers find the same behavior after edits;
 do not renumber existing criteria simply to insert another one.
 
+## Reference syntax and validation
+
+Write IDs this way and a project can ask `docuchango validate` to check them:
+
+| Item | Where it is defined | How it links |
+|------|--------------------|--------------|
+| `FR-n`, `NFR-n` | A table's first cell, a bold list item (`**FR-1**: ...`) or a heading | Referenced by criteria and by the RFC |
+| `AC-n` | A heading (`### AC-1: ...`) or a bold list item (`- [ ] **AC-1** (Requirement: FR-1): ...`) | `Requirement: FR-n` on the criterion names what it tests |
+
+Only PRDs and generic documents define IDs. An RFC cites them, for example in its
+Requirements Coverage table, whose rows each end up covered, deferred or
+unresolved, and links the PRD it implements. Ranges such as `AC-1 through AC-5`
+are not expanded, so write the IDs that matter.
+
+Enabling `check_traceability` reports a reference nothing defines (`TRC-001`), a
+duplicate definition (`TRC-002`), a coverage row with no disposition (`TRC-003`),
+a criterion or requirement an RFC-linked PRD defines but nothing references
+(`TRC-004`), and a criterion without a `Requirement:` or a requirement without a
+criterion (`TRC-005`). See the
+[validation reference](VALIDATION_REFERENCE.md#requirement-traceability). The
+checks confirm the shape of the links. Whether a criterion is meaningful, or a
+test detects the failure it targets, remains a review question.
+
 ## Worked example: inspecting documentation without changing it
 
 The following PRD and RFC excerpts are an illustrative proposal, not a statement
@@ -38,7 +61,7 @@ applying repairs so that I can choose when my files change.
 
 #### AC-1: Report a repairable issue without writing
 
-Source: FR-1
+Requirement: FR-1
 
 - **Given** a document containing a known repairable formatting issue
 - **When** the author runs inspection in read-only mode
@@ -47,7 +70,7 @@ Source: FR-1
 
 #### AC-2: Preserve files when inspection fails
 
-Source: FR-1
+Requirement: FR-1
 
 - **Given** a project with a valid document and a document with invalid metadata
 - **When** the author runs inspection in read-only mode
@@ -56,7 +79,7 @@ Source: FR-1
 
 #### AC-3: Inspect a valid document
 
-Source: FR-1
+Requirement: FR-1
 
 - **Given** a document satisfying the configured checks
 - **When** the author runs inspection in read-only mode
@@ -221,8 +244,9 @@ an evaluable contract, not forced determinism where the design does not require 
 - Are covered, deferred, and unresolved criteria distinguished at the source baseline?
 - Is the amount of documentation proportionate to the change?
 
-These are authoring aids, not additional `docuchango validate` rules. The presence
-of Given / When / Then keywords does not prove that a scenario is meaningful.
+The checklist is an authoring aid. `docuchango validate` can check ID references
+(see above), not meaning: the presence of Given / When / Then keywords does not
+prove that a scenario is meaningful.
 
 Use the [review and amendment guide](REVIEW_GUIDE.md) for evidence-backed findings,
 scope disagreements, change-impact analysis, and reader-oriented handoffs.

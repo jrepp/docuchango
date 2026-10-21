@@ -151,9 +151,9 @@ See the [worked example](../docs/ACCEPTANCE_CRITERIA.md).
 **So that** [specific benefit]
 
 **Acceptance Criteria:**
-- [ ] **AC-1** (FR-1): Given [initial state], when [action], then [observable result].
-- [ ] **AC-2** (FR-1): Given [relevant failure], when [action], then [error/recovery outcome] and [state that must remain unchanged].
-- [ ] **AC-3** (FR-1): Given [relevant boundary], when [action], then [expected outcome].
+- [ ] **AC-1** (Requirement: FR-1): Given [initial state], when [action], then [observable result].
+- [ ] **AC-2** (Requirement: FR-1): Given [relevant failure], when [action], then [error/recovery outcome] and [state that must remain unchanged].
+- [ ] **AC-3** (Requirement: FR-1): Given [relevant boundary], when [action], then [expected outcome].
 
 **Priority**: P0 (Must Have)
 **Estimated Effort**: S/M/L/XL
@@ -166,8 +166,8 @@ See the [worked example](../docs/ACCEPTANCE_CRITERIA.md).
 **So that** [specific benefit]
 
 **Acceptance Criteria:**
-- [ ] **AC-4** (FR-2): Given [initial state], when [action], then [observable result].
-- [ ] **AC-5** (FR-2): [Failure or boundary behavior, where applicable].
+- [ ] **AC-4** (Requirement: FR-2): Given [initial state], when [action], then [observable result].
+- [ ] **AC-5** (Requirement: FR-2): [Failure or boundary behavior, where applicable].
 
 Equivalent testable prose is acceptable. “Add a handler” and “write tests” are
 tasks, not acceptance outcomes. Keep product behavior here; the RFC supplements

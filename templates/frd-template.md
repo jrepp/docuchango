@@ -113,9 +113,9 @@ text. Keep clarification and new scope visibly proposed until agreed.
 **So that** [specific benefit]
 
 **Acceptance Criteria:**
-- [ ] **AC-1** (source requirement): **Given** [context], **When** [action], **Then** [observable outcome]
-- [ ] **AC-2** (source requirement): **Given** [failure condition], **When** [action], **Then** [response and preserved state]
-- [ ] **AC-3** (source requirement): **Given** [relevant boundary], **When** [action], **Then** [observable outcome]
+- [ ] **AC-1** (Requirement: FR-1): **Given** [context], **When** [action], **Then** [observable outcome]
+- [ ] **AC-2** (Requirement: FR-1): **Given** [failure condition], **When** [action], **Then** [response and preserved state]
+- [ ] **AC-3** (Requirement: FR-1): **Given** [relevant boundary], **When** [action], **Then** [observable outcome]
 
 **Priority**: P0 (Must Have)
 **Story Points**: X (or T-shirt size: S/M/L/XL)
