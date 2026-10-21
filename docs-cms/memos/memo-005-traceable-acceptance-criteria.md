@@ -36,6 +36,31 @@ That example does not decide CLI defaults or accept the separate
 
 ## Maintenance boundaries
 
+### Follow-up: evidence and change maintenance
+
+After a broader scan of authoring skills and bundled resources,
+the user requested the documentation
+follow-ups while excluding deferred integrations and workflow orchestration.
+
+The templates and guides now cover source baselines, covered/deferred/unresolved
+dispositions, meaning-preserving amendments, and acceptance versus Definition of
+Done. ADR and memo guidance distinguishes observations, interpretations, and
+recommendations and asks what would cause a consequential choice to be reconsidered.
+
+The [review guide](../../docs/REVIEW_GUIDE.md) requires evidence for defects and
+distinguishes fixes, reasoned declines, deferrals, and unresolved questions. It
+includes downstream impact and recipient-oriented handoff checks. The optional
+[planning example](../../docs/PLANNING_AND_VERIFICATION.md) connects the existing
+worked criteria to implementation steps, scenarios, and execution evidence.
+
+These adapt ideas from the PRD amendment, RFC traceability/verification/cascade,
+research-evidence, and planning/testing resources. They deliberately omit fixed
+scenario quotas, numerical review scores, mandatory multi-stage gates, and the
+source project's metadata conventions. Import/conversion tools, remote ticket
+synchronization, automatic resource updates, and orchestration remain out of scope.
+
+### Compatibility
+
 - These are optional authoring prompts, not mandatory frontmatter or new schemas.
 - No validator behavior or finding registry entries change.
 - Keep one authoritative requirement and reference it from technical criteria.

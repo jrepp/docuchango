@@ -59,6 +59,16 @@ for a worked PRD → RFC → verification example. The compact templates install
 `docuchango init` include the same core guidance; the templates here provide more
 detail.
 
+Additional optional guidance:
+- [Evidence-based review and amendments](../docs/REVIEW_GUIDE.md): verify findings,
+  preserve meaning, assess downstream impact, and record reasoned dispositions.
+- [Planning and verification example](../docs/PLANNING_AND_VERIFICATION.md): connect
+  criteria to reviewable implementation steps and executable evidence.
+
+ADR and memo prompts also distinguish observations, assumptions, and recommendations,
+with reconsideration conditions for consequential decisions. These guides do not
+add a mandatory lifecycle, review score, or document type.
+
 ### Creating a document
 
 1. Copy the appropriate template

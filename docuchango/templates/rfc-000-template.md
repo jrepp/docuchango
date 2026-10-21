@@ -27,9 +27,17 @@ Reference the parent PRD and its requirement/acceptance IDs. If there is no PRD,
 state the requirements and their rationale locally. Keep IDs stable; identify
 deferred requirements explicitly rather than silently omitting them.
 
-| Source requirement | Acceptance criterion | Design section | Verification |
-|--------------------|----------------------|----------------|--------------|
-| [PRD reference / FR-1] | AC-1 | [Relevant section] | [Test level and observable evidence] |
+For long-running work, identify the source baseline (path plus commit, version,
+or date where needed). Resolve ID ranges against actual definitions; repeated
+references are valid, but duplicate definitions or unknown IDs need clarification.
+
+| Source requirement | Acceptance criterion | Disposition | Design section | Verification |
+|--------------------|----------------------|-------------|----------------|--------------|
+| [PRD reference / FR-1] | AC-1 | [Covered / deferred / unresolved] | [Relevant section] | [Test level and observable evidence] |
+
+Covered means a mechanism and observable result address the requirement. Give a
+reason and agreement source for a deferral; a proposed deferral stays unresolved.
+Accounted for is not the same as covered.
 
 Use a brief list instead of a table for small changes. A link to a test plan is
 planned coverage, not proof that a test exists or has passed.
@@ -72,6 +80,35 @@ check detects. Verify internal constraints at the appropriate test level rather
 than requiring every property to be observed through an end-to-end test.
 Keep execution results with the test or release record; do not equate a filled
 coverage table with passing tests or demonstrated user value.
+
+Separate feature acceptance from shared Definition of Done checks such as lint and
+peer review. Size implementation steps as reviewable outcomes, each with its own
+verification. Name existing behavior that only needs verification, and attach
+blockers to affected deliverables rather than automatically blocking the whole plan.
+
+## Evidence and Review
+
+Distinguish verified current behavior, proposed changes, and assumptions. Check
+named interfaces, paths, defaults, and enum values at their authoritative sources;
+mark not-yet-built behavior as planned. Record evidence limitations and what would
+cause a consequential decision to be reconsidered.
+
+Review findings should cite the claim, governing evidence, and consequence.
+Separate defects from suggestions and inherited issues from introduced ones.
+Before calling something missing, check scope, deferrals, sibling documents, and
+source freshness. Recheck a correction before calling it resolved.
+
+## Change Impact (when revising an existing design)
+
+| Changed decision | Affected criterion/document/test | Follow-up | Owner and state |
+|------------------|----------------------------------|-----------|-----------------|
+| [Decision and reason] | [Existing reference] | [Update / verify / proposed follow-up] | [Owner; pending / verified / unresolved] |
+
+Preserve unrelated decisions and completed-work history. An impact proposal does
+not mean dependents were updated. Identify follow-up work without silently
+reopening completed items. Before handoff, ask a reader to plan an implementation
+or recovery task from the RFC alone; record guesses and check links from the
+intended shared location.
 
 # Drawbacks
 

@@ -22,6 +22,10 @@ Background information and context for why this memo was written.
 
 Detailed information, analysis, or findings.
 
+Separate observations (source and context), interpretations, and recommendations.
+Record contrary evidence and source limitations where relevant. A partial read or
+single observation cannot establish an exhaustive absence or recurring pattern.
+
 ## Section 2
 
 Additional details, data, or observations.
@@ -29,6 +33,10 @@ Additional details, data, or observations.
 # Recommendations
 
 If applicable, specific recommendations or action items based on the memo's content.
+
+Link each recommendation to supporting findings, name the assumptions it depends
+on, and state what evidence would reverse it. Identify owners and next actions
+when known; leave unknowns explicit rather than inventing commitments.
 
 - Recommendation 1
 - Recommendation 2

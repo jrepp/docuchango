@@ -174,6 +174,13 @@ tasks, not acceptance outcomes. Keep product behavior here; the RFC supplements
 it with technical contracts and verification methods. Do not renumber existing
 criteria just to insert a new one.
 
+Keep feature acceptance separate from shared Definition of Done checks such as
+peer review and lint. When amending criteria, classify changes as restructuring,
+product clarification, new/changed requirement, or engineering question. Preserve
+conditions, exceptions, negative constraints, and IDs. Test the rewrite with a
+counterexample: could it pass while the original promise fails? Required outcomes
+belong in Then, not hidden as assumptions in Given.
+
 **Priority**: P1 (Should Have)
 **Estimated Effort**: S/M/L/XL
 **Dependencies**: Related stories or systems
@@ -442,6 +449,11 @@ Sign-off required before proceeding:
 ### User Research Summary
 
 Key findings from user research (or link to full report):
+
+Distinguish source observations from interpretations and recommendations. Name
+material assumptions, contrary evidence, and limits of the source coverage. Quote
+accurately; do not infer prevalence or consensus from a single report. New needs
+inferred from evidence remain proposals until agreed.
 
 - Finding 1
 - Finding 2

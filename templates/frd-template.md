@@ -101,6 +101,11 @@ failure/boundary outcomes and preserved state; mark unresolved decisions with
 an owner and blocking impact. A small change may need only a few scenarios.
 See the [worked example](../docs/ACCEPTANCE_CRITERIA.md).
 
+Shared Definition of Done checks (review, lint, release preparation) are separate
+from feature-specific acceptance. When rewriting criteria, preserve their meaning:
+do not move a required outcome into Given or remove an exception to simplify the
+text. Keep clarification and new scope visibly proposed until agreed.
+
 #### Story 1: [Story Name] (P0 - Must Have)
 
 **As a** [specific user type]

@@ -89,6 +89,12 @@ Keep the product outcome here; the RFC references these criteria and adds the
 technical contract and verification method. Reference the requirement instead
 of maintaining competing copies of it in several documents.
 
+Acceptance criteria define feature behavior. Keep shared Definition of Done items
+(review completed, lint passes, release notes written) separate; they do not prove
+that the user outcome holds. When revising criteria, preserve conditions,
+exceptions, negative constraints, and IDs. Ask whether the rewrite could pass
+while the original promise fails; do not move required outcomes into Given.
+
 # Design
 
 ## User Interface
@@ -146,3 +152,7 @@ a blocked criterion, or explicitly define the allowed outcomes and invariant.
 # Appendix
 
 Additional information, research, or supporting materials.
+
+Distinguish observations and their sources from interpretations and recommendations.
+Name material assumptions, contrary evidence, and the limits of the sources read.
+Do not turn examples, reviewer preferences, or inferred needs into agreed scope.

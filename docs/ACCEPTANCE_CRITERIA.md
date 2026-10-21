@@ -109,6 +109,64 @@ outcome evidence.
 
 ## Writing guidance
 
+### Identify the baseline and coverage disposition
+
+For long-running or multi-document work, identify which source revision the design
+uses: a path plus commit, document version, or date as appropriate. This is an
+optional prose note, not required frontmatter. A reference to AC-1 is ambiguous
+if several PRDs define it or if its meaning changed since the RFC was written.
+
+Resolve ID ranges against actual definitions. Do not assume that AC-1 through
+AC-5 includes a defined AC-3. Preserve numbering gaps and ask about missing
+definitions rather than allocating them during review. Repeated references are
+normal; duplicate definitions within the same baseline are ambiguous.
+
+| Disposition | Evidence needed |
+|-------------|-----------------|
+| Covered | Design mechanism, observable outcome, and verification implication |
+| Deferred | Reason, intended scope, and agreement source |
+| Unresolved | Missing decision or evidence, owner if known, and next step |
+
+A proposed deferral remains unresolved until agreed. Accounting for every criterion
+does not mean all are covered, and design coverage does not mean implementation
+has passed verification.
+
+### Preserve meaning when amending criteria
+
+Compare the original and revised text, including exceptions, negative constraints,
+units, and approval state. Classify edits as:
+
+- **Restructuring:** same obligation expressed more clearly.
+- **Product clarification:** interpretation of inherited ambiguity; needs agreement.
+- **New or changed requirement:** altered scope or obligation; remains proposed.
+- **Engineering question:** outcome retained while mechanism remains open.
+
+Ask: could the revised criteria pass while the original promise fails?
+
+Original: “Keep the old export available while preparing its replacement.”
+
+Weak rewrite: “Given the old export remains available, when preparation finishes,
+then return the replacement.” This assumes the very guarantee it should test.
+
+Better: “Given an old export and an in-progress replacement, when a user reads the
+export, then the old export is returned and the incomplete replacement is not.”
+
+Do not promote an example mechanism, such as a temporary file, into a requirement
+unless the source requires it. Preserve unrelated text and IDs. An unchanged
+criterion can be the correct result of review. Report inherited weaknesses
+separately from defects introduced by the amendment.
+
+### Separate acceptance criteria from Definition of Done
+
+Acceptance criteria describe the feature's behavior. Definition of Done describes
+shared delivery checks, such as peer review, lint, documentation updates, or release
+preparation. Both matter, but passing lint does not prove that read-only inspection
+preserves files. Do not attach an unrelated AC ID to a delivery task merely to fill
+a coverage table. Record its actual source as a project delivery convention.
+
+See the [planning and verification example](PLANNING_AND_VERIFICATION.md) for the
+relationship between criteria, scenarios, executable checks, and completion evidence.
+
 ### Separate requirements from technical decisions
 
 Reference the source for each technical constraint. If the source does not settle
@@ -159,10 +217,15 @@ an evaluable contract, not forced determinism where the design does not require 
 - Could the proposed check detect the specific incorrect behavior it targets?
 - Are measurement conditions and the source of each numerical target stated?
 - Are IDs stable and references maintained without competing requirement copies?
+- Could an amended criterion pass while the original promise fails?
+- Are covered, deferred, and unresolved criteria distinguished at the source baseline?
 - Is the amount of documentation proportionate to the change?
 
 These are authoring aids, not additional `docuchango validate` rules. The presence
 of Given / When / Then keywords does not prove that a scenario is meaningful.
+
+Use the [review and amendment guide](REVIEW_GUIDE.md) for evidence-backed findings,
+scope disagreements, change-impact analysis, and reader-oriented handoffs.
 
 ## Templates
 

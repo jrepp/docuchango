@@ -65,14 +65,24 @@ Detailed description of the proposed solution.
 Reference the parent PRD's requirements and acceptance criteria. Without a parent
 PRD, state requirements and their rationale here. Preserve IDs across revisions.
 
-| Source requirement | Acceptance criterion | Design section | Verification |
-|--------------------|----------------------|----------------|--------------|
-| [PRD reference / FR-1] | AC-1 | [Relevant section] | [Test level and evidence] |
+For long-running work, identify the source baseline (path plus commit, version,
+or date where needed). Check ranges against actual AC definitions, including gaps;
+do not invent missing IDs. Repeated references are valid; duplicate definitions
+or ambiguous source documents need clarification.
+
+| Source requirement | Acceptance criterion | Disposition | Design section | Verification |
+|--------------------|----------------------|-------------|----------------|--------------|
+| [PRD reference / FR-1] | AC-1 | [Covered / deferred / unresolved] | [Relevant section] | [Test level and evidence] |
 
 Identify deferred requirements explicitly. Keep one authoritative requirement
 statement and reference it; technical details supplement rather than rewrite
 the product contract. A short list is enough for a small change.
 See the [worked example](../docs/ACCEPTANCE_CRITERIA.md).
+
+Covered requires a mechanism and observable result, not just an ID mention.
+Record the reason and agreement source for deferred scope; a proposed deferral
+remains unresolved. Distinguish verified current behavior from proposed design
+and assumptions. Check named interfaces, defaults, and paths at their sources.
 
 ### High-Level Design
 
@@ -252,6 +262,11 @@ evidence and explain which incorrect behavior each check detects. Planned
 coverage is not a passing result. Keep execution results with tests or release
 records instead of maintaining stale results in this RFC.
 
+Separate feature acceptance from shared Definition of Done checks such as lint
+and peer review. The [planning and test example](../docs/PLANNING_AND_VERIFICATION.md)
+shows how to map criteria to reviewable steps and evidence without another
+mandatory document or fixed scenario count.
+
 ### Unit Tests
 
 - Component-level test coverage
@@ -368,6 +383,19 @@ Define technical terms or acronyms used in this RFC.
 Academic papers, blog posts, or other resources that informed this design.
 
 ## Revision History
+
+### Change Impact and Review
+
+For an amendment, identify the changed decision and source baseline, affected
+criteria/documents/tests, follow-up owners, and verification state. Preserve
+unrelated decisions and completed-work history. An impact proposal does not mean
+the downstream artifacts were synchronized.
+
+Use the [review and amendment guide](../docs/REVIEW_GUIDE.md) to distinguish
+evidence-backed defects, open questions, and suggestions. State the conditions
+that would reverse consequential decisions. Before handoff, ask a reader to
+perform a realistic planning or recovery task from the RFC alone, and check
+references from the intended shared location.
 
 Optional section to track major changes:
 

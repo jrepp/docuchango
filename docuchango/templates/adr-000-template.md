@@ -13,9 +13,17 @@ doc_uuid: 00000000-0000-4000-8000-000000000000  # python -c "import uuid; print(
 
 What is the issue that we're seeing that is motivating this decision or change?
 
+Separate observed facts (with source/revision where relevant) from assumptions.
+Verify named paths, interfaces, defaults, and supported values against their
+authoritative sources. Label not-yet-built behavior as planned.
+
 # Decision
 
 What is the change that we're proposing and/or doing?
+
+Explain the evidence for the choice and its trade-offs. State what new evidence
+or changed constraint would cause us to reconsider it. Do not invent alternatives
+or treat a reviewer preference as an approved decision.
 
 # Consequences
 
@@ -49,6 +57,10 @@ Description and reason for rejection.
 Description and reason for rejection.
 
 # References
+
+When amending this decision, identify affected requirements, designs, and tests,
+with owners and follow-ups. Preserve unrelated decisions and completed-work
+history; proposing an update is not evidence that it has been applied.
 
 - [Related ADR](./adr-001-example.md)
 - [External Resource](https://example.com)
