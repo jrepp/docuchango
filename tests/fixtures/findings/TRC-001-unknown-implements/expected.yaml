@@ -1,0 +1,13 @@
+summary: >-
+  An RFC declares implements: [prd-009], but no scanned document has that id.
+  The declaration itself is a dangling reference.
+messages:
+  - "TRC-001: frontmatter implements names 'prd-009', which is not another scanned document of this project"
+forbidden:
+  - "TRC-002"
+  - "TRC-003"
+  - "TRC-004"
+  - "TRC-005"
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1

@@ -1,10 +1,9 @@
 summary: >-
-  Two PRDs both define FR-1 and AC-1 and the RFC links neither, so its
-  references cannot be told apart. TRC-001 asks the author to link the PRD the
-  RFC implements.
+  Two PRDs both define FR-1 and AC-1 and the RFC declares no implements, so
+  its references cannot be told apart. TRC-001 asks for the declaration.
 messages:
-  - "FR-1 is defined in 2 requirements documents (prd-001-reports.md, prd-002-exports.md); link the one this document implements"
-  - "AC-1 is defined in 2 requirements documents (prd-001-reports.md, prd-002-exports.md); link the one this document implements"
+  - "FR-1 is defined in 2 documents (prd-001-reports.md, prd-002-exports.md); add frontmatter implements: [<id>]"
+  - "AC-1 is defined in 2 documents (prd-001-reports.md, prd-002-exports.md); add frontmatter implements: [<id>]"
 forbidden:
   - "TRC-002"
   - "TRC-003"

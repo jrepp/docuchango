@@ -1,0 +1,9 @@
+summary: >-
+  AC-1.1 and AC-1.2 are two distinct criteria, not two definitions of AC-1.
+  The RFC covers both.
+messages: []
+forbidden:
+  - "TRC-"
+fixed: false
+dry_run_exit_code: 0
+exit_code: 0

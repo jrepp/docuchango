@@ -2,7 +2,7 @@ summary: >-
   A PRD that has adopted acceptance criteria defines AC-2 with no Requirement
   line, so it cannot be traced to anything it tests.
 messages:
-  - "AC-2 names no requirement (add 'Requirement: FR-n')"
+  - "TRC-005: Line 31: AC-2 names no requirement (add 'Requirement: FR-n')"
 forbidden:
   - "TRC-001"
   - "TRC-002"

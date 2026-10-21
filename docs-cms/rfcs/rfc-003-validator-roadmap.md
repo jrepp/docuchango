@@ -549,25 +549,35 @@ templates ask for stable `FR-n`, `NFR-n` and `AC-n` IDs and for the RFC to
 account for each criterion as covered, deferred or unresolved. Nothing checked
 that the IDs line up. These five findings do, opt-in per type via
 `structure.doc_types.<type>.check_traceability: true` (default off), keyed by
-the bound schema like ID-010. Opt in the requirement types (`prd`, `generic`)
-and `rfc` together; documents with no IDs are silent.
+the bound schema like ID-010. Documents with no IDs are silent.
 
-Only `prd` and `generic` documents define IDs, in a heading (`### AC-1: ...`),
-a bold list item (`**AC-1** ...`) or a first table cell (`| FR-1 | ...`). An RFC
-that starts a coverage row with `FR-1` is citing it. Every other mention is a
-reference. References resolve against the requirements documents the citing
-document links to, or, when it links to none, every requirements document of
-the same (sub-)project; zero matches is TRC-001 "not defined", two or more is
-TRC-001 "defined in N documents; link the one this document implements".
-Ranges are never expanded (`AC-1 through AC-5` mentions two IDs): the authoring
-guide says not to assume a range contains a defined AC-3.
+Definitions are recognised by form in any opted-in document, because the RFC
+template allows requirements to be stated locally when there is no PRD: a
+heading (`### AC-1: ...`), a bold list item (`**FR-1**: ...`), or a row of a
+table whose header's first column is `ID` or `Requirement` and that has no
+`Disposition` or `Source` column. A table with a `Disposition` column is a
+coverage table; its rows cite IDs, and TRC-003 reads the disposition from that
+column rather than from any cell. A defining row whose other cells say deferred
+or out of scope marks the requirement deferred, which TRC-004 and TRC-005 honour.
+Dotted IDs (`AC-1.1`) are distinct IDs. HTML comments are masked like code.
 
-TRC-004 fires only for a requirements document an RFC links to, so a PRD nobody
-has designed yet is not a wall of findings. TRC-005 fires only for a document
-that already defines at least one `AC-n`, and exempts `NFR-n`, which are
-measured rather than scenario-tested. All five are report-only: the remedy is
-a decision, and inventing a missing criterion is the failure the guide warns
-against. Meaning, test quality and pass/fail evidence stay with review and CI.
+Scope is declared, not inferred. An RFC names the documents it covers in
+frontmatter `implements: [prd-001]` (optional on the RFC and PRD schemas, never
+auto-filled). References resolve against the document itself, then the
+declared documents, or with none declared against every defining document of
+the (sub-)project; two matches is TRC-001 "defined in N documents; add
+implements". TRC-004 fires only for a document something declares it
+implements, so a background link to a PRD claims nothing: the first version
+treated any link as a claim, and review showed that to be exactly the inference
+the authoring guide warns against. A requirement counts as covered when it or
+any criterion naming it is cited; `AC-1 through AC-4` cites every criterion the
+owning document defines between the endpoints and asserts nothing about gaps.
+`NFR-n` is subject to TRC-004 but exempt from TRC-005's "no criterion" rule,
+since a non-functional requirement may be verified by measurement alone.
+
+All five are report-only: the remedy is a decision, and inventing a missing
+criterion is the failure the guide warns against. Meaning, test quality and
+pass/fail evidence stay with review and CI.
 
 ### Planned validators
 

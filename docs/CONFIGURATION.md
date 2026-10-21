@@ -338,10 +338,18 @@ structure:
 ```
 
 Documents that use no IDs are silent, so existing documents need no migration.
-An RFC should link the PRD it implements; with no link its references are
-resolved against every requirements document in the project, and an ID that two
-of them define is reported as ambiguous. The recognised syntax and the five
-findings are described in [Acceptance criteria](ACCEPTANCE_CRITERIA.md#reference-syntax-and-validation)
+An RFC declares the PRDs or FRDs it covers in frontmatter:
+
+```yaml
+implements: [prd-001]
+```
+
+With it, the RFC's `FR-n` / `AC-n` references resolve against those documents
+and their criteria must each be covered or deferred (`TRC-004`). Without it,
+references resolve against every defining document in the project, and an ID
+two of them define is reported as ambiguous. Linking a PRD in the body is not a
+declaration. The recognised syntax and the five findings are described in
+[Acceptance criteria](ACCEPTANCE_CRITERIA.md#reference-syntax-and-validation)
 and the [validation reference](VALIDATION_REFERENCE.md#requirement-traceability).
 
 ## Index files

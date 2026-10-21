@@ -10,6 +10,7 @@ author: Your Name  # Person or team who wrote this RFC (e.g., "Jacob Repp", "Pla
                    # Generate: git config user.name
 tags: ["architecture", "api", "backend"]  # List of lowercase-with-dashes tags (e.g., ["performance", "security"])
 project_id: "your-project-id"  # Project identifier from docs-project.yaml
+implements: []  # optional: ids of the PRDs/FRDs this RFC covers, e.g. [prd-001]
 doc_uuid: "00000000-0000-4000-8000-000000000000"  # UUID v4 - Generate: uuidgen  OR  python -c "import uuid; print(uuid.uuid4())"
 ---
 

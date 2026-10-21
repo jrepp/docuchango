@@ -1,8 +1,8 @@
 summary: >-
-  A PRD that has adopted acceptance criteria defines FR-2, but no criterion
-  names it in a Requirement clause, so nothing says how it would be accepted.
+  A PRD that has adopted acceptance criteria defines FR-2 with no deferral,
+  and no criterion names it, so nothing says how it would be accepted.
 messages:
-  - "FR-2 has no acceptance criterion naming it in a 'Requirement:' clause"
+  - "TRC-005: Line 20: FR-2 has no acceptance criterion naming it in a 'Requirement:' clause"
 forbidden:
   - "TRC-001"
   - "TRC-002"

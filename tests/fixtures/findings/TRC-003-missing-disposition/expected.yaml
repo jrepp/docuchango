@@ -1,9 +1,9 @@
 summary: >-
-  The RFC's Requirements Coverage row for AC-1 leaves the disposition cell
-  empty, so nothing says whether the criterion is covered, deferred or
-  unresolved.
+  The RFC's coverage row for AC-1 leaves the Disposition cell empty while its
+  Design cell happens to begin with 'Covered'. The disposition is read from
+  the Disposition column, so the row is reported.
 messages:
-  - "TRC-003: Line 20: coverage row for FR-1, AC-1 has no disposition (covered, deferred or unresolved)"
+  - "TRC-003: Line 19: coverage row for FR-1, AC-1 has no disposition (covered, deferred or unresolved)"
 forbidden:
   - "TRC-001"
   - "TRC-002"

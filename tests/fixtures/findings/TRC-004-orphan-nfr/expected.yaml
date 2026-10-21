@@ -1,0 +1,16 @@
+summary: >-
+  The PRD defines NFR-1 and the implementing RFC never cites it. Non-
+  functional requirements need a design or a deferral like any other, so
+  TRC-004 reports it.
+messages:
+  - "TRC-004: Line 23: NFR-1 is not covered or deferred by rfc-001-export.md, which implements this document"
+forbidden:
+  - "TRC-001"
+  - "TRC-002"
+  - "TRC-003"
+  - "TRC-005"
+  - ": FR-1 is not covered"
+  - ": AC-1 is not covered"
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1

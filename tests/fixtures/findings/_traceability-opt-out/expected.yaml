@@ -1,5 +1,5 @@
 summary: >-
-  The same broken documents as TRC-001-dangling-reference but with
+  The same dangling AC-4 as TRC-001-dangling-reference but with
   check_traceability left at its default (false), so nothing is reported.
 messages: []
 forbidden:

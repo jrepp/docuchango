@@ -1,0 +1,14 @@
+summary: >-
+  AC-1 says 'Requirement: AC-2' and AC-2 names FR-1. A criterion is not a
+  requirement, so AC-1 still names none.
+messages:
+  - "TRC-005: Line 23: AC-1 names no requirement (add 'Requirement: FR-n')"
+forbidden:
+  - "TRC-001"
+  - "TRC-002"
+  - "TRC-003"
+  - "TRC-004"
+  - "AC-2 names no requirement"
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1

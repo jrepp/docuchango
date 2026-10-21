@@ -1,0 +1,34 @@
+---
+id: rfc-001
+title: "RFC-001: Export"
+status: Draft
+author: Engineering Team
+created: 2026-01-01
+tags: [testing]
+project_id: fixture-project
+doc_uuid: cccccccc-0001-4000-8000-000000000001
+---
+
+# RFC-001: Export
+
+## Requirements
+
+| ID | Requirement | Priority |
+|----|-------------|----------|
+| FR-1 | Reports are exportable | Must Have |
+
+## Acceptance Criteria
+
+### AC-1: Export a report
+
+Requirement: FR-1
+
+- **Given** a finished report
+- **When** the author exports it
+- **Then** a file is written
+
+## Requirements Coverage
+
+| Source requirement | Acceptance criterion | Disposition | Design section | Verification |
+|---|---|---|---|---|
+| FR-1 | AC-1 | Covered | Design | CLI test |

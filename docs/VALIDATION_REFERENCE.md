@@ -390,25 +390,27 @@ update references in one step.
 ## Requirement traceability
 
 Opt-in per document type with `check_traceability: true` (see
-[configuration](CONFIGURATION.md#requirement-traceability)). Requirement
-documents (`prd`, `generic`) define `FR-n`, `NFR-n` and `AC-n` IDs; every opted-in
-document references them. Nothing here judges whether a criterion is meaningful
-or a test passes.
+[configuration](CONFIGURATION.md#requirement-traceability)). Any opted-in
+document may define `FR-n`, `NFR-n` and `AC-n` IDs by form: a heading, a bold
+list item, or a row of a table whose first column is `ID` or `Requirement`. An
+RFC names the documents it covers in frontmatter `implements: [prd-001]`; that
+scopes its references and claims those documents' criteria. A body link does
+neither. Nothing here judges whether a criterion is meaningful or a test passes.
 
 **Detected**
 
-- `TRC-001`: an ID that no requirements document defines, or that two or more define. A reference resolves against the requirements documents the citing document links to, or, with no such link, every one in the project
+- `TRC-001`: an ID that no document defines, or that two or more define. A reference resolves against the document itself, then the documents it `implements`, or, with none declared, every defining document in the project. An `implements` id that names no scanned document is reported the same way
 - `TRC-002`: the same ID defined more than once in a document
-- `TRC-003`: a row of an RFC's Requirements Coverage table with no covered, deferred or unresolved disposition
-- `TRC-004`: an `FR-n` or `AC-n` that no document references, in a requirements document an RFC links to
-- `TRC-005`: an `AC-n` with no `Requirement:` clause, or an `FR-n` that no criterion names, in a document that already defines at least one `AC-n`
+- `TRC-003`: a row of a table with a `Disposition` column whose disposition cell is empty or still the template placeholder
+- `TRC-004`: an `FR-n`, `NFR-n` or `AC-n` of an implemented document that no implementer cites. A requirement counts as cited when any criterion naming it is cited; `AC-1 through AC-4` cites every criterion defined between the endpoints; a requirement whose defining row says deferred or out of scope is exempt
+- `TRC-005`: an `AC-n` with no `Requirement: FR-n` clause, or a non-deferred `FR-n` that no criterion names, in a document that already defines at least one `AC-n`
 
 **Left to you**
 
-All five are report-only. Decide whether the missing definition, disposition or
-criterion exists, then write it; the validator does not invent one. `NFR-n` is
-exempt from TRC-004 and TRC-005 because it is measured rather than
-scenario-tested.
+All five are report-only. Decide whether the missing definition, disposition,
+criterion or `implements` entry exists, then write it; the validator does not
+invent one. `NFR-n` is subject to TRC-004 but not to TRC-005: a non-functional
+requirement may be verified by measurement without a scenario.
 
 ## Index files
 

@@ -1,18 +1,33 @@
 """Requirement / acceptance-criterion traceability (TRC-001 .. TRC-005).
 
 The PRD, FRD and RFC templates ask authors to give requirements and acceptance
-criteria stable IDs (``FR-1``, ``NFR-1``, ``AC-1``) and to reference them from
-the RFC. This module reads those IDs out of Markdown so ``docuchango validate``
-can report a broken edge: a reference nobody defines, a definition made twice,
-a coverage row with no disposition, a criterion no design claims, or a
-requirement no criterion tests.
+criteria stable IDs (``FR-1``, ``NFR-1``, ``AC-1``, ``AC-1.1``) and to reference
+them from the RFC. This module reads those IDs out of Markdown so
+``docuchango validate`` can report a broken edge: a reference nobody defines, a
+definition made twice, a coverage row with no disposition, a criterion no
+design claims, or a requirement no criterion tests.
 
 Only the shape of the references is checked. Whether a criterion is meaningful,
 or a test passes, is for review and CI. The recognised syntax is documented in
 ``docs/ACCEPTANCE_CRITERIA.md``.
 
+Definitions are recognised by form, in any document type, so an RFC with no
+parent PRD can state its requirements locally as the template allows:
+
+* a heading whose text starts with the ID (``### AC-1: Export a report``);
+* a list item whose text starts with the ID in bold
+  (``- [ ] **AC-1** (Requirement: FR-1): ...``, ``1. **FR-1**: ...``);
+* a row of a table whose header's first column is ``ID`` or ``Requirement``
+  and that has no ``Disposition`` or ``Source`` column (``| FR-1 | ... |``).
+
+A table with a ``Disposition`` column is a coverage table: its rows cite IDs
+and must say covered, deferred or unresolved. A defining row whose other cells
+say ``deferred`` or ``out of scope`` is a deferred requirement, which is
+accounted for without a criterion or design.
+
 Parsing works on text already masked by :func:`docuchango.markdown.mask_code`,
 so IDs inside code fences and inline code are never definitions or references.
+HTML comments are masked here for the same reason.
 """
 
 from __future__ import annotations
@@ -20,24 +35,30 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-#: Schemas whose documents may define IDs. RFCs, ADRs and memos only reference
-#: them: an RFC coverage table that starts a row with ``FR-1`` is citing the
-#: requirement, not restating it.
-DEFINING_SCHEMAS = frozenset({"prd", "generic"})
-
-_ID = r"(?:AC|FR|NFR)-\d+"
+_ID = r"(?:AC|FR|NFR)-\d+(?:\.\d+)*"
 #: A bare ID. The lookbehind keeps ``NFR-1`` from also yielding ``FR-1`` and
-#: ``UAC-1`` from yielding ``AC-1``; the lookahead keeps ``AC-1a`` out.
+#: ``UAC-1`` from yielding ``AC-1``; the lookahead keeps ``AC-1a`` out. A dotted
+#: ID (``AC-1.1``) is one ID, distinct from ``AC-1``; a trailing full stop is
+#: punctuation (``see AC-1.``).
 ID_RE = re.compile(rf"(?<![A-Za-z0-9_-])({_ID})(?![A-Za-z0-9_])")
+#: ``AC-1 through AC-3``. A bare hyphen is not a range operator: ``AC-1-AC-3``
+#: cannot be told from hyphenated prose.
+RANGE_RE = re.compile(rf"({_ID})\s*(?:through|thru|to|\.\.+|–|—)\s*({_ID})", re.IGNORECASE)
 
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
-_DEF_HEADING_RE = re.compile(rf"^(#{{2,6}})\s+\W*({_ID})(?![A-Za-z0-9_])")
+_DEF_HEADING_RE = re.compile(rf"^(#{{1,6}})\s+\W*({_ID})(?![A-Za-z0-9_])")
 _DEF_BULLET_RE = re.compile(rf"^\s*(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?\*\*({_ID})\*\*")
-_DEF_TABLE_RE = re.compile(r"^\s*\|\s*\**\s*((?:FR|NFR)-\d+)\s*\**\s*\|")
-_REQUIREMENT_RE = re.compile(r"Requirements?\s*:\s*([^)]*)")
-_TABLE_ROW_RE = re.compile(r"^\s*\|")
+_TABLE_ROW_RE = re.compile(r"^\s*\|.*\|\s*$")
 _TABLE_SEPARATOR_RE = re.compile(r"^\s*\|[\s:|-]+\|\s*$")
-_COVERAGE_HEADING_RE = re.compile(r"requirements?\s+coverage", re.IGNORECASE)
+_DEFINING_HEADER_RE = re.compile(r"^(ids?|requirements?|criteri(?:a|on)|acceptance criteri(?:a|on))\b")
+_CITING_HEADER_RE = re.compile(r"disposition|source|coverage")
+_DISPOSITION_HEADER_RE = re.compile(r"disposition")
+_DEFERRED_RE = re.compile(r"\b(deferred|descoped|out of scope|not in scope)\b", re.IGNORECASE)
+#: ``Requirement: FR-1, FR-2`` up to the end of the clause. The clause ends at
+#: a closing bracket, colon or semicolon so the Given/When/Then text that
+#: follows on the same line is not read as more requirements.
+_REQUIREMENT_RE = re.compile(r"Requirements?\s*:\s*([^():;]*)")
+_HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 _DISPOSITIONS = ("covered", "deferred", "unresolved")
 
 
@@ -47,9 +68,12 @@ class Definition:
 
     id: str
     line: int
-    #: Requirement IDs named by a ``Requirement:`` clause in this definition's
-    #: span. Only meaningful for ``AC-*`` definitions.
+    #: FR/NFR IDs named by a ``Requirement:`` clause in this definition's span.
+    #: Only meaningful for ``AC-*`` definitions.
     requirements: list[str] = field(default_factory=list)
+    #: A defining table row whose other cells say the requirement is deferred
+    #: or out of scope. It is accounted for without a criterion or design.
+    deferred: bool = False
 
 
 @dataclass
@@ -61,83 +85,149 @@ class Reference:
 
 
 @dataclass
+class Range:
+    """``lo through hi``: a claim over every defined ID between the endpoints."""
+
+    prefix: str
+    lo: int
+    hi: int
+    line: int
+
+
+@dataclass
 class DocTrace:
     """Everything traceability reads from one document."""
 
     definitions: dict[str, list[Definition]] = field(default_factory=dict)
     references: list[Reference] = field(default_factory=list)
+    ranges: list[Range] = field(default_factory=list)
     #: (line, IDs on the row) for coverage-table rows with no disposition.
     rows_without_disposition: list[tuple[int, list[str]]] = field(default_factory=list)
 
     def defined_ids(self, prefix: str | None = None) -> list[str]:
-        ids = self.definitions.keys()
-        return [i for i in ids if prefix is None or i.startswith(prefix)]
+        return [i for i in self.definitions if prefix is None or i.startswith(prefix)]
+
+    def is_deferred(self, def_id: str) -> bool:
+        return any(d.deferred for d in self.definitions.get(def_id, []))
 
 
-def _heading_level(line: str) -> int | None:
-    match = _HEADING_RE.match(line)
-    return len(match.group(1)) if match else None
+def split_id(def_id: str) -> tuple[str, int | None]:
+    """``("AC", 3)`` for ``AC-3``; number is None for a dotted ID."""
+    prefix, _, number = def_id.partition("-")
+    return prefix, int(number) if number.isdigit() else None
 
 
-def _definition_at(line: str, can_define: bool) -> tuple[str, int | None] | None:
-    """Return ``(id, heading level or None)`` when ``line`` defines an ID."""
-    if not can_define:
-        return None
-    match = _DEF_HEADING_RE.match(line)
-    if match:
-        return match.group(2), len(match.group(1))
-    match = _DEF_BULLET_RE.match(line)
-    if match:
-        return match.group(1), None
-    match = _DEF_TABLE_RE.match(line)
-    if match:
-        return match.group(1), None
-    return None
+def _cells(row: str) -> list[str]:
+    return [cell.strip() for cell in row.strip().strip("|").split("|")]
 
 
-def _requirement_ids(text: str) -> list[str]:
+def _plain(cell: str) -> str:
+    return cell.strip().strip("*_`[] ").lower()
+
+
+def has_disposition(cell: str) -> bool:
+    """True when a coverage-table cell says covered, deferred or unresolved."""
+    text = _plain(cell)
+    return text.startswith(_DISPOSITIONS) and "/" not in text  # "[Covered / deferred / unresolved]" is the placeholder
+
+
+def mask_html_comments(lines: list[str]) -> list[str]:
+    """Blank HTML comments, line count preserved."""
+    text = "\n".join(lines)
+    masked = _HTML_COMMENT_RE.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), text)
+    return masked.split("\n")
+
+
+def _requirement_ids(line: str) -> list[str]:
     ids: list[str] = []
-    for clause in _REQUIREMENT_RE.finditer(text):
-        ids.extend(m.group(1) for m in ID_RE.finditer(clause.group(1)))
+    for clause in _REQUIREMENT_RE.finditer(line):
+        ids.extend(m.group(1) for m in ID_RE.finditer(clause.group(1)) if not m.group(1).startswith("AC-"))
     return ids
 
 
-def has_disposition(row: str) -> bool:
-    """True when a coverage-table row has a covered/deferred/unresolved cell."""
-    cells = [cell.strip().strip("*_` ").lower() for cell in row.strip().strip("|").split("|")]
-    return any(cell.startswith(_DISPOSITIONS) for cell in cells)
+@dataclass
+class _Table:
+    header: list[str]
+    defines: bool
+    disposition_column: int | None
 
 
-def parse_traceability(lines: list[str], can_define: bool) -> DocTrace:
-    """Read definitions, references and coverage rows from masked lines.
+def _table_at(lines: list[str], index: int) -> _Table | None:
+    """The table whose header row is ``lines[index]``, if it is one."""
+    if (
+        index + 1 >= len(lines)
+        or not _TABLE_ROW_RE.match(lines[index])
+        or not _TABLE_SEPARATOR_RE.match(lines[index + 1])
+    ):
+        return None
+    header = [_plain(cell) for cell in _cells(lines[index])]
+    if not header:
+        return None
+    disposition = next((i for i, cell in enumerate(header) if _DISPOSITION_HEADER_RE.search(cell)), None)
+    defines = bool(_DEFINING_HEADER_RE.match(header[0])) and not any(_CITING_HEADER_RE.search(c) for c in header)
+    return _Table(header=header, defines=defines, disposition_column=disposition)
+
+
+def parse_traceability(lines: list[str]) -> DocTrace:
+    """Read definitions, references, ranges and coverage rows from masked lines.
 
     ``lines`` is the document with frontmatter and code already masked, one
     string per line, so list index plus one is the real line number.
     """
+    lines = mask_html_comments(lines)
     trace = DocTrace()
 
-    # First pass: where is each ID defined, and how far does its span run?
-    starts: list[tuple[int, str, int | None]] = []  # (index, id, heading level)
+    # First pass: definitions and coverage rows, walking tables as units.
+    # (index, id, heading level or None, deferred)
+    starts: list[tuple[int, str, int | None, bool]] = []
+    table: _Table | None = None
     for index, line in enumerate(lines):
-        found = _definition_at(line, can_define)
-        if found:
-            starts.append((index, found[0], found[1]))
+        if table is not None:
+            if not _TABLE_ROW_RE.match(line):
+                table = None
+            elif _TABLE_SEPARATOR_RE.match(line):
+                continue
+            else:
+                cells = _cells(line)
+                if table.defines and cells:
+                    match = ID_RE.match(cells[0].strip("*_` "))
+                    if match and match.group(1) == cells[0].strip("*_` "):
+                        deferred = any(_DEFERRED_RE.search(c) for c in cells[1:])
+                        starts.append((index, match.group(1), None, deferred))
+                if table.disposition_column is not None:
+                    ids = [m.group(1) for m in ID_RE.finditer(line)]
+                    cell = cells[table.disposition_column] if table.disposition_column < len(cells) else ""
+                    if ids and not has_disposition(cell):
+                        trace.rows_without_disposition.append((index + 1, ids))
+                continue
+        table = _table_at(lines, index)
+        if table is not None:
+            continue
+        match = _DEF_HEADING_RE.match(line)
+        if match:
+            starts.append((index, match.group(2), len(match.group(1)), False))
+            continue
+        match = _DEF_BULLET_RE.match(line)
+        if match:
+            starts.append((index, match.group(1), None, False))
 
+    # A definition's span runs to the next definition, a heading at or above
+    # its own level, or (for a list item) the next unindented line.
     definition_lines: dict[int, str] = {}
-    for position, (index, def_id, level) in enumerate(starts):
+    for position, (index, def_id, level, deferred) in enumerate(starts):
         end = starts[position + 1][0] if position + 1 < len(starts) else len(lines)
         for probe in range(index + 1, end):
             probe_level = _heading_level(lines[probe])
             if probe_level is not None and (level is None or probe_level <= level):
                 end = probe
                 break
-            # A bullet's span is its own line plus indented continuation lines.
             if level is None and lines[probe].strip() and not lines[probe][0].isspace():
                 end = probe
                 break
-        definition = Definition(id=def_id, line=index + 1)
+        definition = Definition(id=def_id, line=index + 1, deferred=deferred)
         if def_id.startswith("AC-"):
-            definition.requirements = _requirement_ids("\n".join(lines[index:end]))
+            for span_line in lines[index:end]:
+                definition.requirements.extend(_requirement_ids(span_line))
         trace.definitions.setdefault(def_id, []).append(definition)
         definition_lines[index] = def_id
 
@@ -152,21 +242,14 @@ def parse_traceability(lines: list[str], can_define: bool) -> DocTrace:
                 skipped_own = True
                 continue
             trace.references.append(Reference(id=ref_id, line=index + 1))
-
-    # Third pass: coverage-table rows need a disposition.
-    coverage_level: int | None = None
-    for index, line in enumerate(lines):
-        level = _heading_level(line)
-        if level is not None:
-            if coverage_level is not None and level <= coverage_level:
-                coverage_level = None
-            if _COVERAGE_HEADING_RE.search(line):
-                coverage_level = level
-            continue
-        if coverage_level is None or not _TABLE_ROW_RE.match(line) or _TABLE_SEPARATOR_RE.match(line):
-            continue
-        ids = [m.group(1) for m in ID_RE.finditer(line)]
-        if ids and not has_disposition(line):
-            trace.rows_without_disposition.append((index + 1, ids))
+        for match in RANGE_RE.finditer(line):
+            (lo_prefix, lo), (hi_prefix, hi) = split_id(match.group(1)), split_id(match.group(2))
+            if lo_prefix == hi_prefix and lo is not None and hi is not None and lo <= hi:
+                trace.ranges.append(Range(prefix=lo_prefix, lo=lo, hi=hi, line=index + 1))
 
     return trace
+
+
+def _heading_level(line: str) -> int | None:
+    match = _HEADING_RE.match(line)
+    return len(match.group(1)) if match else None

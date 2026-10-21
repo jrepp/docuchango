@@ -1,9 +1,8 @@
 summary: >-
-  A PRD defines FR-1 and AC-1, and an RFC that links it also cites AC-4, which
-  the linked PRD never defines. The RFC's own coverage table is complete, so
-  only the dangling reference is reported.
+  An RFC implements prd-001 and cites AC-4, which that PRD never defines. Its
+  coverage table is complete, so only the dangling reference is reported.
 messages:
-  - "TRC-001: Line 24: AC-4 is not defined in a linked requirements document (prd-001-reports.md)"
+  - "TRC-001: Line 23: AC-4 is not defined in an implemented document (prd-001-reports.md)"
 forbidden:
   - "TRC-002"
   - "TRC-003"

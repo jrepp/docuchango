@@ -6,6 +6,7 @@ created: YYYY-MM-DDTHH:MM:SSZ  # python -c "from datetime import datetime, timez
 tags: [rfc, design]
 id: rfc-000  # lowercase rfc-XXX format matching filename
 project_id: my-project  # from docs-project.yaml
+implements: []  # optional: ids of the PRDs/FRDs this RFC covers, e.g. [prd-001]
 doc_uuid: 00000000-0000-4000-8000-000000000000  # python -c "import uuid; print(uuid.uuid4())"
 ---
 

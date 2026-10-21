@@ -1,0 +1,10 @@
+summary: >-
+  The PRD defines AC-1, AC-2 and AC-4 and the RFC claims 'AC-1 through AC-4'.
+  The range covers every criterion defined between the endpoints; the gap at
+  AC-3 is neither claimed nor an error.
+messages: []
+forbidden:
+  - "TRC-"
+fixed: false
+dry_run_exit_code: 0
+exit_code: 0

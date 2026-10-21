@@ -105,7 +105,7 @@ from docuchango.text_io import (
     line_ending_finding_message,
     read_text,
 )
-from docuchango.traceability import DEFINING_SCHEMAS, DocTrace, parse_traceability
+from docuchango.traceability import DocTrace, parse_traceability, split_id
 
 #: Frontmatter fields FM-011 checks. The legacy ``date`` field is excluded:
 #: Phase 1 migrates it to ``created`` before Phase 2 could report it.
@@ -202,6 +202,10 @@ class Document:
     # the parse cannot distinguish a `Z` timestamp from a `+00:00` one, so the
     # check reads the document source (see `frontmatter_date_source`).
     date_source: dict[str, str] = field(default_factory=dict)
+    # Frontmatter `implements`: ids of the requirements documents this one
+    # covers (`[prd-001]`). Declares scope for TRC-001/TRC-004; a body link
+    # does not.
+    implements: list[str] = field(default_factory=list)
     links: list["Link"] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     _content_cache: str | None = None  # Cached file content to avoid multiple reads
@@ -799,6 +803,15 @@ class DocValidator:
         )
 
     @staticmethod
+    def _frontmatter_implements(metadata: dict[str, Any]) -> list[str]:
+        """Frontmatter `implements` as a list of lowercase ids; a scalar is one id."""
+        value = metadata.get("implements")
+        if value is None:
+            return []
+        items = value if isinstance(value, list) else [value]
+        return [str(item).strip().lower() for item in items if str(item).strip()]
+
+    @staticmethod
     def _frontmatter_project_id(metadata: dict[str, Any]) -> str | None:
         """Return the frontmatter ``project_id`` as written, or ``None``.
 
@@ -882,6 +895,7 @@ class DocValidator:
                     tags=metadata.get("tags", []),
                     doc_id=metadata.get("id", ""),
                     expected_id=expected_id,
+                    implements=self._frontmatter_implements(metadata),
                     project_id=self._frontmatter_project_id(metadata),
                     date_source=frontmatter_date_source(content, metadata),
                     _content_cache=content,
@@ -914,6 +928,7 @@ class DocValidator:
                 doc_id=metadata.get("id", ""),
                 expected_id=expected_id,
                 doc_uuid=metadata.get("doc_uuid", ""),
+                implements=self._frontmatter_implements(metadata),
                 project_id=self._frontmatter_project_id(metadata),
                 date_source=frontmatter_date_source(content, metadata),
                 _content_cache=content,
@@ -2083,22 +2098,24 @@ class DocValidator:
         return {cfg.frontmatter_schema for cfg in structure.doc_types.values() if cfg.check_traceability}
 
     def check_traceability(self):
-        """Check FR/NFR/AC reference integrity between requirements and RFCs.
+        """Check FR/NFR/AC reference integrity across the opted-in documents.
 
         Opt-in per document type via
-        `structure.doc_types.<type>.check_traceability: true`. Requirement
-        documents (prd, generic) define IDs; every document of an opted-in type
-        references them. A reference resolves against the requirements
-        documents the referencing document links to, or, when it links to none,
-        against every requirements document of the same project. Report only:
-        inventing a missing requirement or criterion is the failure the
-        authoring guide warns against.
+        `structure.doc_types.<type>.check_traceability: true`. Any opted-in
+        document may define IDs (by heading, bold list item or ID table; see
+        :mod:`docuchango.traceability`), so an RFC without a parent PRD can
+        state its requirements locally. An RFC names the requirements
+        documents it covers in frontmatter `implements: [prd-001]`; that
+        declaration scopes reference resolution and claims the document's
+        criteria. A body link does neither.
 
-        TRC-001 reference defined nowhere (or ambiguously); TRC-002 ID defined
+        TRC-001 reference defined nowhere or ambiguously; TRC-002 ID defined
         twice in one document; TRC-003 coverage row with no disposition;
-        TRC-004 criterion/requirement no RFC claims, in a document an RFC links
-        to; TRC-005 criterion with no `Requirement:` or requirement with no
-        criterion, in a document that defines criteria.
+        TRC-004 criterion or requirement of an implemented document that no
+        implementer covers or defers; TRC-005 criterion naming no requirement,
+        or requirement with no criterion, in a document that defines criteria.
+        Report only: inventing a missing requirement or criterion is the
+        failure the authoring guide warns against.
         """
         self.log("\n🧭 Checking requirement traceability...")
 
@@ -2123,8 +2140,7 @@ class DocValidator:
             except Exception as e:
                 self.errors.append(f"Error reading {doc.file_path} for traceability: {e}")
                 continue
-            trace = parse_traceability(lines, can_define=doc.doc_type in DEFINING_SCHEMAS)
-            groups.setdefault(context.path, []).append((doc, trace))
+            groups.setdefault(context.path, []).append((doc, parse_traceability(lines)))
 
         if not groups:
             self.log("   ⊘ No document type opts into traceability checks")
@@ -2142,7 +2158,8 @@ class DocValidator:
     def _check_traceability_group(self, entries: list[tuple[Document, DocTrace]]) -> int:
         """Run TRC-001..005 over the opted-in documents of one project."""
         traces = {doc.file_path.resolve(): (doc, trace) for doc, trace in entries}
-        definers = {path: pair for path, pair in traces.items() if pair[1].definitions}
+        definers = {path for path, (_, trace) in traces.items() if trace.definitions}
+        by_id = {doc.doc_id.lower(): path for path, (doc, _) in traces.items() if doc.doc_id}
         findings = 0
 
         def report(doc: Document, message: str) -> None:
@@ -2151,21 +2168,30 @@ class DocValidator:
             self.log(f"   ✗ {doc.file_path.name}: {message}")
             findings += 1
 
-        # Which opted-in documents does each document link to?
-        linked: dict[Path, set[Path]] = {}
+        def name(path: Path) -> str:
+            return traces[path][0].file_path.name
+
+        # `implements` resolved to documents of this group. Unknown ids are a
+        # dangling reference; a document never implements itself.
+        implements: dict[Path, set[Path]] = {}
+        implementers: dict[Path, set[Path]] = {}
         for path, (doc, _) in traces.items():
             targets: set[Path] = set()
-            for link in doc.links:
-                if link.link_type not in RESOLVED_LINK_TYPES:
+            for ref_id in doc.implements:
+                target = by_id.get(ref_id)
+                if target is None or target == path:
+                    report(
+                        doc,
+                        f"TRC-001: frontmatter implements names '{ref_id}', which is not another scanned document of this project",
+                    )
                     continue
-                target, exists = resolve_internal_link(link.source_doc, self.repo_root, link.target)
-                if exists and target.resolve() != path and target.resolve() in traces:
-                    targets.add(target.resolve())
-            linked[path] = targets
+                targets.add(target)
+                implementers.setdefault(target, set()).add(path)
+            implements[path] = targets
 
         def sources_for(path: Path) -> set[Path]:
-            explicit = linked[path] & definers.keys()
-            return explicit if explicit else set(definers) - {path}
+            declared = implements[path] & definers
+            return declared if declared else definers - {path}
 
         def resolve(path: Path, ref_id: str) -> tuple[Path | None, list[Path]]:
             """The document that defines ref_id for path, plus the candidates tried."""
@@ -2174,8 +2200,8 @@ class DocValidator:
             candidates = sorted(p for p in sources_for(path) if ref_id in traces[p][1].definitions)
             return (candidates[0] if len(candidates) == 1 else None), candidates
 
-        referenced: set[tuple[Path, str]] = set()  # (defining doc, id) mentioned by another doc
-        requirement_covered: set[tuple[Path, str]] = set()  # FRs some AC names in a Requirement: clause
+        referenced: set[tuple[Path, str]] = set()  # (defining doc, id) cited by another doc
+        requirement_covered: set[tuple[Path, str]] = set()  # (defining doc, FR/NFR) some AC names
 
         for path, (doc, trace) in traces.items():
             # TRC-002: one ID defined twice in the same document.
@@ -2196,23 +2222,31 @@ class DocValidator:
                         referenced.add((owner, ref.id))
                     continue
                 if candidates:
-                    names = ", ".join(traces[p][0].file_path.name for p in candidates)
+                    names = ", ".join(name(p) for p in candidates)
                     report(
                         doc,
-                        f"TRC-001: Line {ref.line}: {ref.id} is defined in {len(candidates)} requirements "
-                        f"documents ({names}); link the one this document implements",
+                        f"TRC-001: Line {ref.line}: {ref.id} is defined in {len(candidates)} documents ({names}); "
+                        f"add frontmatter implements: [<id>] naming the one this document implements",
                     )
-                elif linked[path] & definers.keys():
-                    names = ", ".join(sorted(traces[p][0].file_path.name for p in linked[path] & definers.keys()))
+                elif implements[path] & definers:
+                    names = ", ".join(sorted(name(p) for p in implements[path] & definers))
                     report(
-                        doc,
-                        f"TRC-001: Line {ref.line}: {ref.id} is not defined in a linked requirements document ({names})",
+                        doc, f"TRC-001: Line {ref.line}: {ref.id} is not defined in an implemented document ({names})"
                     )
                 else:
-                    report(
-                        doc,
-                        f"TRC-001: Line {ref.line}: {ref.id} is not defined in any requirements document in this project",
-                    )
+                    report(doc, f"TRC-001: Line {ref.line}: {ref.id} is not defined in any document of this project")
+
+            # A range claims every defined ID between endpoints that resolve to
+            # one document. Interior IDs that are not defined are not an error.
+            for span in trace.ranges:
+                lo_owner, _ = resolve(path, f"{span.prefix}-{span.lo}")
+                hi_owner, _ = resolve(path, f"{span.prefix}-{span.hi}")
+                if lo_owner is None or lo_owner != hi_owner or lo_owner == path:
+                    continue
+                for def_id in traces[lo_owner][1].defined_ids(f"{span.prefix}-"):
+                    _, number = split_id(def_id)
+                    if number is not None and span.lo <= number <= span.hi:
+                        referenced.add((lo_owner, def_id))
 
             # TRC-003: a coverage row must say covered, deferred or unresolved.
             for line, ids in trace.rows_without_disposition:
@@ -2229,20 +2263,37 @@ class DocValidator:
                         if owner is not None:
                             requirement_covered.add((owner, req_id))
 
-        for path, (doc, trace) in definers.items():
-            # TRC-004: only for a document an RFC claims by linking to it, so a
-            # PRD nobody has designed yet is not a wall of findings.
-            claimed = any(
-                traces[other][0].doc_type == "rfc" and path in linked[other] for other in traces if other != path
-            )
-            if claimed:
+        # An FR/NFR counts as covered when it, or any criterion that names it, is cited.
+        criteria_of: dict[tuple[Path, str], set[str]] = {}
+        for path, (_, trace) in traces.items():
+            for ac_id in trace.defined_ids("AC-"):
+                for definition in trace.definitions[ac_id]:
+                    for req_id in definition.requirements:
+                        owner, _ = resolve(path, req_id)
+                        if owner is not None:
+                            criteria_of.setdefault((owner, req_id), set()).add(ac_id)
+        # Only criteria defined in the same document as the requirement count
+        # for TRC-004 (an FRD's criteria are claimed through the FRD itself).
+
+        for path in sorted(definers, key=str):
+            doc, trace = traces[path]
+            # TRC-004: only for a document something declares it implements.
+            claimers = implementers.get(path, set())
+            if claimers:
+                claimer_names = ", ".join(sorted(name(p) for p in claimers))
                 for def_id in trace.defined_ids():
-                    if def_id.startswith("NFR-") or (path, def_id) in referenced:
+                    if trace.is_deferred(def_id) or (path, def_id) in referenced:
+                        continue
+                    if not def_id.startswith("AC-") and any(
+                        (path, ac_id) in referenced
+                        for ac_id in criteria_of.get((path, def_id), ())
+                        if ac_id in trace.definitions
+                    ):
                         continue
                     line = trace.definitions[def_id][0].line
                     report(
                         doc,
-                        f"TRC-004: Line {line}: {def_id} is not referenced by any document; an RFC links here but does not cover or defer it",
+                        f"TRC-004: Line {line}: {def_id} is not covered or deferred by {claimer_names}, which implements this document",
                     )
 
             # TRC-005: only once the document has adopted acceptance criteria.
@@ -2256,12 +2307,13 @@ class DocValidator:
                         doc, f"TRC-005: Line {definition.line}: {ac_id} names no requirement (add 'Requirement: FR-n')"
                     )
             for fr_id in trace.defined_ids("FR-"):
-                if (path, fr_id) not in requirement_covered:
-                    line = trace.definitions[fr_id][0].line
-                    report(
-                        doc,
-                        f"TRC-005: Line {line}: {fr_id} has no acceptance criterion naming it in a 'Requirement:' clause",
-                    )
+                if trace.is_deferred(fr_id) or (path, fr_id) in requirement_covered:
+                    continue
+                line = trace.definitions[fr_id][0].line
+                report(
+                    doc,
+                    f"TRC-005: Line {line}: {fr_id} has no acceptance criterion naming it in a 'Requirement:' clause",
+                )
 
         return findings
 
