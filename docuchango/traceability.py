@@ -121,7 +121,23 @@ def split_id(def_id: str) -> tuple[str, int | None]:
 
 
 def _cells(row: str) -> list[str]:
-    return [cell.strip() for cell in row.strip().strip("|").split("|")]
+    """Split Markdown delimiters without discarding empty or escaped cells."""
+    cells: list[str] = []
+    start = 0
+    backslashes = 0
+    text = row.strip()
+    for index, char in enumerate(text):
+        if char == "|" and backslashes % 2 == 0:
+            cells.append(text[start:index].strip())
+            start = index + 1
+        backslashes = backslashes + 1 if char == "\\" else 0
+    cells.append(text[start:].strip())
+    # Remove only the boundary delimiters, not adjacent empty data cells.
+    if text.startswith("|"):
+        cells = cells[1:]
+    if start == len(text) and text.endswith("|"):
+        cells = cells[:-1]
+    return cells
 
 
 def _plain(cell: str) -> str:
@@ -130,8 +146,12 @@ def _plain(cell: str) -> str:
 
 def has_disposition(cell: str) -> bool:
     """True when a coverage-table cell says covered, deferred or unresolved."""
-    text = _plain(cell)
-    return text.startswith(_DISPOSITIONS) and "/" not in text  # "[Covered / deferred / unresolved]" is the placeholder
+    text = re.sub(r"\*\*|__", "", _plain(cell))
+    alternatives = "|".join(_DISPOSITIONS)
+    if not re.match(rf"^(?:{alternatives})\b", text):
+        return False
+    # Reject an unselected choice, not slashes in explanatory prose or URLs.
+    return not re.match(rf"^(?:{alternatives})\s*/\s*(?:{alternatives})\b", text)
 
 
 def mask_html_comments(lines: list[str]) -> list[str]:

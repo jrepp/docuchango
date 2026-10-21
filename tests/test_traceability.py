@@ -10,7 +10,7 @@ import pytest
 
 from docuchango.markdown import mask_code
 from docuchango.schemas import DocsProjectConfig, RFCFrontmatter
-from docuchango.traceability import has_disposition, parse_traceability
+from docuchango.traceability import _cells, has_disposition, parse_traceability
 from docuchango.validator import DocValidator
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -121,6 +121,26 @@ class TestRequirementClause:
 
 class TestCoverageRows:
     @pytest.mark.parametrize(
+        ("row", "expected"),
+        [
+            ("|| AC-1 | Covered | design | test |", ["", "AC-1", "Covered", "design", "test"]),
+            (r"| FR-1 | Accept A \| B | Deferred |", ["FR-1", r"Accept A \| B", "Deferred"]),
+            ("| a ||", ["a", ""]),
+            (r"| a \\| b |", [r"a \\", "b"]),
+        ],
+    )
+    def test_trc003_table_cell_boundaries(self, row, expected):
+        assert _cells(row) == expected
+
+    def test_trc003_empty_source_cell_keeps_disposition_column(self):
+        trace = _parse(COVERAGE + "|| AC-1 | Covered | design | test |\n")
+        assert trace.rows_without_disposition == []
+
+    def test_trc004_trc005_escaped_pipe_preserves_deferral(self):
+        trace = _parse(ID_TABLE + r"| FR-1 | Accept A \| B | Deferred |" + "\n")
+        assert trace.is_deferred("FR-1")
+
+    @pytest.mark.parametrize(
         ("cell", "expected"),
         [
             ("Covered", True),
@@ -129,6 +149,12 @@ class TestCoverageRows:
             ("", False),
             ("[Covered / deferred / unresolved]", False),
             ("TBD", False),
+            ("Covered (unit/integration tests)", True),
+            ("Deferred: [decision](../adr/adr-002.md)", True),
+            ("**Covered** (unit/integration tests)", True),
+            ("Covered/deferred", False),
+            ("**Covered** / **Unresolved**", False),
+            ("Coveredness", False),
         ],
     )
     def test_disposition_cell(self, cell, expected):
@@ -204,6 +230,28 @@ GOOD_RFC = COVERAGE + "| FR-1 | AC-1 | Covered | d | t |\n"
 
 
 class TestCheck:
+    def test_trc003_slash_explanations_and_empty_cells_validate_end_to_end(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(root, 1, GOOD_PRD)
+        _rfc(root, 1, COVERAGE + "|| AC-1 | Covered (unit/integration tests) | design | test |\n", "[prd-001]")
+        assert _findings(root) == []
+
+    def test_trc004_trc005_escaped_description_keeps_deferred_scope(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(root, 1, GOOD_PRD + "\n" + ID_TABLE + r"| FR-2 | Accept A \| B | Deferred |" + "\n")
+        _rfc(root, 1, GOOD_RFC, "[prd-001]")
+        assert _findings(root) == []
+
+    @pytest.mark.parametrize("reference", ["FR-1", "prd-002::FR-1"])
+    def test_trc001_empty_declared_source_does_not_fall_back(self, tmp_path, reference):
+        root = _project(tmp_path)
+        _prd(root, 1, "Requirements not numbered yet.\n")
+        _prd(root, 2, GOOD_PRD)
+        _rfc(root, 1, f"See {reference}.\n", "[prd-001]")
+        findings = _findings(root)
+        assert len(findings) == 1
+        assert "TRC-001" in findings[0] and "implemented document (prd-001-x.md)" in findings[0]
+
     @pytest.mark.parametrize("background", ["FR-1 and AC-1", "AC-1 through AC-1"])
     def test_trc004_background_cannot_cover_an_implementer(self, tmp_path, background):
         root = _project(tmp_path)
@@ -302,9 +350,9 @@ class TestCheck:
         _rfc(root, 1, GOOD_RFC, "prd-001")
         _rfc(root, 2, GOOD_RFC, "[prd-009]")
         findings = _findings(root)
-        assert findings == [
-            "TRC-001: frontmatter implements names 'prd-009', which is not another scanned document of this project"
-        ]
+        assert len(findings) == 3
+        assert "frontmatter implements names 'prd-009'" in findings[0]
+        assert all("cannot resolve because no implements target resolved" in f for f in findings[1:])
 
     def test_review_2_standalone_rfc_defines_its_own_requirements(self, tmp_path):
         root = _project(tmp_path)

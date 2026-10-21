@@ -2190,8 +2190,7 @@ class DocValidator:
             implements[path] = targets
 
         def sources_for(path: Path) -> set[Path]:
-            declared = implements[path] & definers
-            return declared if declared else definers - {path}
+            return implements[path] if traces[path][0].implements else definers - {path}
 
         def resolve(path: Path, ref_id: str) -> tuple[Path | None, list[Path]]:
             """The document that defines ref_id for path, plus the candidates tried."""
@@ -2238,10 +2237,14 @@ class DocValidator:
                         f"TRC-001: Line {ref.line}: {ref.id} is defined in {len(candidates)} documents ({names}); "
                         f"add frontmatter implements: [<id>] naming the source, or qualify the reference as <document-id>::{ref.id}",
                     )
-                elif implements[path] & definers:
-                    names = ", ".join(sorted(name(p) for p in implements[path] & definers))
+                elif implements[path]:
+                    names = ", ".join(sorted(name(p) for p in implements[path]))
                     report(
                         doc, f"TRC-001: Line {ref.line}: {ref.id} is not defined in an implemented document ({names})"
+                    )
+                elif doc.implements:
+                    report(
+                        doc, f"TRC-001: Line {ref.line}: {ref.id} cannot resolve because no implements target resolved"
                     )
                 else:
                     report(doc, f"TRC-001: Line {ref.line}: {ref.id} is not defined in any document of this project")

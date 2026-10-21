@@ -564,9 +564,16 @@ after a colon, dash, parenthesis, or `to`. Description text and negated phrases
 such as "not deferred" do not establish a deferral.
 Dotted IDs (`AC-1.1`) are distinct IDs. HTML comments are masked like code.
 
+TRC table parsing preserves empty columns and escaped pipes, including the
+backslash parity that determines whether a pipe is a delimiter. TRC-003 accepts
+slashes in explanations and evidence URLs; it rejects a slash-separated choice
+of dispositions instead of rejecting every slash.
+
 Scope is declared, not inferred. An RFC names the documents it covers in
 frontmatter `implements: [prd-001]` (optional on the RFC and PRD schemas, never
-auto-filled). References resolve against the document itself, then the
+auto-filled). Declared sources bound resolution even when no target defines any
+IDs; missing targets are reported without falling back to unrelated documents.
+References resolve against the document itself, then the
 declared documents, or with none declared against every defining document of
 the (sub-)project; two matches is TRC-001 "defined in N documents; add
 implements". TRC-004 fires only for a document something declares it

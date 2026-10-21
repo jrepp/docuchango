@@ -389,6 +389,16 @@ update references in one step.
 
 ## Requirement traceability
 
+Declared `implements` targets remain the resolution boundary even when they have
+no recognized definitions. Unknown targets are reported; they do not enable a
+fallback to unrelated documents. Only documents with no declared targets use
+project-wide resolution.
+
+Table parsing preserves empty cells and escaped pipes (`\|`). A disposition may
+include an explanation or evidence link, such as `Covered (unit/integration tests)`
+or `Deferred: [decision](../adr/adr-002.md)`. Unselected choices such as
+`Covered / deferred / unresolved` still produce TRC-003.
+
 TRC-001 supports document-qualified references such as `prd-001::AC-1` when
 multiple sources reuse the same local ID. Qualify both endpoints of numeric
 ranges. A qualification must name a declared source when `implements` is present.
