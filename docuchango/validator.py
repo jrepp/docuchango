@@ -2195,12 +2195,22 @@ class DocValidator:
 
         def resolve(path: Path, ref_id: str) -> tuple[Path | None, list[Path]]:
             """The document that defines ref_id for path, plus the candidates tried."""
+            source, separator, local_id = ref_id.partition("::")
+            if separator:
+                target = by_id.get(source)
+                if (
+                    target is not None
+                    and (target == path or target in (implements[path] if traces[path][0].implements else definers))
+                    and local_id in traces[target][1].definitions
+                ):
+                    return target, [target]
+                return None, []
             if ref_id in traces[path][1].definitions:
                 return path, [path]
             candidates = sorted(p for p in sources_for(path) if ref_id in traces[p][1].definitions)
             return (candidates[0] if len(candidates) == 1 else None), candidates
 
-        referenced: set[tuple[Path, str]] = set()  # (defining doc, id) cited by another doc
+        referenced: set[tuple[Path, str]] = set()  # (defining doc, id) cited by its declared implementer
         requirement_covered: set[tuple[Path, str]] = set()  # (defining doc, FR/NFR) some AC names
 
         for path, (doc, trace) in traces.items():
@@ -2218,15 +2228,15 @@ class DocValidator:
                 seen.add(ref.id)
                 owner, candidates = resolve(path, ref.id)
                 if owner is not None:
-                    if owner != path:
-                        referenced.add((owner, ref.id))
+                    if owner in implements[path]:
+                        referenced.add((owner, ref.id.split("::")[-1]))
                     continue
                 if candidates:
                     names = ", ".join(name(p) for p in candidates)
                     report(
                         doc,
                         f"TRC-001: Line {ref.line}: {ref.id} is defined in {len(candidates)} documents ({names}); "
-                        f"add frontmatter implements: [<id>] naming the one this document implements",
+                        f"add frontmatter implements: [<id>] naming the source, or qualify the reference as <document-id>::{ref.id}",
                     )
                 elif implements[path] & definers:
                     names = ", ".join(sorted(name(p) for p in implements[path] & definers))
@@ -2239,9 +2249,10 @@ class DocValidator:
             # A range claims every defined ID between endpoints that resolve to
             # one document. Interior IDs that are not defined are not an error.
             for span in trace.ranges:
-                lo_owner, _ = resolve(path, f"{span.prefix}-{span.lo}")
-                hi_owner, _ = resolve(path, f"{span.prefix}-{span.hi}")
-                if lo_owner is None or lo_owner != hi_owner or lo_owner == path:
+                qualifier = f"{span.source}::" if span.source else ""
+                lo_owner, _ = resolve(path, f"{qualifier}{span.prefix}-{span.lo}")
+                hi_owner, _ = resolve(path, f"{qualifier}{span.prefix}-{span.hi}")
+                if lo_owner is None or lo_owner != hi_owner or lo_owner not in implements[path]:
                     continue
                 for def_id in traces[lo_owner][1].defined_ids(f"{span.prefix}-"):
                     _, number = split_id(def_id)
@@ -2261,7 +2272,7 @@ class DocValidator:
                     for req_id in definition.requirements:
                         owner, _ = resolve(path, req_id)
                         if owner is not None:
-                            requirement_covered.add((owner, req_id))
+                            requirement_covered.add((owner, req_id.split("::")[-1]))
 
         # An FR/NFR counts as covered when it, or any criterion that names it, is cited.
         criteria_of: dict[tuple[Path, str], set[str]] = {}
@@ -2270,8 +2281,8 @@ class DocValidator:
                 for definition in trace.definitions[ac_id]:
                     for req_id in definition.requirements:
                         owner, _ = resolve(path, req_id)
-                        if owner is not None:
-                            criteria_of.setdefault((owner, req_id), set()).add(ac_id)
+                        if owner == path:
+                            criteria_of.setdefault((owner, req_id.split("::")[-1]), set()).add(ac_id)
         # Only criteria defined in the same document as the requirement count
         # for TRC-004 (an FRD's criteria are claimed through the FRD itself).
 

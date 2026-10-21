@@ -104,7 +104,7 @@ reported.
 | TRC-001 | FR/NFR/AC reference that no requirements document defines, or that two define, opt-in per type via `structure.doc_types.<type>.check_traceability` | Implemented | report | `check_traceability`, `_check_traceability_group`, `_traceability_types`, `traceability.py`, `schemas.py` (`DocTypeConfig.check_traceability`) |
 | TRC-002 | Same FR/NFR/AC ID defined more than once in one document | Implemented | report | `check_traceability`, `_check_traceability_group`, `_traceability_types`, `traceability.py`, `schemas.py` (`DocTypeConfig.check_traceability`) |
 | TRC-003 | Requirements Coverage table row with no covered, deferred or unresolved disposition | Implemented | report | `check_traceability`, `_check_traceability_group`, `_traceability_types`, `traceability.py`, `schemas.py` (`DocTypeConfig.check_traceability`) |
-| TRC-004 | Criterion or requirement that no document references, in a requirements document an RFC links to | Implemented | report | `check_traceability`, `_check_traceability_group`, `_traceability_types`, `traceability.py`, `schemas.py` (`DocTypeConfig.check_traceability`) |
+| TRC-004 | Criterion or requirement not cited by a declared implementer of its source document | Implemented | report | `check_traceability`, `_check_traceability_group`, `_traceability_types`, `traceability.py`, `schemas.py` (`DocTypeConfig.check_traceability`) |
 | TRC-005 | Acceptance criterion with no `Requirement:` clause, or functional requirement no criterion names, in a document that defines criteria | Implemented | report | `check_traceability`, `_check_traceability_group`, `_traceability_types`, `traceability.py`, `schemas.py` (`DocTypeConfig.check_traceability`) |
 | BLD-001 | TypeScript config error | Implemented | report | `check_typescript_config` |
 | BLD-002 | Docusaurus build error | Implemented | report | `check_docusaurus_build` |
@@ -557,8 +557,11 @@ heading (`### AC-1: ...`), a bold list item (`**FR-1**: ...`), or a row of a
 table whose header's first column is `ID` or `Requirement` and that has no
 `Disposition` or `Source` column. A table with a `Disposition` column is a
 coverage table; its rows cite IDs, and TRC-003 reads the disposition from that
-column rather than from any cell. A defining row whose other cells say deferred
-or out of scope marks the requirement deferred, which TRC-004 and TRC-005 honour.
+column rather than from any cell. A defining row explicitly marked deferred in a
+Scope, Status, or Priority cell is exempt under TRC-004/TRC-005. Values are
+Deferred, Descoped, Out of scope, or Not in scope, optionally followed by a reason
+after a colon, dash, parenthesis, or `to`. Description text and negated phrases
+such as "not deferred" do not establish a deferral.
 Dotted IDs (`AC-1.1`) are distinct IDs. HTML comments are masked like code.
 
 Scope is declared, not inferred. An RFC names the documents it covers in
@@ -572,6 +575,14 @@ treated any link as a claim, and review showed that to be exactly the inference
 the authoring guide warns against. A requirement counts as covered when it or
 any criterion naming it is cited; `AC-1 through AC-4` cites every criterion the
 owning document defines between the endpoints and asserts nothing about gaps.
+Only citations from declared implementers satisfy TRC-004; background citations
+from unrelated documents cannot hide missing coverage. TRC-001 accepts explicit
+document-qualified references (`prd-001::AC-1`) to disambiguate reused local IDs
+across multiple implemented documents. Both range endpoints may be qualified with
+the same source. Qualifications respect declared scope and work in Requirement:
+clauses as well as coverage rows. Criterion-to-requirement coverage retains the
+defining document identity so identically named criteria in other documents do
+not accidentally satisfy it.
 `NFR-n` is subject to TRC-004 but exempt from TRC-005's "no criterion" rule,
 since a non-functional requirement may be verified by measurement alone.
 

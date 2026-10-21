@@ -389,6 +389,19 @@ update references in one step.
 
 ## Requirement traceability
 
+TRC-001 supports document-qualified references such as `prd-001::AC-1` when
+multiple sources reuse the same local ID. Qualify both endpoints of numeric
+ranges. A qualification must name a declared source when `implements` is present.
+Write references as plain text; IDs in code spans are ignored.
+
+TRC-004 counts direct or range citations from declared implementers only, including
+indirect requirement coverage through a cited criterion. An unrelated document's
+background references cannot satisfy it. Source deferral exemptions for TRC-004
+and TRC-005 require a `Scope`, `Status`, or `Priority` cell starting with the
+explicit value `Deferred`, `Descoped`, `Out of scope`, or `Not in scope`.
+Optional reasons follow a colon, dash, parenthesis, or `to` (for example
+`Deferred to v2`). A descriptive phrase or negated deferral does not exempt a row.
+
 Opt-in per document type with `check_traceability: true` (see
 [configuration](CONFIGURATION.md#requirement-traceability)). Any opted-in
 document may define `FR-n`, `NFR-n` and `AC-n` IDs by form: a heading, a bold
@@ -402,7 +415,7 @@ neither. Nothing here judges whether a criterion is meaningful or a test passes.
 - `TRC-001`: an ID that no document defines, or that two or more define. A reference resolves against the document itself, then the documents it `implements`, or, with none declared, every defining document in the project. An `implements` id that names no scanned document is reported the same way
 - `TRC-002`: the same ID defined more than once in a document
 - `TRC-003`: a row of a table with a `Disposition` column whose disposition cell is empty or still the template placeholder
-- `TRC-004`: an `FR-n`, `NFR-n` or `AC-n` of an implemented document that no implementer cites. A requirement counts as cited when any criterion naming it is cited; `AC-1 through AC-4` cites every criterion defined between the endpoints; a requirement whose defining row says deferred or out of scope is exempt
+- `TRC-004`: an `FR-n`, `NFR-n` or `AC-n` of an implemented document that no implementer cites. A requirement counts as cited when any criterion naming it in the same source document is cited; `AC-1 through AC-4` cites every criterion defined between the endpoints; a requirement explicitly deferred in a Scope, Status or Priority cell is exempt
 - `TRC-005`: an `AC-n` with no `Requirement: FR-n` clause, or a non-deferred `FR-n` that no criterion names, in a document that already defines at least one `AC-n`
 
 **Left to you**

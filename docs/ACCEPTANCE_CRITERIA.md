@@ -33,10 +33,22 @@ Write IDs this way and a project can ask `docuchango validate` to check them:
 Any document may define IDs, so an RFC with no parent PRD states its requirements
 locally. A table with a `Disposition` column is a coverage table: its rows cite
 IDs and each says covered, deferred or unresolved. A requirement whose defining
-row says deferred or out of scope needs no criterion or design. `AC-1 through
+row explicitly marks a `Scope`, `Status`, or `Priority` cell as `Deferred`,
+`Descoped`, `Out of scope`, or `Not in scope` needs no criterion or design.
+A reason may follow a colon, dash, or parenthesis, or use `Deferred to v2`.
+Words in the requirement description never establish deferral. `AC-1 through
 AC-4` claims every criterion actually defined between the endpoints and nothing
 more, so a gap at `AC-3` is not an error and is not assumed to exist. A body link
 to a PRD is background, not a scope claim.
+
+When several implemented documents reuse local IDs, qualify each reference with
+its document ID: `prd-001::FR-1`, `prd-001::AC-1`, or `prd-002::AC-1`.
+Use these as plain text in coverage rows or `Requirement:` clauses (inline code
+is ignored by the checks). For a qualified numeric range, qualify both endpoints,
+for example `prd-001::AC-1 through prd-001::AC-4`. Qualifications must name a
+declared source when `implements` is present; surrounding links do not qualify IDs.
+TRC-004 counts citations only from documents declaring that they implement the
+source. References in unrelated background documents cannot satisfy that coverage.
 
 Enabling `check_traceability` reports a reference nothing defines or two documents
 define (`TRC-001`), a duplicate definition (`TRC-002`), a coverage row with no

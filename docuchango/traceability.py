@@ -21,8 +21,8 @@ parent PRD can state its requirements locally as the template allows:
   and that has no ``Disposition`` or ``Source`` column (``| FR-1 | ... |``).
 
 A table with a ``Disposition`` column is a coverage table: its rows cite IDs
-and must say covered, deferred or unresolved. A defining row whose other cells
-say ``deferred`` or ``out of scope`` is a deferred requirement, which is
+and must say covered, deferred or unresolved. A defining row whose Scope, Status
+or Priority cell explicitly marks deferral is a deferred requirement, which is
 accounted for without a criterion or design.
 
 Parsing works on text already masked by :func:`docuchango.markdown.mask_code`,
@@ -41,9 +41,11 @@ _ID = r"(?:AC|FR|NFR)-\d+(?:\.\d+)*"
 #: ID (``AC-1.1``) is one ID, distinct from ``AC-1``; a trailing full stop is
 #: punctuation (``see AC-1.``).
 ID_RE = re.compile(rf"(?<![A-Za-z0-9_-])({_ID})(?![A-Za-z0-9_])")
+_REFERENCE = rf"(?:[a-z][a-z0-9_-]*::)?{_ID}"
+REFERENCE_RE = re.compile(rf"(?<![A-Za-z0-9_:-])({_REFERENCE})(?![A-Za-z0-9_])")
 #: ``AC-1 through AC-3``. A bare hyphen is not a range operator: ``AC-1-AC-3``
 #: cannot be told from hyphenated prose.
-RANGE_RE = re.compile(rf"({_ID})\s*(?:through|thru|to|\.\.+|–|—)\s*({_ID})", re.IGNORECASE)
+RANGE_RE = re.compile(rf"({_REFERENCE})\s*(?i:through|thru|to|\.\.+|–|—)\s*({_REFERENCE})")
 
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
 _DEF_HEADING_RE = re.compile(rf"^(#{{1,6}})\s+\W*({_ID})(?![A-Za-z0-9_])")
@@ -53,11 +55,11 @@ _TABLE_SEPARATOR_RE = re.compile(r"^\s*\|[\s:|-]+\|\s*$")
 _DEFINING_HEADER_RE = re.compile(r"^(ids?|requirements?|criteri(?:a|on)|acceptance criteri(?:a|on))\b")
 _CITING_HEADER_RE = re.compile(r"disposition|source|coverage")
 _DISPOSITION_HEADER_RE = re.compile(r"disposition")
-_DEFERRED_RE = re.compile(r"\b(deferred|descoped|out of scope|not in scope)\b", re.IGNORECASE)
+_DEFERRED_RE = re.compile(r"^(?:deferred|descoped|out of scope|not in scope)(?:$|\s*[:(—–-]|\s+to\b)", re.IGNORECASE)
 #: ``Requirement: FR-1, FR-2`` up to the end of the clause. The clause ends at
 #: a closing bracket, colon or semicolon so the Given/When/Then text that
 #: follows on the same line is not read as more requirements.
-_REQUIREMENT_RE = re.compile(r"Requirements?\s*:\s*([^():;]*)")
+_REQUIREMENT_RE = re.compile(r"Requirements?\s*:\s*((?:(?:::)|[^():;])*)")
 _HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 _DISPOSITIONS = ("covered", "deferred", "unresolved")
 
@@ -71,8 +73,8 @@ class Definition:
     #: FR/NFR IDs named by a ``Requirement:`` clause in this definition's span.
     #: Only meaningful for ``AC-*`` definitions.
     requirements: list[str] = field(default_factory=list)
-    #: A defining table row whose other cells say the requirement is deferred
-    #: or out of scope. It is accounted for without a criterion or design.
+    #: Explicit deferral in a defining table row's Scope, Status or Priority cell.
+    #: It is accounted for without a criterion or design.
     deferred: bool = False
 
 
@@ -92,6 +94,7 @@ class Range:
     lo: int
     hi: int
     line: int
+    source: str | None = None
 
 
 @dataclass
@@ -141,7 +144,11 @@ def mask_html_comments(lines: list[str]) -> list[str]:
 def _requirement_ids(line: str) -> list[str]:
     ids: list[str] = []
     for clause in _REQUIREMENT_RE.finditer(line):
-        ids.extend(m.group(1) for m in ID_RE.finditer(clause.group(1)) if not m.group(1).startswith("AC-"))
+        ids.extend(
+            m.group(1)
+            for m in REFERENCE_RE.finditer(clause.group(1))
+            if not m.group(1).split("::")[-1].startswith("AC-")
+        )
     return ids
 
 
@@ -150,6 +157,7 @@ class _Table:
     header: list[str]
     defines: bool
     disposition_column: int | None
+    deferral_columns: list[int]
 
 
 def _table_at(lines: list[str], index: int) -> _Table | None:
@@ -165,7 +173,12 @@ def _table_at(lines: list[str], index: int) -> _Table | None:
         return None
     disposition = next((i for i, cell in enumerate(header) if _DISPOSITION_HEADER_RE.search(cell)), None)
     defines = bool(_DEFINING_HEADER_RE.match(header[0])) and not any(_CITING_HEADER_RE.search(c) for c in header)
-    return _Table(header=header, defines=defines, disposition_column=disposition)
+    return _Table(
+        header=header,
+        defines=defines,
+        disposition_column=disposition,
+        deferral_columns=[i for i, cell in enumerate(header) if cell in {"scope", "status", "priority"}],
+    )
 
 
 def parse_traceability(lines: list[str]) -> DocTrace:
@@ -192,7 +205,9 @@ def parse_traceability(lines: list[str]) -> DocTrace:
                 if table.defines and cells:
                     match = ID_RE.match(cells[0].strip("*_` "))
                     if match and match.group(1) == cells[0].strip("*_` "):
-                        deferred = any(_DEFERRED_RE.search(c) for c in cells[1:])
+                        deferred = any(
+                            _DEFERRED_RE.match(_plain(cells[i])) for i in table.deferral_columns if i < len(cells)
+                        )
                         starts.append((index, match.group(1), None, deferred))
                 if table.disposition_column is not None:
                     ids = [m.group(1) for m in ID_RE.finditer(line)]
@@ -236,16 +251,18 @@ def parse_traceability(lines: list[str]) -> DocTrace:
     for index, line in enumerate(lines):
         own_id = definition_lines.get(index)
         skipped_own = False
-        for match in ID_RE.finditer(line):
+        for match in REFERENCE_RE.finditer(line):
             ref_id = match.group(1)
             if own_id == ref_id and not skipped_own:
                 skipped_own = True
                 continue
             trace.references.append(Reference(id=ref_id, line=index + 1))
         for match in RANGE_RE.finditer(line):
-            (lo_prefix, lo), (hi_prefix, hi) = split_id(match.group(1)), split_id(match.group(2))
-            if lo_prefix == hi_prefix and lo is not None and hi is not None and lo <= hi:
-                trace.ranges.append(Range(prefix=lo_prefix, lo=lo, hi=hi, line=index + 1))
+            lo_source, _, lo_id = match.group(1).rpartition("::")
+            hi_source, _, hi_id = match.group(2).rpartition("::")
+            (lo_prefix, lo), (hi_prefix, hi) = split_id(lo_id), split_id(hi_id)
+            if lo_source == hi_source and lo_prefix == hi_prefix and lo is not None and hi is not None and lo <= hi:
+                trace.ranges.append(Range(prefix=lo_prefix, lo=lo, hi=hi, line=index + 1, source=lo_source or None))
 
     return trace
 

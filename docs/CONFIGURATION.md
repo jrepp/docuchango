@@ -319,6 +319,11 @@ amendment id such as `adr-043-a1` does not.
 
 ## Requirement traceability
 
+When `implements` lists several documents with colliding local IDs, qualify the
+references, for example `prd-001::AC-1` and `prd-002::AC-1`. The qualifier uses
+the source document's frontmatter `id`, not its filename. It must be within the
+declared scope. A body link is not a substitute for declaring implementation scope.
+
 The PRD, FRD and RFC templates give requirements and acceptance criteria stable
 IDs (`FR-1`, `NFR-1`, `AC-1`) and ask the RFC to account for each criterion.
 Turn on `check_traceability` to have `validate` report broken edges between

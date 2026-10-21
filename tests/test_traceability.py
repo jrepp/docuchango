@@ -28,6 +28,17 @@ def _parse(text: str):
 
 
 class TestDefinitions:
+    @pytest.mark.parametrize("column", ["Scope", "Status", "Priority"])
+    @pytest.mark.parametrize("value", ["Deferred", "Deferred to v2", "Out of scope (future)", "Descoped: agreed"])
+    def test_trc004_trc005_explicit_deferral_columns(self, column, value):
+        trace = _parse(f"| ID | Requirement | {column} |\n|---|---|---|\n| FR-1 | Export | {value} |\n")
+        assert trace.is_deferred("FR-1")
+
+    @pytest.mark.parametrize("value", ["Not deferred", "Deferredness", "Must", "Potentially deferred"])
+    def test_trc004_trc005_non_deferral_values(self, value):
+        trace = _parse(ID_TABLE + f"| FR-1 | Export | {value} |\n")
+        assert not trace.is_deferred("FR-1")
+
     def test_heading_bullet_and_id_table(self):
         trace = _parse(
             ID_TABLE + "| FR-1 | One | Must |\n| **NFR-1** | Two | Must |\n\n"
@@ -85,6 +96,10 @@ class TestDefinitions:
 
 
 class TestRequirementClause:
+    def test_trc005_qualified_requirement_clause_preserves_source(self):
+        trace = _parse("### AC-1: Local\nRequirement: prd-001::FR-1, prd-002::NFR-1\n")
+        assert trace.definitions["AC-1"][0].requirements == ["prd-001::FR-1", "prd-002::NFR-1"]
+
     def test_review_5_a_criterion_cannot_name_a_criterion(self):
         trace = _parse("### AC-1: First\n\nRequirement: AC-2\n\n### AC-2: Second\n\nRequirement: FR-1\n")
         assert trace.definitions["AC-1"][0].requirements == []
@@ -189,6 +204,69 @@ GOOD_RFC = COVERAGE + "| FR-1 | AC-1 | Covered | d | t |\n"
 
 
 class TestCheck:
+    @pytest.mark.parametrize("background", ["FR-1 and AC-1", "AC-1 through AC-1"])
+    def test_trc004_background_cannot_cover_an_implementer(self, tmp_path, background):
+        root = _project(tmp_path)
+        _prd(root, 1, GOOD_PRD)
+        _rfc(root, 1, "Design pending.\n", "[prd-001]")
+        _rfc(root, 2, f"Background: {background}.\n")
+        findings = _findings(root)
+        assert len(findings) == 2
+        assert all(f.startswith("TRC-004") for f in findings)
+
+    @pytest.mark.parametrize(
+        "description", ["Deferred execution must preserve files", "This requirement is not deferred"]
+    )
+    def test_trc004_trc005_description_does_not_defer_requirement(self, tmp_path, description):
+        root = _project(tmp_path)
+        _prd(root, 1, GOOD_PRD + "\n" + ID_TABLE + f"| FR-2 | {description} | Must |\n")
+        _rfc(root, 1, GOOD_RFC, "[prd-001]")
+        findings = _findings(root)
+        assert len(findings) == 2
+        assert any(f.startswith("TRC-004") and "FR-2" in f for f in findings)
+        assert any(f.startswith("TRC-005") and "FR-2" in f for f in findings)
+
+    def test_trc001_qualified_references_resolve_colliding_ids(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(root, 1, GOOD_PRD)
+        _prd(root, 2, GOOD_PRD)
+        _rfc(
+            root,
+            1,
+            COVERAGE + "| prd-001::FR-1 | prd-001::AC-1 | Covered | d | t |\n"
+            "| prd-002::FR-1 | prd-002::AC-1 | Covered | d | t |\n",
+            "[prd-001, prd-002]",
+        )
+        assert _findings(root) == []
+
+    def test_trc001_qualified_reference_cannot_bypass_declared_scope(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(root, 1, GOOD_PRD)
+        _prd(root, 2, GOOD_PRD)
+        _rfc(root, 1, GOOD_RFC + "\nSee prd-002::AC-1.\n", "[prd-001]")
+        findings = _findings(root)
+        assert len(findings) == 1
+        assert findings[0].startswith("TRC-001") and "prd-002::AC-1" in findings[0]
+
+    def test_trc001_qualified_unknown_source_is_reported(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(root, 1, GOOD_PRD)
+        _rfc(root, 1, "See prd-999::AC-1.\n")
+        findings = _findings(root)
+        assert len(findings) == 1 and "TRC-001" in findings[0] and "prd-999::AC-1" in findings[0]
+
+    def test_trc004_qualified_ranges_and_indirect_coverage(self, tmp_path):
+        root = _project(tmp_path)
+        for number in (1, 2):
+            _prd(root, number, GOOD_PRD + "\n### AC-2: Two\nRequirement: FR-1\n")
+        _rfc(
+            root,
+            1,
+            "Covers prd-001::AC-1 through prd-001::AC-2.\nCovers prd-002::AC-1 through prd-002::AC-2.\n",
+            "[prd-001, prd-002]",
+        )
+        assert _findings(root) == []
+
     def test_clean_pair_is_silent(self, tmp_path):
         root = _project(tmp_path)
         _prd(root, 1, GOOD_PRD)
@@ -317,10 +395,12 @@ def test_config_flag_and_implements_field():
             "structure": {"doc_types": {"prd": {"schema": "prd", "folders": ["prd"], "check_traceability": True}}},
         }
     )
+    assert config.structure.doc_types is not None
     assert config.structure.doc_types["prd"].check_traceability is True
     plain = DocsProjectConfig.model_validate(
         {"version": "1", "project": {"id": "p", "name": "p"}, "structure": {"doc_types": {"adr": {"schema": "adr"}}}}
     )
+    assert plain.structure.doc_types is not None
     assert plain.structure.doc_types["adr"].check_traceability is False
     rfc = RFCFrontmatter.model_validate(
         {
