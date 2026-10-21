@@ -350,10 +350,17 @@ implements: [prd-001]
 ```
 
 With it, the RFC's `FR-n` / `AC-n` references resolve against those documents
-and their criteria must each be covered or deferred (`TRC-004`). Without it,
-references resolve against every defining document in the project, and an ID
-two of them define is reported as ambiguous. Linking a PRD in the body is not a
-declaration. The recognised syntax and the five findings are described in
+and their criteria must each be covered or deferred (`TRC-004`). Multiple
+RFCs may implement different parts of the same PRD; TRC-004 checks that the
+declared implementers together cover or defer each requirement and criterion.
+Without `implements`, references resolve against every defining document in the
+project, and an ID two of them define is reported as ambiguous. Linking a PRD in
+the body is not a declaration. In multi-mode repositories that combine a wiki
+overlay (`bootstrap --wiki --overlay`) or unnumbered `generic` wiki lanes with
+numbered `prd`/`rfc` lanes, traceability stays scoped to the opted-in lanes and
+owning config: wiki task routes and colocated system pages can mention `FR-n` or
+`AC-n` IDs as navigation context without being checked or claiming coverage. The
+recognised syntax and the five findings are described in
 [Acceptance criteria](ACCEPTANCE_CRITERIA.md#reference-syntax-and-validation)
 and the [validation reference](VALIDATION_REFERENCE.md#requirement-traceability).
 

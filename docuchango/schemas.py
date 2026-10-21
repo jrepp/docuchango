@@ -911,6 +911,13 @@ class GenericDocFrontmatter(BaseModel):
         None,
         description="Document identifier (optional). Use lowercase with hyphens if provided (e.g., 'getting-started')",
     )
+    implements: list[str] | str | None = Field(
+        default=None,
+        description=(
+            "Optional ids of the requirements documents this document covers (e.g. ['prd-001']). "
+            "With check_traceability on, it scopes FR/AC reference resolution and claims those documents' criteria (TRC-001, TRC-004)."
+        ),
+    )
     project_id: str = Field(
         ...,
         description="Project identifier from docs-project.yaml. Must match configured project ID (e.g., 'my-project')",

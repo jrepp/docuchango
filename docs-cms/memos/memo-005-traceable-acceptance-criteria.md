@@ -65,6 +65,10 @@ synchronization, automatic resource updates, and orchestration remain out of sco
 - Enforcement is a separate opt-in: `check_traceability` enables `TRC-001` to `TRC-005`, which check
   that `FR-n` / `AC-n` references resolve (see [RFC-003](../rfcs/rfc-003-validator-roadmap.md)).
   Projects that do not set it see no change in `validate`.
+- In multi-mode repositories that combine a wiki overlay (`bootstrap --wiki --overlay`)
+  or unnumbered `generic` wiki lanes with numbered `prd`/`rfc` lanes, traceability
+  stays scoped to the opted-in lanes and owning config so wiki routes can reference
+  requirement or criterion IDs without claiming coverage.
 - Keep one authoritative requirement and reference it from technical criteria.
 - Label new decisions as proposed; do not fill missing decisions with assumptions.
 - Keep the bundled guidance self-contained because `init` distributes it.

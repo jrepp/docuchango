@@ -206,6 +206,10 @@ class Document:
     # covers (`[prd-001]`). Declares scope for TRC-001/TRC-004; a body link
     # does not.
     implements: list[str] = field(default_factory=list)
+    # Whether the document's `doc_types` entry explicitly sets `check_traceability`,
+    # so a `generic` wiki lane and a `generic` FRD lane in the same config stay
+    # independent. ``None`` falls back to the schema-level check.
+    check_traceability: bool | None = None
     links: list["Link"] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     _content_cache: str | None = None  # Cached file content to avoid multiple reads
@@ -529,11 +533,12 @@ class DocValidator:
             return self.project_config.structure.scan_subfolders
         return False
 
-    def _build_scan_entries(self) -> list[tuple[str, str, str, bool, bool, Path, Path, bool, bool]]:
+    def _build_scan_entries(self) -> list[tuple[str, str, str, bool, bool, Path, Path, bool, bool, bool | None]]:
         """Build scan entries as tuples:
 
         (doc_type, folder_relative, filename_pattern, enforce_filename_pattern,
-        require_frontmatter, root_path, boundary, allow_external_paths, scan_subfolders)
+        require_frontmatter, root_path, boundary, allow_external_paths, scan_subfolders,
+        check_traceability)
         """
         default_patterns = {
             "adr": r"^(adr)-(\d{3})-(.+)\.md$",
@@ -545,7 +550,7 @@ class DocValidator:
         contexts = self.project_configs or []
 
         if contexts:
-            entries: list[tuple[str, str, str, bool, bool, Path, Path, bool, bool]] = []
+            entries: list[tuple[str, str, str, bool, bool, Path, Path, bool, bool, bool | None]] = []
             for context in contexts:
                 config = context.config
                 config_base = context.base_dir
@@ -591,6 +596,9 @@ class DocValidator:
                                         root_path,
                                         context.allow_external_paths,
                                         scan_subfolders,
+                                        cfg.check_traceability
+                                        if "check_traceability" in cfg.model_fields_set
+                                        else None,
                                     )
                                 )
                     continue
@@ -618,6 +626,7 @@ class DocValidator:
                                 root_path,
                                 context.allow_external_paths,
                                 structure.scan_subfolders,
+                                None,
                             )
                         )
             return entries
@@ -645,6 +654,7 @@ class DocValidator:
                         root_path,
                         False,
                         structure.scan_subfolders,
+                        None,
                     )
                 )
         return entries
@@ -658,6 +668,7 @@ class DocValidator:
         enforce_filename_pattern: bool,
         require_frontmatter: bool,
         scan_subfolders: bool = False,
+        check_traceability: bool | None = None,
     ):
         """Scan a specific document folder for markdown files"""
         if not folder_path.exists():
@@ -720,6 +731,7 @@ class DocValidator:
                 md_file, doc_type, require_frontmatter=require_frontmatter, expected_id=expected_id
             )
             if doc:
+                doc.check_traceability = check_traceability
                 self.documents.append(doc)
                 self.file_to_doc[md_file] = doc
 
@@ -741,6 +753,7 @@ class DocValidator:
             boundary,
             allow_external_paths,
             scan_subfolders,
+            check_traceability,
         ) in entries:
             try:
                 pattern = re.compile(pattern_text)
@@ -763,6 +776,7 @@ class DocValidator:
                 enforce_pattern,
                 require_frontmatter,
                 scan_subfolders,
+                check_traceability,
             )
 
         # Scan general docs markdown files at each configured docs root.
@@ -2129,12 +2143,15 @@ class DocValidator:
             context = self._config_context_for_path(doc.file_path)
             if context is None:
                 continue
-            enabled = enabled_cache.get(context.path)
-            if enabled is None:
-                enabled = self._traceability_types(context)
-                enabled_cache[context.path] = enabled
-            if doc.doc_type not in enabled:
+            if doc.check_traceability is False:
                 continue
+            if doc.check_traceability is None:
+                enabled = enabled_cache.get(context.path)
+                if enabled is None:
+                    enabled = self._traceability_types(context)
+                    enabled_cache[context.path] = enabled
+                if doc.doc_type not in enabled:
+                    continue
             try:
                 lines = self._mask_code(doc.get_content(), strip_frontmatter=True)
             except Exception as e:
@@ -2204,9 +2221,13 @@ class DocValidator:
                 ):
                     return target, [target]
                 return None, []
-            if ref_id in traces[path][1].definitions:
-                return path, [path]
             candidates = sorted(p for p in sources_for(path) if ref_id in traces[p][1].definitions)
+            if ref_id in traces[path][1].definitions:
+                if not candidates:
+                    return path, [path]
+                if not implements[path]:
+                    return path, [path]
+                candidates = sorted({path, *candidates})
             return (candidates[0] if len(candidates) == 1 else None), candidates
 
         referenced: set[tuple[Path, str]] = set()  # (defining doc, id) cited by its declared implementer
@@ -2274,8 +2295,22 @@ class DocValidator:
                 for definition in defs:
                     for req_id in definition.requirements:
                         owner, _ = resolve(path, req_id)
-                        if owner is not None:
+                        if owner is not None and (owner == path or owner in implements[path]):
                             requirement_covered.add((owner, req_id.split("::")[-1]))
+                    for span in definition.requirement_ranges:
+                        qualifier = f"{span.source}::" if span.source else ""
+                        lo_owner, _ = resolve(path, f"{qualifier}{span.prefix}-{span.lo}")
+                        hi_owner, _ = resolve(path, f"{qualifier}{span.prefix}-{span.hi}")
+                        if (
+                            lo_owner is None
+                            or lo_owner != hi_owner
+                            or (lo_owner != path and lo_owner not in implements[path])
+                        ):
+                            continue
+                        for def_id in traces[lo_owner][1].defined_ids(f"{span.prefix}-"):
+                            _, number = split_id(def_id)
+                            if number is not None and span.lo <= number <= span.hi:
+                                requirement_covered.add((lo_owner, def_id))
 
         # An FR/NFR counts as covered when it, or any criterion that names it, is cited.
         criteria_of: dict[tuple[Path, str], set[str]] = {}
@@ -2286,6 +2321,15 @@ class DocValidator:
                         owner, _ = resolve(path, req_id)
                         if owner == path:
                             criteria_of.setdefault((owner, req_id.split("::")[-1]), set()).add(ac_id)
+                    for span in definition.requirement_ranges:
+                        qualifier = f"{span.source}::" if span.source else ""
+                        lo_owner, _ = resolve(path, f"{qualifier}{span.prefix}-{span.lo}")
+                        hi_owner, _ = resolve(path, f"{qualifier}{span.prefix}-{span.hi}")
+                        if lo_owner == path and hi_owner == path:
+                            for def_id in trace.defined_ids(f"{span.prefix}-"):
+                                _, number = split_id(def_id)
+                                if number is not None and span.lo <= number <= span.hi:
+                                    criteria_of.setdefault((path, def_id), set()).add(ac_id)
         # Only criteria defined in the same document as the requirement count
         # for TRC-004 (an FRD's criteria are claimed through the FRD itself).
 
@@ -2295,6 +2339,7 @@ class DocValidator:
             claimers = implementers.get(path, set())
             if claimers:
                 claimer_names = ", ".join(sorted(name(p) for p in claimers))
+                verb = "implement" if len(claimers) > 1 else "implements"
                 for def_id in trace.defined_ids():
                     if trace.is_deferred(def_id) or (path, def_id) in referenced:
                         continue
@@ -2307,7 +2352,7 @@ class DocValidator:
                     line = trace.definitions[def_id][0].line
                     report(
                         doc,
-                        f"TRC-004: Line {line}: {def_id} is not covered or deferred by {claimer_names}, which implements this document",
+                        f"TRC-004: Line {line}: {def_id} is not covered or deferred by {claimer_names}, which {verb} this document",
                     )
 
             # TRC-005: only once the document has adopted acceptance criteria.
@@ -2315,11 +2360,12 @@ class DocValidator:
             if not criteria:
                 continue
             for ac_id in criteria:
-                definition = trace.definitions[ac_id][0]
-                if not definition.requirements:
-                    report(
-                        doc, f"TRC-005: Line {definition.line}: {ac_id} names no requirement (add 'Requirement: FR-n')"
-                    )
+                for definition in trace.definitions[ac_id]:
+                    if not definition.requirements and not definition.requirement_ranges:
+                        report(
+                            doc,
+                            f"TRC-005: Line {definition.line}: {ac_id} names no requirement (add 'Requirement: FR-n')",
+                        )
             for fr_id in trace.defined_ids("FR-"):
                 if trace.is_deferred(fr_id) or (path, fr_id) in requirement_covered:
                     continue

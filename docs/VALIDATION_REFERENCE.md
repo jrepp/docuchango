@@ -400,23 +400,33 @@ or `Deferred: [decision](../adr/adr-002.md)`. Unselected choices such as
 `Covered / deferred / unresolved` still produce TRC-003.
 
 TRC-001 supports document-qualified references such as `prd-001::AC-1` when
-multiple sources reuse the same local ID. Qualify both endpoints of numeric
-ranges. A qualification must name a declared source when `implements` is present.
+multiple sources reuse the same local ID, or when an implementing document
+defines a local ID that collides with a source ID. Qualify both endpoints of
+numeric ranges. Both endpoints of a range must be bounded reference tokens. A
+qualification must name a declared source when `implements` is present.
 Write references as plain text; IDs in code spans are ignored.
 
 TRC-004 counts direct or range citations from declared implementers only, including
-indirect requirement coverage through a cited criterion. An unrelated document's
-background references cannot satisfy it. Source deferral exemptions for TRC-004
-and TRC-005 require a `Scope`, `Status`, or `Priority` cell starting with the
-explicit value `Deferred`, `Descoped`, `Out of scope`, or `Not in scope`.
-Optional reasons follow a colon, dash, parenthesis, or `to` (for example
-`Deferred to v2`). A descriptive phrase or negated deferral does not exempt a row.
+indirect requirement coverage through a cited criterion (whether the criterion
+names individual requirements or a `Requirement: FR-1 through FR-3` range). When
+several documents implement the same source, their citations combine to cover it.
+An unrelated document's background references or unlinked criteria cannot satisfy
+TRC-004 or TRC-005. Source deferral exemptions for TRC-004 and TRC-005 require a
+`Scope`, `Status`, or `Priority` cell starting with the explicit value `Deferred`,
+`Descoped`, `Out of scope`, or `Not in scope` (plain or bold/italic). Optional
+reasons follow a colon, dash, parenthesis, or `to` (for example `Deferred to v2`).
+A descriptive phrase or negated deferral does not exempt a row.
 
 Opt-in per document type with `check_traceability: true` (see
-[configuration](CONFIGURATION.md#requirement-traceability)). Any opted-in
-document may define `FR-n`, `NFR-n` and `AC-n` IDs by form: a heading, a bold
-list item, or a row of a table whose first column is `ID` or `Requirement`. An
-RFC names the documents it covers in frontmatter `implements: [prd-001]`; that
+[configuration](CONFIGURATION.md#requirement-traceability)). Each `doc_types`
+lane honours its own explicit `check_traceability` setting, and groups are
+resolved per owning config using the same scan-folder ownership rules as
+`FM-010` and `RD-001`. Wiki overlays and unnumbered `generic` wiki lanes
+therefore stay isolated from `prd`/`rfc` traceability checks even when they share
+a repository or config. Any opted-in document (including a `generic`-schema FRD
+lane) may define `FR-n`, `NFR-n` and `AC-n` IDs by form: a heading, a bold list
+item, or a row of a table whose first column is `ID` or `Requirement`. An RFC or
+FRD names the documents it covers in frontmatter `implements: [prd-001]`; that
 scopes its references and claims those documents' criteria. A body link does
 neither. Nothing here judges whether a criterion is meaningful or a test passes.
 
