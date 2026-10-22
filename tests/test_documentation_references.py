@@ -10,13 +10,17 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 USER_FACING_DOCS = [
     REPO_ROOT / "README.md",
+    REPO_ROOT / "docs" / "ACCEPTANCE_CRITERIA.md",
     REPO_ROOT / "docs" / "AGENT_GUIDE.md",
     REPO_ROOT / "docs" / "BOOTSTRAP_GUIDE.md",
     REPO_ROOT / "docs" / "BEST_PRACTICES.md",
     REPO_ROOT / "docs" / "CONFIGURATION.md",
+    REPO_ROOT / "docs" / "PLANNING_AND_VERIFICATION.md",
+    REPO_ROOT / "docs" / "REVIEW_GUIDE.md",
     REPO_ROOT / "docs" / "VALIDATION_REFERENCE.md",
     REPO_ROOT / "templates" / "README.md",
     REPO_ROOT / "docuchango" / "templates" / "README.md",
+    REPO_ROOT / "examples" / "README.md",
     REPO_ROOT / "docs-cms" / "prd" / "prd-001-validation-framework.md",
 ]
 
@@ -88,3 +92,22 @@ def test_user_facing_docs_do_not_use_retired_adr_rfc_statuses(doc_path: Path):
             continue
         for retired in ("In Review", "Approved"):
             assert retired not in line, f"{doc_path}: {line}"
+
+
+@pytest.mark.parametrize(
+    "entrypoint_doc",
+    [
+        REPO_ROOT / "README.md",
+        REPO_ROOT / "docs" / "AGENT_GUIDE.md",
+        REPO_ROOT / "docs" / "BOOTSTRAP_GUIDE.md",
+        REPO_ROOT / "docs" / "BEST_PRACTICES.md",
+        REPO_ROOT / "templates" / "README.md",
+        REPO_ROOT / "examples" / "README.md",
+    ],
+)
+def test_traceability_guides_are_discoverable_from_entrypoints(entrypoint_doc: Path):
+    """Every primary user and agent entrypoint must link to the traceability guide."""
+    content = entrypoint_doc.read_text(encoding="utf-8")
+    assert "ACCEPTANCE_CRITERIA.md" in content or "--guide traceability" in content, (
+        f"{entrypoint_doc} must reference ACCEPTANCE_CRITERIA.md or 'docuchango bootstrap --guide traceability'"
+    )

@@ -683,3 +683,161 @@ class TestShippedTemplates:
         assert sorted(trace.definitions) == ["AC-1", "AC-2", "AC-3", "FR-1", "FR-2"]
         assert trace.is_deferred("FR-2"), "the example defers FR-2 in its Scope column"
         assert [trace.definitions[i][0].requirements for i in ("AC-1", "AC-2", "AC-3")] == [["FR-1"]] * 3
+
+
+class TestExamplesDocsCmsLadder:
+    """Progressive traceability example ladder in examples/docs-cms.
+
+    Verifies that the shipped examples/docs-cms directory validates cleanly
+    end-to-end with check_traceability enabled across all 5 ladder levels, and
+    that targeted mutations on a staged copy trigger each TRC-001..TRC-005
+    finding and edge case as documented in examples/README.md.
+    """
+
+    EXAMPLES_ROOT = REPO_ROOT / "examples"
+
+    def _stage_examples(self, tmp_path: Path) -> Path:
+        import shutil
+
+        staged = tmp_path / "examples"
+        shutil.copytree(self.EXAMPLES_ROOT / "docs-cms", staged / "docs-cms")
+        return staged
+
+    def test_shipped_examples_validate_cleanly_via_cli(self):
+        from click.testing import CliRunner
+
+        from docuchango.cli import validate
+
+        res = CliRunner().invoke(
+            validate,
+            ["--repo-root", str(self.EXAMPLES_ROOT), "--dry-run", "--skip-build"],
+            catch_exceptions=False,
+        )
+        assert res.exit_code == 0, res.output
+        assert "All documents valid" in res.output
+
+    def test_ladder_rungs_parse_expected_structures(self):
+        cms = self.EXAMPLES_ROOT / "docs-cms"
+
+        # Level 1: Standalone RFC with local requirements + deferred FR-2 + code-masked FR-999
+        rfc1 = _parse((cms / "rfcs/rfc-001-automated-doc-generation.md").read_text(encoding="utf-8"))
+        assert sorted(rfc1.definitions) == ["AC-1", "FR-1", "FR-2"]
+        assert rfc1.is_deferred("FR-2")
+        assert "FR-999" not in {r.id for r in rfc1.references}
+
+        # Level 2: PRD-001 with FR-1..3 (FR-3 deferred), NFR-1, and AC-1, AC-2, AC-4 (gap at AC-3)
+        prd1 = _parse((cms / "prd/prd-001-doc-export.md").read_text(encoding="utf-8"))
+        assert sorted(prd1.definitions) == ["AC-1", "AC-2", "AC-4", "FR-1", "FR-2", "FR-3", "NFR-1"]
+        assert prd1.is_deferred("FR-3")
+
+        # Level 3: PRD-002 with colliding local IDs, dotted AC-1.1, and Out of scope FR-3
+        prd2 = _parse((cms / "prd/prd-002-audit-trail.md").read_text(encoding="utf-8"))
+        assert sorted(prd2.definitions) == ["AC-1", "AC-1.1", "AC-2", "FR-1", "FR-2", "FR-3"]
+        assert prd2.is_deferred("FR-3")
+
+        # Level 4: RFC-002 multi-PRD qualified references + qualified range across AC-3 gap
+        rfc2 = _parse((cms / "rfcs/rfc-002-cli-export-pipeline.md").read_text(encoding="utf-8"))
+        assert rfc2.rows_without_disposition == []
+        assert any(r.source == "prd-001" and r.prefix == "AC" and (r.lo, r.hi) == (1, 4) for r in rfc2.ranges)
+
+        # Level 5: RFC-003 split implementation with Unresolved disposition
+        rfc3 = _parse((cms / "rfcs/rfc-003-audit-stream.md").read_text(encoding="utf-8"))
+        assert rfc3.rows_without_disposition == []
+        assert "prd-002::AC-2" in {r.id for r in rfc3.references}
+
+    def test_edge_case_removing_qualifier_in_multi_prd_rfc_triggers_trc001(self, tmp_path):
+        staged = self._stage_examples(tmp_path)
+        rfc2 = staged / "docs-cms/rfcs/rfc-002-cli-export-pipeline.md"
+        rfc2.write_text(
+            rfc2.read_text(encoding="utf-8").replace("prd-001::FR-1", "FR-1"),
+            encoding="utf-8",
+        )
+        findings = _findings(staged / "docs-cms")
+        assert any(f.startswith("TRC-001") and "FR-1 is defined in 2 documents" in f for f in findings)
+
+    def test_edge_case_duplicate_id_in_example_prd_triggers_trc002(self, tmp_path):
+        staged = self._stage_examples(tmp_path)
+        prd1 = staged / "docs-cms/prd/prd-001-doc-export.md"
+        prd1.write_text(
+            prd1.read_text(encoding="utf-8") + "\n### AC-1: Accidental duplicate\n\nRequirement: FR-1\n",
+            encoding="utf-8",
+        )
+        findings = _findings(staged / "docs-cms")
+        assert any(f.startswith("TRC-002") and "AC-1 is defined 2 times" in f for f in findings)
+
+    def test_edge_case_unselected_disposition_placeholder_triggers_trc003(self, tmp_path):
+        staged = self._stage_examples(tmp_path)
+        rfc3 = staged / "docs-cms/rfcs/rfc-003-audit-stream.md"
+        rfc3.write_text(
+            rfc3.read_text(encoding="utf-8").replace(
+                "Unresolved: awaiting retry backoff decision",
+                "Covered / deferred / unresolved",
+            ),
+            encoding="utf-8",
+        )
+        findings = _findings(staged / "docs-cms")
+        assert any(f.startswith("TRC-003") and "prd-002::FR-2, prd-002::AC-2" in f for f in findings)
+
+    def test_edge_case_dropping_second_implementing_rfc_triggers_trc004(self, tmp_path):
+        staged = self._stage_examples(tmp_path)
+        (staged / "docs-cms/rfcs/rfc-003-audit-stream.md").unlink()
+        findings = _findings(staged / "docs-cms")
+        assert any(f.startswith("TRC-004") and "FR-2 is not covered or deferred" in f for f in findings)
+        assert any(f.startswith("TRC-004") and "AC-2 is not covered or deferred" in f for f in findings)
+
+    def test_edge_case_dropping_requirement_clause_triggers_trc005(self, tmp_path):
+        staged = self._stage_examples(tmp_path)
+        prd2 = staged / "docs-cms/prd/prd-002-audit-trail.md"
+        prd2.write_text(
+            prd2.read_text(encoding="utf-8").replace("Requirement: FR-2\n", ""),
+            encoding="utf-8",
+        )
+        findings = _findings(staged / "docs-cms")
+        assert any(f.startswith("TRC-005") and "AC-2 names no requirement" in f for f in findings)
+        assert any(f.startswith("TRC-005") and "FR-2 has no acceptance criterion" in f for f in findings)
+
+    def test_edge_case_range_expansion_is_what_covers_interior_ac2(self, tmp_path):
+        """Proves prd-001::AC-2 is covered solely by the prd-001::AC-1..AC-4 range expansion."""
+        staged = self._stage_examples(tmp_path)
+        rfc2 = staged / "docs-cms/rfcs/rfc-002-cli-export-pipeline.md"
+        # Replace the range operator with a comma so only the endpoints (AC-1 and AC-4) are cited
+        rfc2.write_text(
+            rfc2.read_text(encoding="utf-8").replace(
+                "prd-001::AC-1 through prd-001::AC-4",
+                "prd-001::AC-1, prd-001::AC-4",
+            ),
+            encoding="utf-8",
+        )
+        findings = _findings(staged / "docs-cms")
+        assert len(findings) == 1
+        assert findings[0].startswith("TRC-004") and "AC-2 is not covered or deferred" in findings[0]
+
+    def test_edge_case_range_with_undefined_endpoint_triggers_trc001(self, tmp_path):
+        """Proves a range endpoint that does not exist in the target PRD is rejected by TRC-001."""
+        staged = self._stage_examples(tmp_path)
+        rfc2 = staged / "docs-cms/rfcs/rfc-002-cli-export-pipeline.md"
+        rfc2.write_text(
+            rfc2.read_text(encoding="utf-8").replace(
+                "prd-001::AC-1 through prd-001::AC-4",
+                "prd-001::AC-1 through prd-001::AC-5",
+            ),
+            encoding="utf-8",
+        )
+        findings = _findings(staged / "docs-cms")
+        assert any(f.startswith("TRC-001") and "prd-001::AC-5 is not defined" in f for f in findings)
+        assert any(f.startswith("TRC-004") and "AC-2 is not covered or deferred" in f for f in findings)
+
+    def test_edge_case_inverted_or_cross_source_range_does_not_expand(self, tmp_path):
+        """Proves inverted ranges (AC-4 through AC-1) or cross-PRD ranges do not expand to cover AC-2."""
+        staged = self._stage_examples(tmp_path)
+        rfc2 = staged / "docs-cms/rfcs/rfc-002-cli-export-pipeline.md"
+        rfc2.write_text(
+            rfc2.read_text(encoding="utf-8").replace(
+                "prd-001::AC-1 through prd-001::AC-4",
+                "prd-001::AC-4 through prd-001::AC-1",
+            ),
+            encoding="utf-8",
+        )
+        findings = _findings(staged / "docs-cms")
+        assert len(findings) == 1
+        assert findings[0].startswith("TRC-004") and "AC-2 is not covered or deferred" in findings[0]

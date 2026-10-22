@@ -13,8 +13,14 @@ This directory contains a complete example `docs-cms` system demonstrating best 
 - **adr-001-adopt-docs-cms.md**: Decision to adopt docs-cms framework
 - **adr-002-agent-collaboration-workflow.md**: Agent collaboration guidelines
 
+#### Product Requirements Documents (PRDs)
+- **prd-001-doc-export.md**: Requirements, NFRs, explicit deferral (`FR-3`), and acceptance criteria (`AC-1`, `AC-2`, `AC-4`) for archive export
+- **prd-002-audit-trail.md**: Requirements, dotted criteria (`AC-1.1`), and scope deferral for audit logging and streaming
+
 #### Request for Comments (RFCs)
-- **rfc-001-automated-doc-generation.md**: Proposal for auto-generating API docs
+- **rfc-001-automated-doc-generation.md**: Standalone proposal defining local `FR-1`/`AC-1` without a parent PRD, plus background link isolation
+- **rfc-002-cli-export-pipeline.md**: Multi-PRD proposal (`implements: [prd-001, prd-002]`) using `prd-001::` and `prd-002::` qualifiers and range coverage (`AC-1 through AC-4`)
+- **rfc-003-audit-stream.md**: Complementary RFC covering the remaining `prd-002` scope with an `Unresolved` disposition
 
 #### Memos
 - **memo-001-docs-cms-launch.md**: Launch status and metrics
@@ -115,6 +121,18 @@ docuchango validate
 - How to break work into phases
 - How to identify and address risks
 - How to define success criteria
+
+### Traceability Example Ladder (PRD-001, PRD-002, RFC-001..003)
+
+`examples/docs-cms` enables `check_traceability: true` on `prd` and `rfc` in `docs-project.yaml` and demonstrates the progressive traceability ladder:
+
+1. **Level 1 (Standalone RFC with local requirements)**: `rfc-001-automated-doc-generation.md` defines `FR-1`, a deferred `FR-2`, and `AC-1` locally without an `implements` target, while linking to `prd-001` in prose as background context without claiming its criteria.
+2. **Level 2 (PRD with explicit deferral, NFR, and numbering gap)**: `prd-001-doc-export.md` defines `FR-1`, `FR-2`, deferred `FR-3`, `NFR-1`, and criteria `AC-1`, `AC-2`, and `AC-4`.
+3. **Level 3 (Dotted criteria & out-of-scope column)**: `prd-002-audit-trail.md` defines colliding local IDs (`FR-1`, `FR-2`, `AC-1`), a dotted sub-criterion (`AC-1.1`), and an `Out of scope` row (`FR-3`).
+4. **Level 4 (Multi-PRD RFC with `doc-id::` qualifiers & ranges)**: `rfc-002-cli-export-pipeline.md` declares `implements: [prd-001, prd-002]`, disambiguates colliding IDs (`prd-001::FR-1` vs `prd-002::FR-1`), and uses `prd-001::AC-1 through prd-001::AC-4` to cover defined criteria across a numbering gap.
+5. **Level 5 (Split implementation across multiple RFCs)**: `rfc-003-audit-stream.md` implements the remaining `prd-002::FR-2` / `prd-002::AC-2` with an `Unresolved` disposition, so `rfc-002` and `rfc-003` together satisfy `TRC-004` for `prd-002`.
+
+Run `docuchango bootstrap --guide traceability` or see `../docs/ACCEPTANCE_CRITERIA.md` for the full authoring guide.
 
 ### Memo-001: docs-cms Launch
 
@@ -249,25 +267,25 @@ status: Proposed  # Agent uses Proposed
 
 ## Validation
 
-All example documents pass docuchango validation:
+All example documents pass docuchango validation (including `TRC-001`..`TRC-005` requirement traceability):
 
 ```bash
-$ cd examples
-$ docuchango validate
+$ docuchango validate --repo-root examples --dry-run --skip-build
 
-Scanning docs-cms/...
-✓ Found 4 documents
-✓ All frontmatter valid
-✓ All internal links resolve
-✓ All code blocks properly formatted
-✓ No validation errors
+🔍 Validating Documentation
+DRY RUN - No changes will be made
 
-Summary: 4/4 documents passed validation (100%)
+Scanned 8 files
+
+✅ All documents valid
 ```
 
 ## Resources
 
 - **Bootstrap Guide**: `../docs/BOOTSTRAP_GUIDE.md` - Setup instructions
+- **Traceability Guide**: `../docs/ACCEPTANCE_CRITERIA.md` (`docuchango bootstrap --guide traceability`) - Requirements, acceptance criteria, and TRC validation
+- **Planning & Verification**: `../docs/PLANNING_AND_VERIFICATION.md` - Connecting criteria to implementation steps and tests
+- **Review Guide**: `../docs/REVIEW_GUIDE.md` - Evidence-based review and amendments
 - **Agent Guide**: `../docs/AGENT_GUIDE.md` - Agent collaboration guidelines
 - **Schema Reference**: `../docuchango/schemas.py` - Field requirements
 - **Main README**: `../README.md` - docuchango documentation

@@ -367,6 +367,7 @@ def validate(
     - Internal link reachability
     - Markdown formatting issues
     - Consistent ADR/RFC numbering
+    - Requirement and acceptance-criterion traceability (opt-in TRC-001..TRC-005)
     """
     from docuchango.fixes.code_blocks import fix_code_blocks
     from docuchango.fixes.cross_plugin_links import fix_cross_plugin_links
@@ -807,7 +808,7 @@ def init(path: Path | None, project_id: str, project_name: str, force: bool):
 @main.command()
 @click.option(
     "--guide",
-    type=click.Choice(["bootstrap", "agent", "best-practices"], case_sensitive=False),
+    type=click.Choice(["bootstrap", "agent", "best-practices", "traceability"], case_sensitive=False),
     default="bootstrap",
     help="Which guide to display (default: bootstrap)",
 )
@@ -845,6 +846,7 @@ def bootstrap(
     - bootstrap: Step-by-step setup guide for docs-cms
     - agent: Instructions for AI agents using docs-cms
     - best-practices: Best practices for agent-CMS interaction
+    - traceability: Traceable requirements, acceptance criteria, and TRC validation
 
     Examples:
 
@@ -855,6 +857,10 @@ def bootstrap(
         \b
         # Display agent guide
         docuchango bootstrap --guide agent
+
+        \b
+        # Display traceability guide
+        docuchango bootstrap --guide traceability
 
         \b
         # Save bootstrap guide to file
@@ -896,9 +902,10 @@ def bootstrap(
         "bootstrap": "BOOTSTRAP_GUIDE.md",
         "agent": "AGENT_GUIDE.md",
         "best-practices": "BEST_PRACTICES.md",
+        "traceability": "ACCEPTANCE_CRITERIA.md",
     }
 
-    guide_file = guide_files[guide]
+    guide_file = guide_files[guide.lower()]
 
     # Try to find the guide in the package
     try:

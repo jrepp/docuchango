@@ -119,7 +119,8 @@ grep -r "topic-name" docs-cms/
 
 **Step 2**: Choose the right document type
 - **ADR**: For architectural decisions
-- **RFC**: For proposals and significant changes
+- **PRD**: For product requirements and acceptance criteria (`FR-n`, `NFR-n`, `AC-n`)
+- **RFC**: For proposals, technical contracts, and requirements coverage
 - **Memo**: For sharing information or investigation results
 
 **Step 3**: Create from template
@@ -355,6 +356,17 @@ Why this memo exists
 - "Team Meeting Notes: API Design Review"
 - "Security Audit Findings"
 - "Migration Progress Update"
+
+### Product Requirements Documents (PRDs) and Requirement Traceability
+
+**When to create:**
+- Defining product outcomes, user stories, and measurable targets
+- Establishing stable requirement (`FR-n`, `NFR-n`) and acceptance-criterion (`AC-n`) IDs for an RFC to implement
+
+**Progressive disclosure for agents:**
+1. **Templates first:** `docs-cms/templates/prd-000-template.md` and `rfc-000-template.md` contain inline syntax prompts for `FR-n`, `NFR-n`, `AC-n`, `Requirement: FR-n`, `implements: [prd-NNN]`, and the `Requirements Coverage` disposition table.
+2. **Full authoring & planning guides:** Run `docuchango bootstrap --guide traceability` or read `docs/ACCEPTANCE_CRITERIA.md`, `docs/PLANNING_AND_VERIFICATION.md`, and `docs/REVIEW_GUIDE.md` when designing test scenarios, planning implementation steps, or reviewing amendments.
+3. **Opt-in structural validation (`TRC-001`..`TRC-005`):** When `check_traceability: true` is enabled on `doc_types` in `docs-project.yaml`, `docuchango validate` checks that every referenced ID resolves, definitions are unique, coverage rows have a `Covered`, `Deferred`, or `Unresolved` disposition, implemented PRDs have no uncovered items, and criteria link to requirements. Do not invent requirements or metrics to silence a finding—record unknown targets or missing decisions as open questions or `Unresolved` dispositions.
 
 ## Best Practices for Agents
 
@@ -795,7 +807,10 @@ def test_authentication_flow():
 ## Resources
 
 - **Bootstrap Guide**: `docs/BOOTSTRAP_GUIDE.md` - How to set up docs-cms
-- **Configuration**: `docs/CONFIGURATION.md` - Monorepos, mixed schemas, naming standards
+- **Traceability Guide**: `docs/ACCEPTANCE_CRITERIA.md` (`docuchango bootstrap --guide traceability`) - Traceable requirements, acceptance criteria, and TRC validation
+- **Planning & Verification**: `docs/PLANNING_AND_VERIFICATION.md` - Connecting acceptance criteria to implementation steps and tests
+- **Review Guide**: `docs/REVIEW_GUIDE.md` - Evidence-based review, dispositions, and amendment checks
+- **Configuration**: `docs/CONFIGURATION.md` - Monorepos, mixed schemas, naming standards, traceability opt-in
 - **Validation Reference**: `docs/VALIDATION_REFERENCE.md` - Every check and fix
 - **Schema Reference**: `docuchango/schemas.py` - Field requirements
 - **Templates**: `docs-cms/templates/` - Document templates

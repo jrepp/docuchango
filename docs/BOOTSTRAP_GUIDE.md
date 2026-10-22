@@ -294,7 +294,11 @@ where you ran the command. Use `--repo-root` to point at the right directory.
 ## Next
 
 - [CONFIGURATION.md](CONFIGURATION.md): monorepos, mixed schemas, naming
-  standards, index files.
+  standards, requirement traceability, index files.
 - [VALIDATION_REFERENCE.md](VALIDATION_REFERENCE.md): every check and fix.
+- [ACCEPTANCE_CRITERIA.md](ACCEPTANCE_CRITERIA.md),
+  [PLANNING_AND_VERIFICATION.md](PLANNING_AND_VERIFICATION.md), and
+  [REVIEW_GUIDE.md](REVIEW_GUIDE.md): connecting requirements, acceptance
+  criteria, design coverage, and evidence-based reviews (`docuchango bootstrap --guide traceability`).
 - [AGENT_GUIDE.md](AGENT_GUIDE.md): how agents should use the docs-cms.
 - `examples/docs-cms/`: a complete sample project.

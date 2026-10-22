@@ -708,6 +708,9 @@ Before committing any docs-cms change, verify:
 
 - **Bootstrap Guide**: `BOOTSTRAP_GUIDE.md` - Setup instructions
 - **Agent Guide**: `AGENT_GUIDE.md` - Detailed agent instructions
+- **Traceability Guide**: `ACCEPTANCE_CRITERIA.md` (`docuchango bootstrap --guide traceability`) - Connecting requirements, acceptance criteria, RFC coverage, and verification
+- **Planning & Verification**: `PLANNING_AND_VERIFICATION.md` - Turning criteria into implementation steps and test cases
+- **Review Guide**: `REVIEW_GUIDE.md` - Evidence-based design review and amendment maintenance
 - **Examples**: `examples/docs-cms/` - Sample documents
 - **Schemas**: `docuchango/schemas.py` - Field requirements
 
