@@ -2,6 +2,42 @@
 
 <!-- version list -->
 
+## v1.20.0-rc.2 (2026-10-22)
+
+### Bug Fixes
+
+- **validate**: Address TRC-001/TRC-003 table and scope review findings
+  ([`1d86323`](https://github.com/jrepp/docuchango/commit/1d863232b91053970ced16a6705277462100db03))
+
+- **validate**: Declare RFC scope with `implements`; harden TRC-001..005
+  ([`d565e85`](https://github.com/jrepp/docuchango/commit/d565e853a312d53712b66c9b647388c0d1cf3e97))
+
+- **validate**: Harden TRC-001..005 ranges, scope, and multi-mode lanes
+  ([`4ecfa0a`](https://github.com/jrepp/docuchango/commit/4ecfa0a899525cfdecf5ede9c1443b495e0427f2))
+
+- **validate**: Scope TRC-001/004/005 references and deferrals
+  ([`8bd286d`](https://github.com/jrepp/docuchango/commit/8bd286debc98546ddcf3dd18102fa062f6db37ba))
+
+### Documentation
+
+- **templates**: Use one Requirement: keyword to link criteria to requirements
+  ([`bb0e913`](https://github.com/jrepp/docuchango/commit/bb0e9132df092d87eb843c6622a63e9e8be02cfb))
+
+### Features
+
+- **templates**: Add evidence-based review and change maintenance guidance
+  ([`989b573`](https://github.com/jrepp/docuchango/commit/989b573a85bec81350ad546c2daad5f08d7c607d))
+
+- **templates**: Connect requirements to acceptance criteria and verification
+  ([`d5d1ae1`](https://github.com/jrepp/docuchango/commit/d5d1ae15a853f1df749fc047d8f1cfa6cef9a246))
+
+- **traceability**: Add example ladder and guide support
+  ([`a6ad9d4`](https://github.com/jrepp/docuchango/commit/a6ad9d459faf7aa315604c96b065d999cb0c1ad9))
+
+- **validate**: Add opt-in requirement traceability checks (TRC-001..005)
+  ([`9dba3bd`](https://github.com/jrepp/docuchango/commit/9dba3bd4df29ada4e35f5d647b871dabdf7471df))
+
+
 ## v1.20.0-rc.1 (2026-10-16)
 
 ### Bug Fixes
