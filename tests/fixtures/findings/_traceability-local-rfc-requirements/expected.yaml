@@ -1,0 +1,10 @@
+summary: >-
+  An RFC with no parent PRD states FR-1 in an ID table and AC-1 as a heading,
+  as the template allows, then covers them. Definitions are recognised by form
+  in any document type.
+messages: []
+forbidden:
+  - "TRC-"
+fixed: false
+dry_run_exit_code: 0
+exit_code: 0

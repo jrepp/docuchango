@@ -139,6 +139,11 @@ High-level user journeys:
 
 Specific features and workflows:
 
+Give requirements and acceptance criteria stable local IDs (for example `FR-1`
+and `AC-1`). Reference them from the RFC and tests instead of copying requirements
+into several sources of truth. Use only the sections relevant to the change.
+See the [worked example](../docs/ACCEPTANCE_CRITERIA.md).
+
 #### Story 1: [Feature Name]
 
 **As a** [specific user type]
@@ -146,9 +151,9 @@ Specific features and workflows:
 **So that** [specific benefit]
 
 **Acceptance Criteria:**
-- [ ] Criterion 1: Observable, testable requirement
-- [ ] Criterion 2: Observable, testable requirement
-- [ ] Criterion 3: Observable, testable requirement
+- [ ] **AC-1** (Requirement: FR-1): Given [initial state], when [action], then [observable result].
+- [ ] **AC-2** (Requirement: FR-1): Given [relevant failure], when [action], then [error/recovery outcome] and [state that must remain unchanged].
+- [ ] **AC-3** (Requirement: FR-1): Given [relevant boundary], when [action], then [expected outcome].
 
 **Priority**: P0 (Must Have)
 **Estimated Effort**: S/M/L/XL
@@ -161,9 +166,20 @@ Specific features and workflows:
 **So that** [specific benefit]
 
 **Acceptance Criteria:**
-- [ ] Criterion 1: Observable, testable requirement
-- [ ] Criterion 2: Observable, testable requirement
-- [ ] Criterion 3: Observable, testable requirement
+- [ ] **AC-4** (Requirement: FR-2): Given [initial state], when [action], then [observable result].
+- [ ] **AC-5** (Requirement: FR-2): [Failure or boundary behavior, where applicable].
+
+Equivalent testable prose is acceptable. “Add a handler” and “write tests” are
+tasks, not acceptance outcomes. Keep product behavior here; the RFC supplements
+it with technical contracts and verification methods. Do not renumber existing
+criteria just to insert a new one.
+
+Keep feature acceptance separate from shared Definition of Done checks such as
+peer review and lint. When amending criteria, classify changes as restructuring,
+product clarification, new/changed requirement, or engineering question. Preserve
+conditions, exceptions, negative constraints, and IDs. Test the rewrite with a
+counterexample: could it pass while the original promise fails? Required outcomes
+belong in Then, not hidden as assumptions in Given.
 
 **Priority**: P1 (Should Have)
 **Estimated Effort**: S/M/L/XL
@@ -171,16 +187,19 @@ Specific features and workflows:
 
 ## Functional Requirements
 
+Assign the `FR-*` IDs referenced by the stories above. Explicitly identify deferred
+requirements and their release scope; do not infer coverage from a document link.
+
 ### Must Have (P0)
 
 Critical for launch - if these aren't met, we can't ship:
 
-1. **Requirement 1**: Detailed description
+1. **FR-1**: Detailed description
    - Why it's critical
    - Acceptance criteria
    - Dependencies
 
-2. **Requirement 2**: Detailed description
+2. **FR-2**: Detailed description
    - Why it's critical
    - Acceptance criteria
    - Dependencies
@@ -189,12 +208,12 @@ Critical for launch - if these aren't met, we can't ship:
 
 Important but can be delayed if needed:
 
-1. **Requirement 1**: Detailed description
+1. **FR-3**: Detailed description
    - Value proposition
    - Acceptance criteria
    - Impact if deferred
 
-2. **Requirement 2**: Detailed description
+2. **FR-4**: Detailed description
    - Value proposition
    - Acceptance criteria
    - Impact if deferred
@@ -203,11 +222,11 @@ Important but can be delayed if needed:
 
 Would improve the product but not essential:
 
-1. **Requirement 1**: Detailed description
+1. **FR-5**: Detailed description
    - Incremental value
    - Could be post-launch
 
-2. **Requirement 2**: Detailed description
+2. **FR-6**: Detailed description
    - Incremental value
    - Could be post-launch
 
@@ -221,6 +240,12 @@ System qualities and constraints:
 - **Security**: Authentication, authorization, data protection
 - **Usability**: Accessibility, mobile support, browser compatibility
 - **Compliance**: Regulatory requirements (GDPR, HIPAA, etc.)
+
+Give relevant non-functional requirements stable `NFR-*` IDs. For each target,
+state its source/rationale and measurement conditions: metric/percentile,
+workload, dataset, environment, and observation period. Leave unknown targets
+as open questions rather than inventing numbers. Passing tests demonstrate
+delivery evidence, not necessarily adoption or customer value.
 
 ## User Experience
 
@@ -386,6 +411,12 @@ Critical assumptions we're making:
 
 Unresolved items that need decisions:
 
+Record the owner, next step, and affected criterion for each question. Distinguish
+blocking decisions from questions that can remain open during unrelated work.
+Keep proposed decisions separate from agreed requirements, especially in
+agent-generated drafts. If multiple outcomes are intentionally allowed, state
+the allowed set and invariant rather than leaving “warn or reject” ambiguous.
+
 1. **Question 1**: What needs to be decided?
    - Options being considered
    - Decision maker
@@ -418,6 +449,11 @@ Sign-off required before proceeding:
 ### User Research Summary
 
 Key findings from user research (or link to full report):
+
+Distinguish source observations from interpretations and recommendations. Name
+material assumptions, contrary evidence, and limits of the source coverage. Quote
+accurately; do not infer prevalence or consensus from a single report. New needs
+inferred from evidence remain proposals until agreed.
 
 - Finding 1
 - Finding 2

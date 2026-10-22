@@ -1,0 +1,13 @@
+summary: >-
+  An RFC implements prd-001 and cites AC-4, which that PRD never defines. Its
+  coverage table is complete, so only the dangling reference is reported.
+messages:
+  - "TRC-001: Line 23: AC-4 is not defined in an implemented document (prd-001-reports.md)"
+forbidden:
+  - "TRC-002"
+  - "TRC-003"
+  - "TRC-004"
+  - "TRC-005"
+fixed: false
+dry_run_exit_code: 1
+exit_code: 1

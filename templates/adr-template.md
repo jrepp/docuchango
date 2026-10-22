@@ -26,6 +26,10 @@ Include:
 - Stakeholders and decision drivers
 - Forces at play (technical, organizational, timeline)
 
+Separate source-backed facts from assumptions and proposals. Verify current
+interfaces, paths, defaults, and supported values against authoritative sources;
+mark future behavior as planned. Record relevant contradictory evidence and limits.
+
 ## Decision
 
 What did we decide to do? Be specific and concrete.
@@ -46,6 +50,10 @@ Key factors that influenced this decision:
 - **Driver 1**: Description (e.g., Performance requirements)
 - **Driver 2**: Description (e.g., Developer experience)
 - **Driver 3**: Description (e.g., Cost/maintenance)
+
+**Reconsider if:** [Evidence or changed constraint that would reverse this choice].
+Explain which assumptions the decision depends on. Alternatives should be genuine
+contenders with evidence-based trade-offs, not invented to fill template slots.
 
 ### Alternatives Considered
 
@@ -127,6 +135,10 @@ Key technical details, gotchas, or migration steps:
 ## Revision History
 
 Optional section to track major changes to this ADR:
+
+For substantive changes, identify affected requirements, RFCs, and tests with
+follow-up owners. Preserve completed-work history and distinguish proposed impact
+from applied, verified updates. See the [review guide](../docs/REVIEW_GUIDE.md).
 
 - YYYY-MM-DD: Initial draft (Author Name)
 - YYYY-MM-DD: Accepted after review (Deciders)

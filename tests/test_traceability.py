@@ -1,0 +1,843 @@
+"""Requirement traceability: the parser and the opt-in TRC-001..005 check.
+
+The reproductions a review supplied against the first version are kept here
+by name, so the defects they exposed stay fixed.
+"""
+
+from pathlib import Path
+
+import pytest
+
+from docuchango.markdown import mask_code
+from docuchango.schemas import DocsProjectConfig, RFCFrontmatter
+from docuchango.traceability import _cells, has_disposition, parse_traceability
+from docuchango.validator import DocValidator
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+TEMPLATES = REPO_ROOT / "docuchango" / "templates"
+DETAILED_TEMPLATES = REPO_ROOT / "templates"
+
+ID_TABLE = "| ID | Requirement | Priority |\n|---|---|---|\n"
+COVERAGE = (
+    "| Source requirement | Acceptance criterion | Disposition | Design | Verification |\n|---|---|---|---|---|\n"
+)
+
+
+def _parse(text: str):
+    return parse_traceability(mask_code(text, strip_frontmatter=True))
+
+
+class TestDefinitions:
+    @pytest.mark.parametrize("column", ["Scope", "Status", "Priority"])
+    @pytest.mark.parametrize(
+        "value",
+        [
+            "Deferred",
+            "Deferred to v2",
+            "**Deferred** to v2",
+            "**Deferred** (agreed)",
+            "__Out of scope__ (future)",
+            "Descoped: agreed",
+        ],
+    )
+    def test_trc004_trc005_explicit_deferral_columns(self, column, value):
+        trace = _parse(f"| ID | Requirement | {column} |\n|---|---|---|\n| FR-1 | Export | {value} |\n")
+        assert trace.is_deferred("FR-1")
+
+    @pytest.mark.parametrize("value", ["Not deferred", "Deferredness", "Must", "Potentially deferred"])
+    def test_trc004_trc005_non_deferral_values(self, value):
+        trace = _parse(ID_TABLE + f"| FR-1 | Export | {value} |\n")
+        assert not trace.is_deferred("FR-1")
+
+    def test_heading_bullet_and_id_table(self):
+        trace = _parse(
+            ID_TABLE + "| FR-1 | One | Must |\n| **NFR-1** | Two | Must |\n\n"
+            "### AC-1: Heading form\n\nRequirement: FR-1\n\n"
+            "- [ ] **AC-2** (Requirement: FR-1, FR-2): bullet form\n"
+            "1. **FR-2**: numbered form\n"
+        )
+        assert sorted(trace.definitions) == ["AC-1", "AC-2", "FR-1", "FR-2", "NFR-1"]
+        assert trace.definitions["AC-1"][0].requirements == ["FR-1"]
+        assert trace.definitions["AC-2"][0].requirements == ["FR-1", "FR-2"]
+
+    def test_review_1_dotted_ids_are_distinct(self):
+        trace = _parse("### AC-1.1: First\n\n### AC-1.2: Second\n\nSee AC-1.\n")
+        assert sorted(trace.definitions) == ["AC-1.1", "AC-1.2"]
+        assert [r.id for r in trace.references] == ["AC-1"]
+
+    def test_review_2_any_document_defines_by_form(self):
+        """There is no per-schema switch: an RFC's local FR-1 is a definition."""
+        trace = _parse(ID_TABLE + "| FR-1 | Local requirement | Must |\n\n### AC-1: Local\n\nRequirement: FR-1\n")
+        assert sorted(trace.definitions) == ["AC-1", "FR-1"]
+
+    def test_coverage_and_source_tables_cite_rather_than_define(self):
+        trace = _parse(
+            COVERAGE + "| FR-1 | AC-1 | Covered | s | t |\n\n| Source | Criterion |\n|---|---|\n| FR-2 | AC-2 |\n"
+        )
+        assert trace.definitions == {}
+        assert [r.id for r in trace.references] == ["FR-1", "AC-1", "FR-2", "AC-2"]
+
+    def test_table_without_an_id_header_does_not_define(self):
+        """A risks table that happens to start a row with an ID is a citation (second-pass finding)."""
+        trace = _parse(
+            ID_TABLE + "| FR-1 | One | Must |\n\n| Risk | Mitigation |\n|---|---|\n| FR-1 | could regress |\n"
+        )
+        assert len(trace.definitions["FR-1"]) == 1
+        assert [r.id for r in trace.references] == ["FR-1"]
+
+    def test_deferred_row(self):
+        trace = _parse(
+            ID_TABLE + "| FR-1 | One | Must |\n| FR-2 | Two | Deferred to v2 |\n| FR-3 | Three | Out of scope |\n"
+        )
+        assert not trace.is_deferred("FR-1")
+        assert trace.is_deferred("FR-2") and trace.is_deferred("FR-3")
+
+    def test_own_definition_is_not_a_reference_but_repeats_are(self):
+        trace = _parse("### AC-1: Title mentions AC-1 again\n\nSee AC-1.\n")
+        assert [r.line for r in trace.references] == [1, 3]
+
+    def test_code_and_html_comments_are_ignored(self):
+        trace = _parse("Real AC-1 and `AC-2` inline. <!-- AC-3 -->\n\n```\nAC-4\n```\n<!--\nAC-5\n-->\n")
+        assert [r.id for r in trace.references] == ["AC-1"]
+
+    def test_nfr_does_not_yield_fr(self):
+        trace = _parse("NFR-1, UAC-9, AC-7a.\n")
+        assert [r.id for r in trace.references] == ["NFR-1"]
+
+
+class TestRequirementClause:
+    def test_trc005_qualified_requirement_clause_preserves_source(self):
+        trace = _parse("### AC-1: Local\nRequirement: prd-001::FR-1, prd-002::NFR-1\n")
+        assert trace.definitions["AC-1"][0].requirements == ["prd-001::FR-1", "prd-002::NFR-1"]
+
+    def test_trc005_requirement_clause_range_parsed(self):
+        trace = _parse("### AC-1: Local\nRequirement: FR-1 through FR-3, prd-001::NFR-1..prd-001::NFR-3\n")
+        assert [(r.prefix, r.lo, r.hi, r.source) for r in trace.definitions["AC-1"][0].requirement_ranges] == [
+            ("FR", 1, 3, None),
+            ("NFR", 1, 3, "prd-001"),
+        ]
+
+    def test_review_5_a_criterion_cannot_name_a_criterion(self):
+        trace = _parse("### AC-1: First\n\nRequirement: AC-2\n\n### AC-2: Second\n\nRequirement: FR-1\n")
+        assert trace.definitions["AC-1"][0].requirements == []
+        assert trace.definitions["AC-2"][0].requirements == ["FR-1"]
+
+    def test_clause_is_bounded_to_its_line_and_bracket(self):
+        trace = _parse(
+            "### AC-1: x\n\nRequirement: FR-1 and FR-2 (see FR-3)\n\n- **Given** a user with FR-4 access\n"
+            "- [ ] **AC-2** (Requirement: NFR-1): **Given** FR-5 **Then** ok\n"
+        )
+        assert trace.definitions["AC-1"][0].requirements == ["FR-1", "FR-2"]
+        assert trace.definitions["AC-2"][0].requirements == ["NFR-1"]
+
+    def test_span_stops_at_sibling_heading_and_next_unindented_line(self):
+        trace = _parse("### AC-1: One\n\n### Notes\n\nRequirement: FR-3\n\n- **AC-2**: two\n\nRequirement: FR-9\n")
+        assert trace.definitions["AC-1"][0].requirements == []
+        assert trace.definitions["AC-2"][0].requirements == []
+
+
+class TestCoverageRows:
+    @pytest.mark.parametrize(
+        ("row", "expected"),
+        [
+            ("|| AC-1 | Covered | design | test |", ["", "AC-1", "Covered", "design", "test"]),
+            (r"| FR-1 | Accept A \| B | Deferred |", ["FR-1", r"Accept A \| B", "Deferred"]),
+            ("| a ||", ["a", ""]),
+            (r"| a \\| b |", [r"a \\", "b"]),
+        ],
+    )
+    def test_trc003_table_cell_boundaries(self, row, expected):
+        assert _cells(row) == expected
+
+    def test_trc003_empty_source_cell_keeps_disposition_column(self):
+        trace = _parse(COVERAGE + "|| AC-1 | Covered | design | test |\n")
+        assert trace.rows_without_disposition == []
+
+    def test_trc004_trc005_escaped_pipe_preserves_deferral(self):
+        trace = _parse(ID_TABLE + r"| FR-1 | Accept A \| B | Deferred |" + "\n")
+        assert trace.is_deferred("FR-1")
+
+    @pytest.mark.parametrize(
+        ("cell", "expected"),
+        [
+            ("Covered", True),
+            ("**Deferred** (reason)", True),
+            ("unresolved", True),
+            ("", False),
+            ("[Covered / deferred / unresolved]", False),
+            ("TBD", False),
+            ("Covered (unit/integration tests)", True),
+            ("Deferred: [decision](../adr/adr-002.md)", True),
+            ("**Covered** (unit/integration tests)", True),
+            ("Covered/deferred", False),
+            ("**Covered** / **Unresolved**", False),
+            ("Coveredness", False),
+        ],
+    )
+    def test_disposition_cell(self, cell, expected):
+        assert has_disposition(cell) is expected
+
+    def test_review_4_disposition_is_read_from_its_column(self):
+        trace = _parse(COVERAGE + "| FR-1 | AC-1 | | Covered by parser | test |\n| FR-1 | AC-2 | Covered | | |\n")
+        assert trace.rows_without_disposition == [(3, ["FR-1", "AC-1"])]
+
+    def test_trc003_row_ids_keep_qualifier_and_ignore_later_columns(self):
+        trace = _parse(COVERAGE + "| prd-001::FR-1 | prd-001::AC-1 | | See FR-2 notes | Verify AC-2 |\n")
+        assert trace.rows_without_disposition == [(3, ["prd-001::FR-1", "prd-001::AC-1"])]
+
+    def test_table_without_disposition_column_is_not_a_coverage_table(self):
+        trace = _parse("## Verification Plan\n\n| AC | Test |\n|---|---|\n| AC-1 | test_x |\n")
+        assert trace.rows_without_disposition == []
+
+
+class TestRanges:
+    def test_range_operators(self):
+        trace = _parse("AC-1 through AC-3, FR-2 to FR-4, AC-5..AC-6, NFR-1–NFR-2\n")
+        assert [(r.prefix, r.lo, r.hi) for r in trace.ranges] == [
+            ("AC", 1, 3),
+            ("FR", 2, 4),
+            ("AC", 5, 6),
+            ("NFR", 1, 2),
+        ]
+
+    def test_mixed_prefix_dotted_and_hyphen_are_not_ranges(self):
+        trace = _parse("FR-1 to AC-3; AC-1.1 through AC-1.3; AC-1-AC-3\n")
+        assert trace.ranges == []
+
+    def test_malformed_tokens_are_not_range_endpoints(self):
+        trace = _parse("UNFR-1 through NFR-3; NFR-1 through NFR-3a; XAC-1..AC-2\n")
+        assert trace.ranges == []
+
+
+def _project(tmp_path: Path, optin: bool = True) -> Path:
+    root = tmp_path / "docs-cms"
+    (root / "prd").mkdir(parents=True)
+    (root / "rfcs").mkdir()
+    flag = "      check_traceability: true\n" if optin else ""
+    (root / "docs-project.yaml").write_text(
+        'version: "1"\nproject:\n  id: p\n  name: p\n'
+        "structure:\n  document_folders: [prd, rfcs]\n  doc_types:\n"
+        f"    prd:\n      schema: prd\n      folders: [prd]\n{flag}"
+        f"    rfc:\n      schema: rfc\n      folders: [rfcs]\n{flag}"
+        "readability:\n  enabled: false\n",
+        encoding="utf-8",
+    )
+    return root
+
+
+def _prd(root: Path, number: int, body: str) -> None:
+    (root / "prd" / f"prd-{number:03d}-x.md").write_text(
+        f"---\nid: prd-{number:03d}\ntitle: PRD {number}\nstatus: Draft\nauthor: a\ncreated: 2026-01-01\n"
+        f"target_release: v1\ntags: []\nproject_id: p\ndoc_uuid: aaaaaaaa-0000-4000-8000-{number:012d}\n---\n\n{body}",
+        encoding="utf-8",
+    )
+
+
+def _rfc(root: Path, number: int, body: str, implements: str | None = None) -> None:
+    imp = f"implements: {implements}\n" if implements else ""
+    (root / "rfcs" / f"rfc-{number:03d}-x.md").write_text(
+        f"---\nid: rfc-{number:03d}\ntitle: RFC {number}\nstatus: Draft\nauthor: a\ncreated: 2026-01-01\n"
+        f"tags: []\n{imp}project_id: p\ndoc_uuid: bbbbbbbb-0000-4000-8000-{number:012d}\n---\n\n{body}",
+        encoding="utf-8",
+    )
+
+
+def _findings(root: Path) -> list[str]:
+    validator = DocValidator(repo_root=root.parent, verbose=False)
+    validator.scan_documents()
+    validator.extract_links()
+    validator.check_traceability()
+    return [e for doc in validator.documents for e in doc.errors if e.startswith("TRC-")]
+
+
+GOOD_PRD = ID_TABLE + "| FR-1 | One | Must |\n\n### AC-1: One\n\nRequirement: FR-1\n"
+GOOD_RFC = COVERAGE + "| FR-1 | AC-1 | Covered | d | t |\n"
+
+
+class TestCheck:
+    def test_trc003_slash_explanations_and_empty_cells_validate_end_to_end(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(root, 1, GOOD_PRD)
+        _rfc(root, 1, COVERAGE + "|| AC-1 | Covered (unit/integration tests) | design | test |\n", "[prd-001]")
+        assert _findings(root) == []
+
+    def test_trc004_trc005_escaped_description_keeps_deferred_scope(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(root, 1, GOOD_PRD + "\n" + ID_TABLE + r"| FR-2 | Accept A \| B | Deferred |" + "\n")
+        _rfc(root, 1, GOOD_RFC, "[prd-001]")
+        assert _findings(root) == []
+
+    @pytest.mark.parametrize("reference", ["FR-1", "prd-002::FR-1"])
+    def test_trc001_empty_declared_source_does_not_fall_back(self, tmp_path, reference):
+        root = _project(tmp_path)
+        _prd(root, 1, "Requirements not numbered yet.\n")
+        _prd(root, 2, GOOD_PRD)
+        _rfc(root, 1, f"See {reference}.\n", "[prd-001]")
+        findings = _findings(root)
+        assert len(findings) == 1
+        assert "TRC-001" in findings[0] and "implemented document (prd-001-x.md)" in findings[0]
+
+    @pytest.mark.parametrize("background", ["FR-1 and AC-1", "AC-1 through AC-1"])
+    def test_trc004_background_cannot_cover_an_implementer(self, tmp_path, background):
+        root = _project(tmp_path)
+        _prd(root, 1, GOOD_PRD)
+        _rfc(root, 1, "Design pending.\n", "[prd-001]")
+        _rfc(root, 2, f"Background: {background}.\n")
+        findings = _findings(root)
+        assert len(findings) == 2
+        assert all(f.startswith("TRC-004") for f in findings)
+
+    @pytest.mark.parametrize(
+        "description", ["Deferred execution must preserve files", "This requirement is not deferred"]
+    )
+    def test_trc004_trc005_description_does_not_defer_requirement(self, tmp_path, description):
+        root = _project(tmp_path)
+        _prd(root, 1, GOOD_PRD + "\n" + ID_TABLE + f"| FR-2 | {description} | Must |\n")
+        _rfc(root, 1, GOOD_RFC, "[prd-001]")
+        findings = _findings(root)
+        assert len(findings) == 2
+        assert any(f.startswith("TRC-004") and "FR-2" in f for f in findings)
+        assert any(f.startswith("TRC-005") and "FR-2" in f for f in findings)
+
+    def test_trc001_qualified_references_resolve_colliding_ids(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(root, 1, GOOD_PRD)
+        _prd(root, 2, GOOD_PRD)
+        _rfc(
+            root,
+            1,
+            COVERAGE + "| prd-001::FR-1 | prd-001::AC-1 | Covered | d | t |\n"
+            "| prd-002::FR-1 | prd-002::AC-1 | Covered | d | t |\n",
+            "[prd-001, prd-002]",
+        )
+        assert _findings(root) == []
+
+    def test_trc001_qualified_reference_cannot_bypass_declared_scope(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(root, 1, GOOD_PRD)
+        _prd(root, 2, GOOD_PRD)
+        _rfc(root, 1, GOOD_RFC + "\nSee prd-002::AC-1.\n", "[prd-001]")
+        findings = _findings(root)
+        assert len(findings) == 1
+        assert findings[0].startswith("TRC-001") and "prd-002::AC-1" in findings[0]
+
+    def test_trc001_qualified_unknown_source_is_reported(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(root, 1, GOOD_PRD)
+        _rfc(root, 1, "See prd-999::AC-1.\n")
+        findings = _findings(root)
+        assert len(findings) == 1 and "TRC-001" in findings[0] and "prd-999::AC-1" in findings[0]
+
+    def test_trc004_qualified_ranges_and_indirect_coverage(self, tmp_path):
+        root = _project(tmp_path)
+        for number in (1, 2):
+            _prd(root, number, GOOD_PRD + "\n### AC-2: Two\nRequirement: FR-1\n")
+        _rfc(
+            root,
+            1,
+            "Covers prd-001::AC-1 through prd-001::AC-2.\nCovers prd-002::AC-1 through prd-002::AC-2.\n",
+            "[prd-001, prd-002]",
+        )
+        assert _findings(root) == []
+
+    def test_clean_pair_is_silent(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(root, 1, GOOD_PRD)
+        _rfc(root, 1, GOOD_RFC, "[prd-001]")
+        assert _findings(root) == []
+
+    def test_off_by_default(self, tmp_path):
+        root = _project(tmp_path, optin=False)
+        _prd(root, 1, "### AC-1: no requirement\n")
+        _rfc(root, 1, "AC-9\n")
+        assert _findings(root) == []
+
+    def test_review_3_a_background_link_claims_nothing(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(root, 1, GOOD_PRD + "\n### AC-2: Two\n\nRequirement: FR-1\n")
+        _rfc(root, 1, "Background: [related proposal](../prd/prd-001-x.md).\n")
+        assert _findings(root) == []
+
+    def test_implements_claims_the_document(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(root, 1, GOOD_PRD + "\n### AC-2: Two\n\nRequirement: FR-1\n")
+        _rfc(root, 1, GOOD_RFC, "[prd-001]")
+        findings = _findings(root)
+        assert (
+            len(findings) == 1
+            and "TRC-004" in findings[0]
+            and "AC-2 is not covered or deferred by rfc-001-x.md" in findings[0]
+        )
+
+    def test_implements_scalar_and_unknown_id(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(root, 1, GOOD_PRD)
+        _rfc(root, 1, GOOD_RFC, "prd-001")
+        _rfc(root, 2, GOOD_RFC, "[prd-009]")
+        findings = _findings(root)
+        assert len(findings) == 3
+        assert "frontmatter implements names 'prd-009'" in findings[0]
+        assert all("cannot resolve because no implements target resolved" in f for f in findings[1:])
+
+    def test_review_2_standalone_rfc_defines_its_own_requirements(self, tmp_path):
+        root = _project(tmp_path)
+        _rfc(root, 1, GOOD_PRD + "\n" + GOOD_RFC)
+        assert _findings(root) == []
+
+    def test_unlinked_rfc_resolves_against_the_one_definer(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(root, 1, GOOD_PRD)
+        _rfc(root, 1, GOOD_RFC)
+        assert _findings(root) == []
+
+    def test_two_definers_without_implements_is_ambiguous(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(root, 1, GOOD_PRD)
+        _prd(root, 2, GOOD_PRD)
+        _rfc(root, 1, GOOD_RFC)
+        findings = _findings(root)
+        assert all("TRC-001" in f and "add frontmatter implements" in f for f in findings) and len(findings) == 2
+
+    def test_implements_disambiguates(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(root, 1, GOOD_PRD)
+        _prd(root, 2, GOOD_PRD)
+        _rfc(root, 1, GOOD_RFC, "[prd-002]")
+        assert _findings(root) == []
+
+    def test_requirement_covered_when_its_criterion_is_cited(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(root, 1, GOOD_PRD)
+        _rfc(root, 1, "- AC-1: covered by the export path.\n", "[prd-001]")
+        assert _findings(root) == []
+
+    def test_deferred_requirement_needs_no_criterion_or_coverage(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(
+            root,
+            1,
+            ID_TABLE + "| FR-1 | One | Must |\n| FR-2 | Two | Deferred |\n\n### AC-1: One\n\nRequirement: FR-1\n",
+        )
+        _rfc(root, 1, GOOD_RFC, "[prd-001]")
+        assert _findings(root) == []
+
+    def test_range_resolves_against_definitions(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(root, 1, GOOD_PRD + "\n### AC-2: Two\n\nRequirement: FR-1\n\n### AC-4: Four\n\nRequirement: FR-1\n")
+        _rfc(root, 1, "Covers AC-1 through AC-4.\n", "[prd-001]")
+        assert _findings(root) == []
+
+    def test_range_endpoint_must_still_resolve(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(root, 1, GOOD_PRD)
+        _rfc(root, 1, "Covers AC-1 through AC-4.\n", "[prd-001]")
+        findings = _findings(root)
+        assert len(findings) == 1 and "TRC-001" in findings[0] and "AC-4 is not defined" in findings[0]
+
+    def test_nfr_is_orphan_checked_but_needs_no_criterion(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(root, 1, GOOD_PRD + "\n| ID | Requirement | Target |\n|---|---|---|\n| NFR-1 | Fast | p95 2s |\n")
+        _rfc(root, 1, GOOD_RFC, "[prd-001]")
+        findings = _findings(root)
+        assert len(findings) == 1 and "TRC-004" in findings[0] and "NFR-1" in findings[0]
+        _rfc(root, 1, GOOD_RFC + "| NFR-1 | measured | Covered | d | benchmark |\n", "[prd-001]")
+        assert _findings(root) == []
+
+    def test_unclaimed_prd_is_not_a_wall_of_trc004(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(root, 1, GOOD_PRD + "\n### AC-2: Two\n\nRequirement: FR-1\n")
+        assert _findings(root) == []
+
+    def test_prd_without_criteria_is_not_asked_for_them(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(root, 1, ID_TABLE + "| FR-1 | One | Must |\n| FR-2 | Two | Must |\n")
+        assert _findings(root) == []
+
+    def test_each_unresolved_id_is_reported_once(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(root, 1, GOOD_PRD)
+        _rfc(root, 1, "AC-4 then AC-4 then AC-4\n", "[prd-001]")
+        assert len([f for f in _findings(root) if f.startswith("TRC-001")]) == 1
+
+    def test_trc004_malformed_range_endpoints_do_not_claim_coverage(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(
+            root,
+            1,
+            GOOD_PRD
+            + "\n| ID | Requirement | Target |\n|---|---|---|\n| NFR-1 | One | 1s |\n| NFR-2 | Two | 1s |\n| NFR-3 | Three | 1s |\n",
+        )
+        _rfc(root, 1, GOOD_RFC + "\nCovers UNFR-1 through NFR-3 and NFR-1 through NFR-3a.\n", "[prd-001]")
+        findings = _findings(root)
+        assert len(findings) == 1 and findings[0].startswith("TRC-004") and "NFR-2" in findings[0]
+
+    @pytest.mark.parametrize(
+        ("clause", "implements"),
+        [
+            ("FR-1 through FR-3", "[prd-001]"),
+            ("prd-001::FR-1 through prd-001::FR-3", "[prd-001]"),
+        ],
+    )
+    def test_trc004_trc005_criterion_requirement_range_covers_interior_defined_ids(self, tmp_path, clause, implements):
+        root = _project(tmp_path)
+        _prd(
+            root,
+            1,
+            ID_TABLE
+            + "| FR-1 | One | Must |\n| FR-2 | Two | Must |\n| FR-3 | Three | Must |\n| FR-5 | Five | Must |\n\n"
+            f"### AC-1: Range\n\nRequirement: {clause}\n\n"
+            "### AC-2: Five\n\nRequirement: FR-5\n",
+        )
+        _rfc(root, 1, "- AC-1: covered\n- AC-2: covered\n", implements)
+        assert _findings(root) == []
+
+    def test_trc004_trc005_emphasized_deferred_status_is_exempt(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(
+            root,
+            1,
+            ID_TABLE
+            + "| FR-1 | One | Must |\n| FR-2 | Two | **Deferred** to v2 |\n| FR-3 | Three | **Out of scope** (v2) |\n\n"
+            "### AC-1: One\n\nRequirement: FR-1\n",
+        )
+        _rfc(root, 1, GOOD_RFC, "[prd-001]")
+        assert _findings(root) == []
+
+    def test_trc001_trc004_local_id_colliding_with_implemented_source_is_reported(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(root, 1, GOOD_PRD)
+        _rfc(root, 1, "### AC-1: Local criterion\n\nRequirement: FR-1\n\n" + GOOD_RFC, "[prd-001]")
+        findings = _findings(root)
+        assert any(f.startswith("TRC-001") and "AC-1 is defined in 2 documents" in f for f in findings)
+        assert any(f.startswith("TRC-004") and "AC-1 is not covered or deferred" in f for f in findings)
+
+    def test_trc005_unimplemented_document_cannot_satisfy_prd_requirement_criterion(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(root, 1, ID_TABLE + "| FR-1 | One | Must |\n| FR-2 | Two | Must |\n\n### AC-1: One\n\nRequirement: FR-1\n")
+        _rfc(root, 2, "### AC-99: Unrelated\n\nRequirement: FR-2\n")
+        findings = _findings(root)
+        assert len(findings) == 1 and findings[0].startswith("TRC-005") and "FR-2" in findings[0]
+
+    def test_trc005_duplicate_criterion_reports_missing_requirement_on_second_definition(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(
+            root,
+            1,
+            ID_TABLE
+            + "| FR-1 | One | Must |\n\n### AC-1: First\n\nRequirement: FR-1\n\n### AC-1: Duplicate without req\n",
+        )
+        findings = _findings(root)
+        assert any(f.startswith("TRC-002") and "AC-1 is defined 2 times" in f for f in findings)
+        assert any(f.startswith("TRC-005") and "AC-1 names no requirement" in f for f in findings)
+
+    def test_trc004_multiple_implementers_combine_coverage_and_pluralize_report(self, tmp_path):
+        root = _project(tmp_path)
+        _prd(
+            root,
+            1,
+            GOOD_PRD + "\n### AC-2: Two\n\nRequirement: FR-1\n\n### AC-3: Three\n\nRequirement: FR-1\n",
+        )
+        _rfc(root, 1, "- AC-1: covered\n", "[prd-001]")
+        _rfc(root, 2, "- AC-2: covered\n", "[prd-001]")
+        findings = _findings(root)
+        assert (
+            len(findings) == 1
+            and "AC-3 is not covered or deferred by rfc-001-x.md, rfc-002-x.md, which implement this document"
+            in findings[0]
+        )
+
+    def test_multi_mode_wiki_overlay_and_shared_generic_schema_isolation(self, tmp_path):
+        import frontmatter
+        import yaml
+        from click.testing import CliRunner
+
+        from docuchango.cli import main
+
+        root = tmp_path / "docs-cms"
+        res = CliRunner().invoke(main, ["init", "--path", str(root), "--project-id", "multi-app"])
+        assert res.exit_code == 0, res.output
+        cfg_path = root / "docs-project.yaml"
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+        cfg["readability"] = {"enabled": False}
+        cfg["structure"]["doc_types"] = {
+            "prd": {"schema": "prd", "folders": ["prd"], "check_traceability": True},
+            "frd": {
+                "schema": "generic",
+                "folders": ["frd"],
+                "filename_pattern": r"^(frd)-(\d{3})-(.+)\.md$",
+                "check_traceability": True,
+            },
+            "wiki": {
+                "schema": "generic",
+                "folders": ["pages"],
+                "naming_standard": "kebab-case",
+                "scan_subfolders": True,
+                "check_traceability": False,
+            },
+            "rfc": {"schema": "rfc", "folders": ["rfcs"], "check_traceability": True},
+        }
+        cfg_path.write_text(yaml.safe_dump(cfg), encoding="utf-8")
+        for folder in ("frd", "pages"):
+            (root / folder).mkdir(exist_ok=True)
+        (root / "prd/prd-001-reports.md").write_text(
+            "---\nid: prd-001\ntitle: Reporting product requirements\nstatus: Draft\nauthor: a\n"
+            "created: 2026-01-01\ntarget_release: v1\ntags: [prd]\nproject_id: multi-app\n"
+            "doc_uuid: aaaaaaaa-0000-4000-8000-000000000001\n---\n\n" + ID_TABLE + "| FR-1 | Export report | Must |\n",
+            encoding="utf-8",
+        )
+        (root / "frd/frd-001-export.md").write_text(
+            "---\nid: frd-001\ntitle: Export feature requirements\ncreated: 2026-01-01\n"
+            "tags: [frd]\nimplements: [prd-001]\nproject_id: multi-app\n"
+            "doc_uuid: cccccccc-0000-4000-8000-000000000001\n---\n\n"
+            "### AC-1: Export scenario\n\nRequirement: FR-1\n",
+            encoding="utf-8",
+        )
+        (root / "rfcs/rfc-001-export.md").write_text(
+            "---\nid: rfc-001\ntitle: Export technical design\nstatus: Draft\nauthor: a\n"
+            "created: 2026-01-01\ntags: [rfc]\nimplements: [prd-001, frd-001]\nproject_id: multi-app\n"
+            "doc_uuid: bbbbbbbb-0000-4000-8000-000000000001\n---\n\n"
+            + COVERAGE
+            + "| FR-1 | AC-1 | Covered | design | test |\n",
+            encoding="utf-8",
+        )
+        (root / "pages/overview.md").write_text(
+            "---\ntitle: Shared wiki route\nproject_id: multi-app\ncreated: 2026-01-01\n"
+            "tags: [wiki]\ndoc_uuid: dddddddd-0000-4000-8000-000000000001\n---\n\n"
+            "# Shared wiki route\n\nMentions FR-999 and AC-999 as prose examples.\n",
+            encoding="utf-8",
+        )
+
+        res = CliRunner().invoke(main, ["bootstrap", "--wiki", "--overlay", "--path", str(root)])
+        assert res.exit_code == 0, res.output
+        wiki_cfg_path = root / "wiki/docs-project.yaml"
+        wiki_cfg = yaml.safe_load(wiki_cfg_path.read_text(encoding="utf-8"))
+        wiki_cfg["security"]["allow_external_paths"] = True
+        wiki_cfg["structure"]["doc_types"]["wiki"]["folders"].append("../../services/auth/docs")
+        wiki_cfg_path.write_text(yaml.safe_dump(wiki_cfg), encoding="utf-8")
+
+        service_doc = tmp_path / "services/auth/docs/authentication.md"
+        service_doc.parent.mkdir(parents=True)
+        page = frontmatter.load(root / "wiki/templates/page.md")
+        page["tags"] = ["wiki"]
+        page.content += "\n\nRoutes task for FR-1 and AC-1; mentions FR-888 without claiming coverage.\n"
+        service_doc.write_text(frontmatter.dumps(page) + "\n", encoding="utf-8")
+
+        assert _findings(root) == []
+
+
+def test_config_flag_and_implements_field():
+    config = DocsProjectConfig.model_validate(
+        {
+            "version": "1",
+            "project": {"id": "p", "name": "p"},
+            "structure": {"doc_types": {"prd": {"schema": "prd", "folders": ["prd"], "check_traceability": True}}},
+        }
+    )
+    assert config.structure.doc_types is not None
+    assert config.structure.doc_types["prd"].check_traceability is True
+    plain = DocsProjectConfig.model_validate(
+        {"version": "1", "project": {"id": "p", "name": "p"}, "structure": {"doc_types": {"adr": {"schema": "adr"}}}}
+    )
+    assert plain.structure.doc_types is not None
+    assert plain.structure.doc_types["adr"].check_traceability is False
+    rfc = RFCFrontmatter.model_validate(
+        {
+            "title": "Long enough title",
+            "status": "Draft",
+            "author": "a",
+            "created": "2026-01-01",
+            "tags": ["x"],
+            "id": "rfc-001",
+            "project_id": "p",
+            "doc_uuid": "bbbbbbbb-0000-4000-8000-000000000001",
+            "implements": ["prd-001"],
+        }
+    )
+    assert rfc.implements == ["prd-001"]
+
+
+class TestShippedTemplates:
+    """The templates' own ID placeholders must parse the way the guide says."""
+
+    def test_prd_template_defines_a_traceable_criterion(self):
+        trace = _parse((TEMPLATES / "prd-000-template.md").read_text(encoding="utf-8"))
+        assert {"FR-1", "FR-2", "FR-3", "NFR-1", "AC-1"} <= set(trace.definitions)
+        assert trace.definitions["AC-1"][0].requirements == ["FR-1"]
+
+    def test_detailed_prd_and_frd_use_the_same_requirement_keyword(self):
+        for name in ("prd-template.md", "frd-template.md"):
+            trace = _parse((DETAILED_TEMPLATES / name).read_text(encoding="utf-8"))
+            criteria = [d for defs in trace.definitions.values() for d in defs if d.id.startswith("AC-")]
+            assert criteria, name
+            assert all(d.requirements for d in criteria), name
+
+    def test_rfc_templates_placeholder_row_is_flagged_and_implements_hinted(self):
+        for path in (TEMPLATES / "rfc-000-template.md", DETAILED_TEMPLATES / "rfc-template.md"):
+            text = path.read_text(encoding="utf-8")
+            trace = _parse(text)
+            assert trace.rows_without_disposition, f"{path}: unfilled placeholder row should be flagged"
+            assert "implements:" in text, path
+
+    def test_worked_example_in_the_guide_is_internally_consistent(self):
+        trace = _parse((REPO_ROOT / "docs" / "ACCEPTANCE_CRITERIA.md").read_text(encoding="utf-8"))
+        assert sorted(trace.definitions) == ["AC-1", "AC-2", "AC-3", "FR-1", "FR-2"]
+        assert trace.is_deferred("FR-2"), "the example defers FR-2 in its Scope column"
+        assert [trace.definitions[i][0].requirements for i in ("AC-1", "AC-2", "AC-3")] == [["FR-1"]] * 3
+
+
+class TestExamplesDocsCmsLadder:
+    """Progressive traceability example ladder in examples/docs-cms.
+
+    Verifies that the shipped examples/docs-cms directory validates cleanly
+    end-to-end with check_traceability enabled across all 5 ladder levels, and
+    that targeted mutations on a staged copy trigger each TRC-001..TRC-005
+    finding and edge case as documented in examples/README.md.
+    """
+
+    EXAMPLES_ROOT = REPO_ROOT / "examples"
+
+    def _stage_examples(self, tmp_path: Path) -> Path:
+        import shutil
+
+        staged = tmp_path / "examples"
+        shutil.copytree(self.EXAMPLES_ROOT / "docs-cms", staged / "docs-cms")
+        return staged
+
+    def test_shipped_examples_validate_cleanly_via_cli(self):
+        from click.testing import CliRunner
+
+        from docuchango.cli import validate
+
+        res = CliRunner().invoke(
+            validate,
+            ["--repo-root", str(self.EXAMPLES_ROOT), "--dry-run", "--skip-build"],
+            catch_exceptions=False,
+        )
+        assert res.exit_code == 0, res.output
+        assert "All documents valid" in res.output
+
+    def test_ladder_rungs_parse_expected_structures(self):
+        cms = self.EXAMPLES_ROOT / "docs-cms"
+
+        # Level 1: Standalone RFC with local requirements + deferred FR-2 + code-masked FR-999
+        rfc1 = _parse((cms / "rfcs/rfc-001-automated-doc-generation.md").read_text(encoding="utf-8"))
+        assert sorted(rfc1.definitions) == ["AC-1", "FR-1", "FR-2"]
+        assert rfc1.is_deferred("FR-2")
+        assert "FR-999" not in {r.id for r in rfc1.references}
+
+        # Level 2: PRD-001 with FR-1..3 (FR-3 deferred), NFR-1, and AC-1, AC-2, AC-4 (gap at AC-3)
+        prd1 = _parse((cms / "prd/prd-001-doc-export.md").read_text(encoding="utf-8"))
+        assert sorted(prd1.definitions) == ["AC-1", "AC-2", "AC-4", "FR-1", "FR-2", "FR-3", "NFR-1"]
+        assert prd1.is_deferred("FR-3")
+
+        # Level 3: PRD-002 with colliding local IDs, dotted AC-1.1, and Out of scope FR-3
+        prd2 = _parse((cms / "prd/prd-002-audit-trail.md").read_text(encoding="utf-8"))
+        assert sorted(prd2.definitions) == ["AC-1", "AC-1.1", "AC-2", "FR-1", "FR-2", "FR-3"]
+        assert prd2.is_deferred("FR-3")
+
+        # Level 4: RFC-002 multi-PRD qualified references + qualified range across AC-3 gap
+        rfc2 = _parse((cms / "rfcs/rfc-002-cli-export-pipeline.md").read_text(encoding="utf-8"))
+        assert rfc2.rows_without_disposition == []
+        assert any(r.source == "prd-001" and r.prefix == "AC" and (r.lo, r.hi) == (1, 4) for r in rfc2.ranges)
+
+        # Level 5: RFC-003 split implementation with Unresolved disposition
+        rfc3 = _parse((cms / "rfcs/rfc-003-audit-stream.md").read_text(encoding="utf-8"))
+        assert rfc3.rows_without_disposition == []
+        assert "prd-002::AC-2" in {r.id for r in rfc3.references}
+
+    def test_edge_case_removing_qualifier_in_multi_prd_rfc_triggers_trc001(self, tmp_path):
+        staged = self._stage_examples(tmp_path)
+        rfc2 = staged / "docs-cms/rfcs/rfc-002-cli-export-pipeline.md"
+        rfc2.write_text(
+            rfc2.read_text(encoding="utf-8").replace("prd-001::FR-1", "FR-1"),
+            encoding="utf-8",
+        )
+        findings = _findings(staged / "docs-cms")
+        assert any(f.startswith("TRC-001") and "FR-1 is defined in 2 documents" in f for f in findings)
+
+    def test_edge_case_duplicate_id_in_example_prd_triggers_trc002(self, tmp_path):
+        staged = self._stage_examples(tmp_path)
+        prd1 = staged / "docs-cms/prd/prd-001-doc-export.md"
+        prd1.write_text(
+            prd1.read_text(encoding="utf-8") + "\n### AC-1: Accidental duplicate\n\nRequirement: FR-1\n",
+            encoding="utf-8",
+        )
+        findings = _findings(staged / "docs-cms")
+        assert any(f.startswith("TRC-002") and "AC-1 is defined 2 times" in f for f in findings)
+
+    def test_edge_case_unselected_disposition_placeholder_triggers_trc003(self, tmp_path):
+        staged = self._stage_examples(tmp_path)
+        rfc3 = staged / "docs-cms/rfcs/rfc-003-audit-stream.md"
+        rfc3.write_text(
+            rfc3.read_text(encoding="utf-8").replace(
+                "Unresolved: awaiting retry backoff decision",
+                "Covered / deferred / unresolved",
+            ),
+            encoding="utf-8",
+        )
+        findings = _findings(staged / "docs-cms")
+        assert any(f.startswith("TRC-003") and "prd-002::FR-2, prd-002::AC-2" in f for f in findings)
+
+    def test_edge_case_dropping_second_implementing_rfc_triggers_trc004(self, tmp_path):
+        staged = self._stage_examples(tmp_path)
+        (staged / "docs-cms/rfcs/rfc-003-audit-stream.md").unlink()
+        findings = _findings(staged / "docs-cms")
+        assert any(f.startswith("TRC-004") and "FR-2 is not covered or deferred" in f for f in findings)
+        assert any(f.startswith("TRC-004") and "AC-2 is not covered or deferred" in f for f in findings)
+
+    def test_edge_case_dropping_requirement_clause_triggers_trc005(self, tmp_path):
+        staged = self._stage_examples(tmp_path)
+        prd2 = staged / "docs-cms/prd/prd-002-audit-trail.md"
+        prd2.write_text(
+            prd2.read_text(encoding="utf-8").replace("Requirement: FR-2\n", ""),
+            encoding="utf-8",
+        )
+        findings = _findings(staged / "docs-cms")
+        assert any(f.startswith("TRC-005") and "AC-2 names no requirement" in f for f in findings)
+        assert any(f.startswith("TRC-005") and "FR-2 has no acceptance criterion" in f for f in findings)
+
+    def test_edge_case_range_expansion_is_what_covers_interior_ac2(self, tmp_path):
+        """Proves prd-001::AC-2 is covered solely by the prd-001::AC-1..AC-4 range expansion."""
+        staged = self._stage_examples(tmp_path)
+        rfc2 = staged / "docs-cms/rfcs/rfc-002-cli-export-pipeline.md"
+        # Replace the range operator with a comma so only the endpoints (AC-1 and AC-4) are cited
+        rfc2.write_text(
+            rfc2.read_text(encoding="utf-8").replace(
+                "prd-001::AC-1 through prd-001::AC-4",
+                "prd-001::AC-1, prd-001::AC-4",
+            ),
+            encoding="utf-8",
+        )
+        findings = _findings(staged / "docs-cms")
+        assert len(findings) == 1
+        assert findings[0].startswith("TRC-004") and "AC-2 is not covered or deferred" in findings[0]
+
+    def test_edge_case_range_with_undefined_endpoint_triggers_trc001(self, tmp_path):
+        """Proves a range endpoint that does not exist in the target PRD is rejected by TRC-001."""
+        staged = self._stage_examples(tmp_path)
+        rfc2 = staged / "docs-cms/rfcs/rfc-002-cli-export-pipeline.md"
+        rfc2.write_text(
+            rfc2.read_text(encoding="utf-8").replace(
+                "prd-001::AC-1 through prd-001::AC-4",
+                "prd-001::AC-1 through prd-001::AC-5",
+            ),
+            encoding="utf-8",
+        )
+        findings = _findings(staged / "docs-cms")
+        assert any(f.startswith("TRC-001") and "prd-001::AC-5 is not defined" in f for f in findings)
+        assert any(f.startswith("TRC-004") and "AC-2 is not covered or deferred" in f for f in findings)
+
+    def test_edge_case_inverted_or_cross_source_range_does_not_expand(self, tmp_path):
+        """Proves inverted ranges (AC-4 through AC-1) or cross-PRD ranges do not expand to cover AC-2."""
+        staged = self._stage_examples(tmp_path)
+        rfc2 = staged / "docs-cms/rfcs/rfc-002-cli-export-pipeline.md"
+        rfc2.write_text(
+            rfc2.read_text(encoding="utf-8").replace(
+                "prd-001::AC-1 through prd-001::AC-4",
+                "prd-001::AC-4 through prd-001::AC-1",
+            ),
+            encoding="utf-8",
+        )
+        findings = _findings(staged / "docs-cms")
+        assert len(findings) == 1
+        assert findings[0].startswith("TRC-004") and "AC-2 is not covered or deferred" in findings[0]

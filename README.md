@@ -166,7 +166,7 @@ Generate a UUID with `uuidgen | tr '[:upper:]' '[:lower:]'` or
 | `docuchango bulk update --type adr --set status=Accepted` | Change a frontmatter field across many documents |
 | `docuchango bulk timestamps` | Derive `created` dates from git history |
 | `docuchango migrate --project-id my-app` | Upgrade legacy frontmatter to the current schema |
-| `docuchango bootstrap` | Print the setup guide; `--guide agent` prints the agent guide |
+| `docuchango bootstrap` | Print the setup guide; `--guide agent` or `--guide traceability` prints specialized guides |
 
 `validate`, the `bulk` commands and `migrate` all accept `--dry-run`. `init`
 does not: it refuses to write into a folder that already has files in it
@@ -247,6 +247,11 @@ never end up with an unrelated fix mixed into your working tree.
 - [Agent guide](docs/AGENT_GUIDE.md) and
   [Best practices](docs/BEST_PRACTICES.md): how agents should read, cite and
   extend a docs-cms.
+- [Traceable acceptance criteria](docs/ACCEPTANCE_CRITERIA.md),
+  [Planning and verification](docs/PLANNING_AND_VERIFICATION.md), and
+  [Review guide](docs/REVIEW_GUIDE.md): connecting PRD requirements (`FR-n`),
+  acceptance criteria (`AC-n`), RFC coverage dispositions, and opt-in
+  `TRC-001`..`TRC-005` validation.
 - [Templates](templates/) and a complete [example docs-cms](examples/docs-cms/).
 - [Docuchango's own docs-cms](docs-cms/): the decisions behind the tool.
 

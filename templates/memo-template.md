@@ -105,6 +105,13 @@ Deeper examination of the situation:
 
 What we've discovered or observed:
 
+Separate observations (source and context), interpretations, and recommendations.
+Identify relevant contrary evidence and source limitations. Do not infer frequency,
+consensus, or exhaustive absence from a single observation or a partial source.
+For consequential recommendations, state the supporting findings, assumptions,
+and evidence that would cause reconsideration. Use the
+[review guide](../docs/REVIEW_GUIDE.md) when assessing disputed claims.
+
 1. **Finding 1**: Description
    - Supporting evidence
    - Data or examples

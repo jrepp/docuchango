@@ -181,6 +181,7 @@ class TestInitCommand:
             assert "# Context" in adr_content
             assert "# Decision" in adr_content
             assert "# Consequences" in adr_content
+            assert "reconsider" in adr_content
 
             # Check RFC template
             rfc_template = templates_dir / "rfc-000-template.md"
@@ -189,6 +190,12 @@ class TestInitCommand:
             assert "# Summary" in rfc_content
             assert "# Motivation" in rfc_content
             assert "# Detailed Design" in rfc_content
+            assert "## Requirements Coverage" in rfc_content
+            assert "## Technical Acceptance Criteria" in rfc_content
+            assert "## Verification Plan" in rfc_content
+            assert "AC-1" in rfc_content
+            assert "Covered / deferred / unresolved" in rfc_content
+            assert "## Change Impact" in rfc_content
 
             # Check Memo template
             memo_template = templates_dir / "memo-000-template.md"
@@ -196,6 +203,7 @@ class TestInitCommand:
             assert "---" in memo_content
             assert "# Overview" in memo_content
             assert "# Context" in memo_content
+            assert "observations" in memo_content
 
             # Check PRD template
             prd_template = templates_dir / "prd-000-template.md"
@@ -204,6 +212,13 @@ class TestInitCommand:
             assert "# Executive Summary" in prd_content
             assert "# Problem Statement" in prd_content
             assert "# Requirements" in prd_content
+            assert "## Acceptance Criteria" in prd_content
+            assert "Requirement: FR-1" in prd_content
+            assert "**Given**" in prd_content
+            assert "**When**" in prd_content
+            assert "**Then**" in prd_content
+            assert "Blocking impact" in prd_content
+            assert "Definition of Done" in prd_content
 
     def test_init_readme_content(self, runner, tmp_path):
         """Test that README has helpful content."""

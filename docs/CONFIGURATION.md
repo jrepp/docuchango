@@ -236,6 +236,7 @@ structure:
 | `naming_standard` | A named filename rule instead of `filename_pattern`; see below. |
 | `scan_subfolders` | Overrides `structure.scan_subfolders` for this type. Leave unset to use the structure-level default. |
 | `report_numbering_gaps` | Report the numbers missing from this type's id sequence (`ID-010`). Default `false`; see below. |
+| `check_traceability` | Check FR/NFR/AC reference integrity between requirements documents and RFCs (`TRC-001` to `TRC-005`). Default `false`; see [Requirement traceability](#requirement-traceability). |
 
 ## Naming standards
 
@@ -315,6 +316,53 @@ per id prefix, so in a monorepo two sub-projects each keep their own `adr`
 sequence instead of being merged into one with holes in it. An id counts
 towards its sequence only when it is exactly `<prefix>-<number>`; an ADR
 amendment id such as `adr-043-a1` does not.
+
+## Requirement traceability
+
+When `implements` lists several documents with colliding local IDs, qualify the
+references, for example `prd-001::AC-1` and `prd-002::AC-1`. The qualifier uses
+the source document's frontmatter `id`, not its filename. It must be within the
+declared scope. A body link is not a substitute for declaring implementation scope.
+
+The PRD, FRD and RFC templates give requirements and acceptance criteria stable
+IDs (`FR-1`, `NFR-1`, `AC-1`) and ask the RFC to account for each criterion.
+Turn on `check_traceability` to have `validate` report broken edges between
+them. Opt in the requirement type and the RFC type together:
+
+```yaml
+structure:
+  doc_types:
+    prd:
+      schema: prd
+      folders: [prd]
+      check_traceability: true
+    rfc:
+      schema: rfc
+      folders: [rfcs]
+      check_traceability: true
+```
+
+Documents that use no IDs are silent, so existing documents need no migration.
+An RFC declares the PRDs or FRDs it covers in frontmatter:
+
+```yaml
+implements: [prd-001]
+```
+
+With it, the RFC's `FR-n` / `AC-n` references resolve against those documents
+and their criteria must each be covered or deferred (`TRC-004`). Multiple
+RFCs may implement different parts of the same PRD; TRC-004 checks that the
+declared implementers together cover or defer each requirement and criterion.
+Without `implements`, references resolve against every defining document in the
+project, and an ID two of them define is reported as ambiguous. Linking a PRD in
+the body is not a declaration. In multi-mode repositories that combine a wiki
+overlay (`bootstrap --wiki --overlay`) or unnumbered `generic` wiki lanes with
+numbered `prd`/`rfc` lanes, traceability stays scoped to the opted-in lanes and
+owning config: wiki task routes and colocated system pages can mention `FR-n` or
+`AC-n` IDs as navigation context without being checked or claiming coverage. The
+recognised syntax and the five findings are described in
+[Acceptance criteria](ACCEPTANCE_CRITERIA.md#reference-syntax-and-validation)
+and the [validation reference](VALIDATION_REFERENCE.md#requirement-traceability).
 
 ## Index files
 

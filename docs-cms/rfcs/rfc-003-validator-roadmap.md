@@ -55,6 +55,7 @@ be read at a glance. IDs are never reused or renumbered once a check ships.
 | `FMT` | Markdown formatting |
 | `CB` | Code blocks |
 | `IDX` | Document indexes |
+| `TRC` | Requirement traceability |
 | `RD` | Readability |
 | `BLD` | Docusaurus build |
 
@@ -100,6 +101,11 @@ reported.
 | CB-001 | Code fence without a language, or unclosed fence | Implemented | fix/report | `check_code_blocks`, `fixes/code_blocks.py`, `markdown.py` (`frontmatter_span`) |
 | IDX-001 | Document index missing, unlinked, or missing bucket headings | Implemented | report | `check_document_indexes` |
 | RD-001 | Paragraph outside the readability thresholds of the (sub-)project that owns the document | Implemented | report | `check_readability`, `_readability_config_for`, `_config_context_for_path`, `_config_ownership_roots` |
+| TRC-001 | FR/NFR/AC reference that no requirements document defines, or that two define, opt-in per type via `structure.doc_types.<type>.check_traceability` | Implemented | report | `check_traceability`, `_check_traceability_group`, `_traceability_types`, `traceability.py`, `schemas.py` (`DocTypeConfig.check_traceability`) |
+| TRC-002 | Same FR/NFR/AC ID defined more than once in one document | Implemented | report | `check_traceability`, `_check_traceability_group`, `_traceability_types`, `traceability.py`, `schemas.py` (`DocTypeConfig.check_traceability`) |
+| TRC-003 | Requirements Coverage table row with no covered, deferred or unresolved disposition | Implemented | report | `check_traceability`, `_check_traceability_group`, `_traceability_types`, `traceability.py`, `schemas.py` (`DocTypeConfig.check_traceability`) |
+| TRC-004 | Criterion or requirement not cited by a declared implementer of its source document | Implemented | report | `check_traceability`, `_check_traceability_group`, `_traceability_types`, `traceability.py`, `schemas.py` (`DocTypeConfig.check_traceability`) |
+| TRC-005 | Acceptance criterion with no `Requirement:` clause, or functional requirement no criterion names, in a document that defines criteria | Implemented | report | `check_traceability`, `_check_traceability_group`, `_traceability_types`, `traceability.py`, `schemas.py` (`DocTypeConfig.check_traceability`) |
 | BLD-001 | TypeScript config error | Implemented | report | `check_typescript_config` |
 | BLD-002 | Docusaurus build error | Implemented | report | `check_docusaurus_build` |
 
@@ -537,6 +543,68 @@ message that agrees with a dry run of a different document. MDX-011 is
 untouched and stays `Planned`: an indented code block is still masked as prose
 by both the check and the fix, so a `<token>` in one is reported and escaped
 together, which is at least consistent.
+
+**TRC-001..005 Requirement traceability (shipped).** The PRD, FRD and RFC
+templates ask for stable `FR-n`, `NFR-n` and `AC-n` IDs and for the RFC to
+account for each criterion as covered, deferred or unresolved. Nothing checked
+that the IDs line up. These five findings do, opt-in per type via
+`structure.doc_types.<type>.check_traceability: true` (default off). When two
+`doc_types` entries share a schema (for example a `generic` FRD lane and a
+`generic` wiki lane), an explicit `check_traceability` setting on a lane stays
+local to that lane; groups follow `_config_context_for_path` ownership so wiki
+overlays and colocated system pages remain isolated. Documents with no IDs are
+silent.
+
+Definitions are recognised by form in any opted-in document, because the RFC
+template allows requirements to be stated locally when there is no PRD: a
+heading (`### AC-1: ...`), a bold list item (`**FR-1**: ...`), or a row of a
+table whose header's first column is `ID` or `Requirement` and that has no
+`Disposition` or `Source` column. A table with a `Disposition` column is a
+coverage table; its rows cite IDs, and TRC-003 reads the disposition from that
+column rather than from any cell, naming the IDs cited before the disposition
+column. A defining row explicitly marked deferred in a
+Scope, Status, or Priority cell is exempt under TRC-004/TRC-005. Values are
+Deferred, Descoped, Out of scope, or Not in scope (with optional emphasis),
+optionally followed by a reason after a colon, dash, parenthesis, or `to`.
+Description text and negated phrases such as "not deferred" do not establish a
+deferral. Dotted IDs (`AC-1.1`) are distinct IDs. HTML comments are masked like
+code.
+
+TRC table parsing preserves empty columns and escaped pipes, including the
+backslash parity that determines whether a pipe is a delimiter. TRC-003 accepts
+slashes in explanations and evidence URLs; it rejects a slash-separated choice
+of dispositions instead of rejecting every slash.
+
+Scope is declared, not inferred. An RFC or FRD names the documents it covers in
+frontmatter `implements: [prd-001]` (optional on the RFC, PRD and generic
+schemas, never auto-filled). Declared sources bound resolution even when no
+target defines any IDs; missing targets are reported without falling back to
+unrelated documents. References resolve against the document itself and its
+declared documents (reporting TRC-001 when a local definition collides with an
+implemented source), or with none declared against every defining document of
+the (sub-)project; two matches is TRC-001 "defined in N documents; add
+implements". TRC-004 fires only for a document something declares it
+implements, so a background link to a PRD claims nothing: the first version
+treated any link as a claim, and review showed that to be exactly the inference
+the authoring guide warns against. A requirement counts as covered when it or
+any criterion naming it (directly or via a `Requirement: FR-1 through FR-3`
+range) is cited; `AC-1 through AC-4` requires bounded reference endpoints, cites
+every criterion the owning document defines between the endpoints, and asserts
+nothing about gaps. Only citations and criteria from the defining document or its
+declared implementers satisfy TRC-004 and TRC-005; background citations or
+criteria in unrelated documents cannot hide missing coverage. TRC-001 accepts
+explicit document-qualified references (`prd-001::AC-1`) to disambiguate reused
+local IDs across multiple implemented documents. Both range endpoints may be
+qualified with the same source. Qualifications respect declared scope and work in
+Requirement: clauses as well as coverage rows. Criterion-to-requirement coverage
+retains the defining document identity so identically named criteria in other
+documents do not accidentally satisfy it.
+`NFR-n` is subject to TRC-004 but exempt from TRC-005's "no criterion" rule,
+since a non-functional requirement may be verified by measurement alone.
+
+All five are report-only: the remedy is a decision, and inventing a missing
+criterion is the failure the guide warns against. Meaning, test quality and
+pass/fail evidence stay with review and CI.
 
 ### Planned validators
 

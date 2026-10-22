@@ -1,0 +1,10 @@
+summary: >-
+  An RFC links a PRD as background without declaring implements, and the PRD
+  has a criterion the RFC never mentions. A link is not a scope claim, so
+  nothing is reported.
+messages: []
+forbidden:
+  - "TRC-"
+fixed: false
+dry_run_exit_code: 0
+exit_code: 0

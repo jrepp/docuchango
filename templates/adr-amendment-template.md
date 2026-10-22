@@ -34,6 +34,10 @@ Include:
 Describe precisely what is being changed. Reference the specific section or rule
 from the original ADR.
 
+Identify the original document revision when needed to make the comparison
+unambiguous. Separate editorial restructuring, clarification, and changed decisions;
+do not silently introduce a requirement while describing an edit as clarification.
+
 **Before (ADR-NNN):**
 > Quote or summarise the original decision being amended.
 
@@ -97,6 +101,20 @@ List what must be true before this amendment can be marked Implemented:
 2. [Specific measurable criterion]
 
 ## Implementation Notes
+
+### Downstream Impact
+
+| Changed decision | Affected requirement/document/test | Follow-up | Owner and state |
+|------------------|------------------------------------|-----------|-----------------|
+| [Section and changed contract] | [Existing reference] | [Update / verify / proposed work] | [Owner; pending / verified / unresolved] |
+
+State which dependents were checked and which were not assessed. Preserve unrelated
+decisions and completed-work history; propose follow-up work rather than silently
+reopening completed items. A returned amendment or impact table is not evidence
+that dependent documents were updated. Record verified updates separately.
+
+**Reconsider if:** [Evidence or changed constraint that would reverse the amendment].
+See the [review and amendment guide](../docs/REVIEW_GUIDE.md).
 
 Optional section for implementation specifics required by the amended decision.
 

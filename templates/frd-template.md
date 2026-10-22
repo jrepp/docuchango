@@ -94,6 +94,18 @@ Feature is considered complete when:
 
 ### Detailed User Stories
 
+Give acceptance criteria stable `AC-*` IDs and reference their source requirement
+in this FRD or the parent PRD. The RFC adds technical contracts and verification
+methods without creating a competing requirement statement. Include relevant
+failure/boundary outcomes and preserved state; mark unresolved decisions with
+an owner and blocking impact. A small change may need only a few scenarios.
+See the [worked example](../docs/ACCEPTANCE_CRITERIA.md).
+
+Shared Definition of Done checks (review, lint, release preparation) are separate
+from feature-specific acceptance. When rewriting criteria, preserve their meaning:
+do not move a required outcome into Given or remove an exception to simplify the
+text. Keep clarification and new scope visibly proposed until agreed.
+
 #### Story 1: [Story Name] (P0 - Must Have)
 
 **As a** [specific user type]
@@ -101,9 +113,9 @@ Feature is considered complete when:
 **So that** [specific benefit]
 
 **Acceptance Criteria:**
-- [ ] **Given** [context], **When** [action], **Then** [expected outcome]
-- [ ] **Given** [context], **When** [action], **Then** [expected outcome]
-- [ ] **Given** [context], **When** [action], **Then** [expected outcome]
+- [ ] **AC-1** (Requirement: FR-1): **Given** [context], **When** [action], **Then** [observable outcome]
+- [ ] **AC-2** (Requirement: FR-1): **Given** [failure condition], **When** [action], **Then** [response and preserved state]
+- [ ] **AC-3** (Requirement: FR-1): **Given** [relevant boundary], **When** [action], **Then** [observable outcome]
 
 **Priority**: P0 (Must Have)
 **Story Points**: X (or T-shirt size: S/M/L/XL)

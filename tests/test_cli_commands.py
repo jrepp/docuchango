@@ -1075,7 +1075,15 @@ class TestCliBootstrap:
         """Test bootstrap --guide best-practices."""
         runner = CliRunner()
         result = runner.invoke(bootstrap, ["--guide", "best-practices"])
-        assert result.exit_code in [0, 1]
+        assert result.exit_code == 0
+
+    def test_bootstrap_traceability_guide(self):
+        """Test bootstrap --guide traceability prints the traceable acceptance criteria guide."""
+        runner = CliRunner()
+        result = runner.invoke(bootstrap, ["--guide", "traceability"])
+        assert result.exit_code == 0
+        assert "From Requirements to Acceptance Evidence" in result.output
+        assert "TRC-001" in result.output
 
     def test_bootstrap_output_to_file(self, tmp_path):
         """Test bootstrap --output writes the guide to a file."""

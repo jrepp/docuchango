@@ -10,6 +10,7 @@ author: Your Name  # Person or team who wrote this RFC (e.g., "Jacob Repp", "Pla
                    # Generate: git config user.name
 tags: ["architecture", "api", "backend"]  # List of lowercase-with-dashes tags (e.g., ["performance", "security"])
 project_id: "your-project-id"  # Project identifier from docs-project.yaml
+implements: []  # optional: ids of the PRDs/FRDs this RFC covers, e.g. [prd-001]
 doc_uuid: "00000000-0000-4000-8000-000000000000"  # UUID v4 - Generate: uuidgen  OR  python -c "import uuid; print(uuid.uuid4())"
 ---
 
@@ -59,6 +60,30 @@ How will we know this is successful?
 ## Proposal
 
 Detailed description of the proposed solution.
+
+### Requirements Coverage
+
+Reference the parent PRD's requirements and acceptance criteria. Without a parent
+PRD, state requirements and their rationale here. Preserve IDs across revisions.
+
+For long-running work, identify the source baseline (path plus commit, version,
+or date where needed). Check ranges against actual AC definitions, including gaps;
+do not invent missing IDs. Repeated references are valid; duplicate definitions
+or ambiguous source documents need clarification.
+
+| Source requirement | Acceptance criterion | Disposition | Design section | Verification |
+|--------------------|----------------------|-------------|----------------|--------------|
+| [PRD reference / FR-1] | AC-1 | [Covered / deferred / unresolved] | [Relevant section] | [Test level and evidence] |
+
+Identify deferred requirements explicitly. Keep one authoritative requirement
+statement and reference it; technical details supplement rather than rewrite
+the product contract. A short list is enough for a small change.
+See the [worked example](../docs/ACCEPTANCE_CRITERIA.md).
+
+Covered requires a mechanism and observable result, not just an ID mention.
+Record the reason and agreement source for deferred scope; a proposed deferral
+remains unresolved. Distinguish verified current behavior from proposed design
+and assumptions. Check named interfaces, defaults, and paths at their sources.
 
 ### High-Level Design
 
@@ -214,7 +239,34 @@ Expected performance characteristics:
 
 ## Testing Strategy
 
-How will this be tested?
+### Technical Acceptance Criteria
+
+For each source criterion, define the technical contract and its rationale:
+responses, payloads, errors, persistence, compatibility, and recovery as relevant.
+Label new technical decisions as proposed until agreed.
+
+**Technical contract for AC-1**
+- Source: [requirement or agreed decision]
+- Given [state], when [action], then [observable technical result].
+- On failure: [response, allowed side effects, preserved state, recovery].
+- Verification: [test level and evidence that establishes this contract].
+
+Describe necessary guarantees, not incidental helper names or file layouts.
+Internal constraints may need unit or integration tests rather than API-level
+acceptance tests. For quantitative targets, specify metric/percentile, workload,
+dataset, environment, measurement period, and the source of the target.
+
+### Verification Plan
+
+How will each acceptance criterion be tested? Link criteria to tests or planned
+evidence and explain which incorrect behavior each check detects. Planned
+coverage is not a passing result. Keep execution results with tests or release
+records instead of maintaining stale results in this RFC.
+
+Separate feature acceptance from shared Definition of Done checks such as lint
+and peer review. The [planning and test example](../docs/PLANNING_AND_VERIFICATION.md)
+shows how to map criteria to reviewable steps and evidence without another
+mandatory document or fixed scenario count.
 
 ### Unit Tests
 
@@ -238,6 +290,11 @@ How will this be tested?
 2. **Error Cases**: Failure modes and recovery
 3. **Edge Cases**: Boundary conditions
 4. **Scale Tests**: High load behavior
+
+Select scenarios based on the change's risks: invalid input, empty results,
+partial completion, retries, concurrency, and compatibility where applicable.
+Specify what must remain unchanged on failure; “returns an error” alone does
+not establish that persistent state is safe. Omit irrelevant scenarios.
 
 ## Migration and Rollout Plan
 
@@ -295,6 +352,11 @@ Estimated implementation timeline:
 
 Unresolved questions that need discussion:
 
+For each question, name an owner, the affected criterion, whether it blocks
+implementation, and the next step or agreed resolution. Do not silently turn an
+assumption into a requirement. Resolve “warn or reject” before testing unless
+both outcomes intentionally satisfy a stated invariant.
+
 1. **Question 1**: What needs to be decided?
    - Options being considered
    - Decision maker
@@ -322,6 +384,19 @@ Define technical terms or acronyms used in this RFC.
 Academic papers, blog posts, or other resources that informed this design.
 
 ## Revision History
+
+### Change Impact and Review
+
+For an amendment, identify the changed decision and source baseline, affected
+criteria/documents/tests, follow-up owners, and verification state. Preserve
+unrelated decisions and completed-work history. An impact proposal does not mean
+the downstream artifacts were synchronized.
+
+Use the [review and amendment guide](../docs/REVIEW_GUIDE.md) to distinguish
+evidence-backed defects, open questions, and suggestions. State the conditions
+that would reverse consequential decisions. Before handoff, ask a reader to
+perform a realistic planning or recovery task from the RFC alone, and check
+references from the intended shared location.
 
 Optional section to track major changes:
 

@@ -95,4 +95,7 @@ docuchango bootstrap --guide agent
 
 # Display best practices
 docuchango bootstrap --guide best-practices
+
+# Display traceable requirements and acceptance criteria guide
+docuchango bootstrap --guide traceability
 ```

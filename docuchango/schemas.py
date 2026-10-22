@@ -90,6 +90,15 @@ class DocTypeConfig(BaseModel):
             "(a withdrawn proposal), so this is opt-in and defaults to false."
         ),
     )
+    check_traceability: bool = Field(
+        default=False,
+        description=(
+            "Whether TRC-001..TRC-005 check the FR/NFR/AC IDs of this document type: references that "
+            "no linked requirements document defines, duplicate definitions, coverage rows without a "
+            "disposition, criteria no implementer claims, and requirements no criterion tests. Any opted-in "
+            "document may define IDs; opt in the PRD/FRD and RFC types together. Defaults to false."
+        ),
+    )
     model_config = ConfigDict(populate_by_name=True)
 
     frontmatter_schema: Literal["adr", "rfc", "memo", "prd", "generic"] = Field(
@@ -636,6 +645,13 @@ class RFCFrontmatter(BaseModel):
         ...,
         description="Project identifier from docs-project.yaml. Must match configured project ID (e.g., 'my-project')",
     )
+    implements: list[str] | str | None = Field(
+        default=None,
+        description=(
+            "Optional ids of the requirements documents this document covers (e.g. ['prd-001']). "
+            "With check_traceability on, it scopes FR/AC reference resolution and claims those documents' criteria (TRC-001, TRC-004)."
+        ),
+    )
     doc_uuid: str = Field(
         ...,
         description="Unique identifier for backend tracking. Must be valid UUID v4 format. Generated automatically by migration script",
@@ -810,6 +826,13 @@ class PRDFrontmatter(BaseModel):
         ...,
         description="Project identifier from docs-project.yaml. Must match configured project ID (e.g., 'my-project')",
     )
+    implements: list[str] | str | None = Field(
+        default=None,
+        description=(
+            "Optional ids of the requirements documents this document covers (e.g. ['prd-001']). "
+            "With check_traceability on, it scopes FR/AC reference resolution and claims those documents' criteria (TRC-001, TRC-004)."
+        ),
+    )
     doc_uuid: str = Field(
         ...,
         description="Unique identifier for backend tracking. Must be valid UUID v4 format. Generated automatically by migration script",
@@ -887,6 +910,13 @@ class GenericDocFrontmatter(BaseModel):
     id: str | None = Field(
         None,
         description="Document identifier (optional). Use lowercase with hyphens if provided (e.g., 'getting-started')",
+    )
+    implements: list[str] | str | None = Field(
+        default=None,
+        description=(
+            "Optional ids of the requirements documents this document covers (e.g. ['prd-001']). "
+            "With check_traceability on, it scopes FR/AC reference resolution and claims those documents' criteria (TRC-001, TRC-004)."
+        ),
     )
     project_id: str = Field(
         ...,

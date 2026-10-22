@@ -1,0 +1,9 @@
+summary: >-
+  The same dangling AC-4 as TRC-001-dangling-reference but with
+  check_traceability left at its default (false), so nothing is reported.
+messages: []
+forbidden:
+  - "TRC-"
+fixed: false
+dry_run_exit_code: 0
+exit_code: 0

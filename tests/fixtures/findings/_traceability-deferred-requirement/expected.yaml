@@ -1,0 +1,9 @@
+summary: >-
+  FR-2's defining row says it is deferred, so it needs neither a criterion
+  (TRC-005) nor coverage by the implementing RFC (TRC-004).
+messages: []
+forbidden:
+  - "TRC-"
+fixed: false
+dry_run_exit_code: 0
+exit_code: 0

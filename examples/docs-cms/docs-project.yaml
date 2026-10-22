@@ -16,6 +16,21 @@ structure:
     - rfcs
     - memos
     - prd
+  doc_types:
+    adr:
+      schema: adr
+      folders: [adr]
+    rfc:
+      schema: rfc
+      folders: [rfcs]
+      check_traceability: true
+    memo:
+      schema: memo
+      folders: [memos]
+    prd:
+      schema: prd
+      folders: [prd]
+      check_traceability: true
 
 metadata:
   created: 2025-10-27
@@ -25,8 +40,8 @@ metadata:
   purpose: Demonstrate best practices for docs-cms organization
 
 readability:
-  # Enable readability analysis for documentation quality
-  enabled: true
+  # Enable readability analysis for documentation quality (requires optional textstat)
+  enabled: false
 
   # Flesch Reading Ease: 0-100 scale (higher = easier to read)
   # 90-100: Very Easy (5th grade)
