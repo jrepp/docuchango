@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.20.0 (2026-11-15)
+
+### Chores
+
+- **deps**: Bump pypa/gh-action-pypi-publish
+  ([`ba2741b`](https://github.com/jrepp/docuchango/commit/ba2741b4ce84e992248a1e7746be8204f5599faf))
+
+- **deps**: Bump setuptools
+  ([`9fe52cd`](https://github.com/jrepp/docuchango/commit/9fe52cd01fc99c7c5412229446c4f97f2c6cce43))
+
+
 ## v1.20.0-rc.2 (2026-10-22)
 
 ### Bug Fixes
